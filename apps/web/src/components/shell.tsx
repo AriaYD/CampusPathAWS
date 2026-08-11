@@ -6,7 +6,10 @@ import { useEffect, useState } from "react";
 import { motion, useReducedMotion } from "motion/react";
 import { LOCALES, useI18n, type Locale } from "@/i18n";
 import { useSession } from "@/app/providers";
-import { NAV_GROUPS, NAV_ITEMS, homeFor, itemsFor, visibleItemsFor } from "./nav";
+import {
+  NAV_GROUPS, NAV_ITEMS, homeFor, itemsFor, mobilePrimaryFor, visibleItemsFor,
+} from "./nav";
+import { MoreIcon, NavIcon } from "./nav-icons";
 import { SyntheticBadge } from "./ui";
 
 export function LocaleSwitch() {
@@ -237,7 +240,7 @@ function Sidebar() {
   const items = visibleItemsFor(session);
 
   return (
-    <nav aria-label={t("app.name")} className="flex flex-col gap-6" data-sidebar>
+    <nav aria-label={t("nav.landmark.sidebar")} className="flex flex-col gap-6" data-sidebar>
       {NAV_GROUPS.map((groupKey) => {
         const groupItems = items.filter((i) => i.groupKey === groupKey);
         if (!groupItems.length) return null;
@@ -295,6 +298,163 @@ function Sidebar() {
 }
 
 /**
+ * 手机底部标签栏（<lg）。取代旧的「横向滚动文字药丸带」——那条带子把
+ * 10+ 项全排一行，在 390px 视口里排到 858px，是用户点名的
+ * 「按钮溢出界面外面」。
+ *
+ * 结构上不可能再溢出：**格子数固定**（`MOBILE_PRIMARY_SLOTS` 个主入口 + 「更多」，
+ * 当前 5+1=6 格），每格 `flex-1 min-w-0` 均分视口宽度，标签用短名并 `truncate`。
+ * 视口再窄只会让每格变窄，不会把某一格挤出屏幕——实测 390px 下每格 65px、
+ * 简体与英文标签均不截断、命中区 56×65px。
+ */
+function MobileTabBar({ onMore, moreOpen }: { onMore: () => void; moreOpen: boolean }) {
+  const pathname = usePathname();
+  const { t } = useI18n();
+  const { session } = useSession();
+  if (!session) return null;
+  const primary = mobilePrimaryFor(session);
+  // 当前页不属于任何主入口时，「更多」代为点亮——否则深页里所有格子全灭，
+  // 用户失去「我在哪」的锚点（§9 nav-state-active）
+  const onPrimary = primary.some((i) => pathname === i.href);
+
+  return (
+    <nav
+      aria-label={t("nav.landmark.primary")}
+      data-mobile-tabbar
+      className="material-chrome fixed inset-x-0 bottom-0 z-40 border-t border-line lg:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      <ul className="flex items-stretch">
+        {primary.map((item) => {
+          const active = pathname === item.href;
+          return (
+            <li key={item.href} className="min-w-0 flex-1">
+              <Link
+                href={item.href}
+                data-nav-link={item.href}
+                aria-current={active ? "page" : undefined}
+                className="pressable flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 py-1.5"
+                style={{ color: active ? "var(--accent-deep)" : "var(--fg-muted)" }}
+              >
+                <NavIcon href={item.href} className="h-[22px] w-[22px] shrink-0" />
+                <span
+                  className="w-full truncate text-center"
+                  style={{ fontSize: "0.6875rem", lineHeight: 1.2,
+                           fontWeight: active ? 600 : 500 }}
+                >
+                  {t(item.mobileLabelKey ?? item.labelKey)}
+                </span>
+              </Link>
+            </li>
+          );
+        })}
+        <li className="min-w-0 flex-1">
+          <button
+            type="button"
+            data-mobile-more
+            aria-expanded={moreOpen}
+            onClick={onMore}
+            className="pressable flex min-h-[56px] w-full flex-col items-center justify-center gap-0.5 px-1 py-1.5"
+            style={{ color: !onPrimary || moreOpen ? "var(--accent-deep)" : "var(--fg-muted)" }}
+          >
+            <MoreIcon className="h-[22px] w-[22px] shrink-0" />
+            <span className="w-full truncate text-center"
+                  style={{ fontSize: "0.6875rem", lineHeight: 1.2,
+                           fontWeight: !onPrimary || moreOpen ? 600 : 500 }}>
+              {t("nav.more")}
+            </span>
+          </button>
+        </li>
+      </ul>
+    </nav>
+  );
+}
+
+/**
+ * 「更多」底部面板：该门户的**全部**导航项，按侧栏同一套分组。
+ * 清单仍然只从 `nav.ts` 取——手机端不另维护一份，否则「少做了一页」
+ * 会只在一端被发现。
+ */
+function MoreSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const pathname = usePathname();
+  const { t } = useI18n();
+  const { session } = useSession();
+  const reduce = useReducedMotion();
+
+  // 面板打开时锁背景滚动；Esc 关闭（§9 modal-escape）
+  useEffect(() => {
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open || !session) return null;
+  const items = visibleItemsFor(session);
+
+  return (
+    <div className="fixed inset-0 z-50 flex flex-col justify-end lg:hidden"
+         data-more-sheet role="dialog" aria-modal="true"
+         aria-label={t("nav.more")}>
+      {/* 遮罩要足够暗才能把前景隔离出来（§Light/Dark scrim 40–60%） */}
+      <button type="button" aria-label={t("chrome.close")} onClick={onClose}
+              className="absolute inset-0" style={{ background: "rgb(0 0 0 / 0.45)" }} />
+      <motion.div
+        initial={reduce ? false : { y: 24, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={reduce ? { duration: 0.12 } : { type: "spring", bounce: 0, duration: 0.28 }}
+        className="material-card relative max-h-[72dvh] overflow-y-auto rounded-t-lg bg-card px-4 pt-3"
+        style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
+      >
+        {/* 抓握条：告诉用户这是可以往下推走的面板 */}
+        <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full"
+             style={{ background: "var(--line-strong)" }} />
+        {NAV_GROUPS.map((groupKey) => {
+          const groupItems = items.filter((i) => i.groupKey === groupKey);
+          if (!groupItems.length) return null;
+          return (
+            <div key={groupKey} className="mb-3">
+              <div className="t-micro mb-1.5 text-fg-faint">{t(groupKey)}</div>
+              <ul className="flex flex-col gap-0.5">
+                {groupItems.map((item) => {
+                  const active = pathname === item.href;
+                  return (
+                    <li key={item.href}>
+                      <Link
+                        href={item.href}
+                        data-nav-link={item.href}
+                        data-more-link={item.href}
+                        aria-current={active ? "page" : undefined}
+                        onClick={onClose}
+                        className="pressable flex min-h-[44px] items-center gap-2.5 rounded-md px-2"
+                        style={{
+                          background: active ? "var(--accent-soft)" : "transparent",
+                          color: active ? "var(--accent-deep)" : "var(--fg)",
+                          fontWeight: active ? 600 : 450,
+                          fontSize: "0.9375rem",
+                        }}
+                      >
+                        <NavIcon href={item.href} className="h-[20px] w-[20px] shrink-0 opacity-70" />
+                        <span className="min-w-0 truncate">{t(item.labelKey)}</span>
+                      </Link>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          );
+        })}
+      </motion.div>
+    </div>
+  );
+}
+
+/**
  * 门户守卫。三条规则，全部在跳转层面强制（服务端 RBAC 是第二道，独立成立）：
  *
  * 1. 未登录 → `/login`；
@@ -335,12 +495,12 @@ export function Shell({ children }: { children: React.ReactNode }) {
   const { t } = useI18n();
   const { session } = useSession();
   const phase = usePortalGuard();
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [chromeOpen, setChromeOpen] = useState(false);
 
   // 登录页不带导航壳——门户的导航只属于登录后的那个门户
   if (phase === "login") return <>{children}</>;
   if (phase === "checking") return <div className="min-h-dvh" data-guard-checking />;
-
-  const items = session ? visibleItemsFor(session) : [];
 
   return (
     <div className="min-h-dvh">
@@ -351,11 +511,14 @@ export function Shell({ children }: { children: React.ReactNode }) {
         {t("chrome.skipToContent")}
       </a>
 
-      <header className="material-chrome sticky top-0 z-40 border-b border-line">
-        <div className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-3 px-5 py-3">
+      <header
+        className="material-chrome sticky top-0 z-40 border-b border-line"
+        style={{ paddingTop: "env(safe-area-inset-top)" }}
+      >
+        <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3">
           <Link
             href={session ? homeFor(session) : "/login"}
-            className="flex items-baseline gap-2"
+            className="flex min-w-0 items-baseline gap-2"
           >
             <span
               className="t-title"
@@ -369,7 +532,11 @@ export function Shell({ children }: { children: React.ReactNode }) {
                 : t("app.tagline")}
             </span>
           </Link>
-          <div className="ms-auto flex flex-wrap items-center gap-2">
+
+          {/* 桌面：六个 chrome 控件平铺。
+              窄屏：只留语言切换 + 一个「⋯」——六个控件靠 flex-wrap 硬挤
+              会在手机上折成三四行、吃掉半屏（§9 overflow-menu）。 */}
+          <div className="ms-auto hidden flex-wrap items-center gap-2 lg:flex">
             <SyntheticBadge />
             <InstitutionRoleSwitch />
             <PersonaBadge />
@@ -377,34 +544,58 @@ export function Shell({ children }: { children: React.ReactNode }) {
             <RuntimeToggle />
             <LogoutButton />
           </div>
+          <div className="ms-auto flex items-center gap-1.5 lg:hidden">
+            <LocaleSwitch />
+            <button
+              type="button"
+              data-chrome-menu
+              aria-expanded={chromeOpen}
+              aria-label={t("chrome.more")}
+              onClick={() => setChromeOpen((v) => !v)}
+              className="pressable btn btn-secondary"
+              style={{ minWidth: 44, minHeight: 44, padding: 0 }}
+            >
+              <span aria-hidden style={{ fontSize: "1.05rem", lineHeight: 1 }}>⋯</span>
+            </button>
+          </div>
         </div>
+
+        {/* 窄屏的 chrome 抽屉：徽章与登出收在这里，默认不占首屏 */}
+        {chromeOpen && (
+          <div
+            data-chrome-panel
+            className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2.5 lg:hidden"
+          >
+            <SyntheticBadge />
+            <InstitutionRoleSwitch />
+            <PersonaBadge />
+            <RuntimeToggle />
+            <LogoutButton />
+          </div>
+        )}
       </header>
 
-      <div className="mx-auto flex max-w-[1240px] gap-8 px-5 py-8">
+      <div className="mx-auto flex max-w-[1240px] gap-8 px-4 py-6 sm:px-5 sm:py-8">
         <aside className="sticky top-[74px] hidden h-fit w-[210px] shrink-0 lg:block">
           <Sidebar />
         </aside>
-        <main id="main" className="min-w-0 flex-1">
+        {/* 底部标签栏是 fixed 的，主内容必须自己留出等高的下边距，
+            否则最后一屏内容会被压在栏下面（§5 fixed-element-offset）。
+            桌面无此栏，`lg:pb-0` 收回，跨页对齐门禁的基线因此不受影响。 */}
+        <main
+          id="main"
+          className="min-w-0 flex-1 pb-[calc(56px+env(safe-area-inset-bottom)+0.5rem)] lg:pb-0"
+        >
           {children}
         </main>
       </div>
 
       {session?.portal === "student" && <WellbeingNudge />}
 
-      {/* 窄屏：导航折到底部，仍然是同一份门户过滤后的 items */}
-      <div className="material-chrome sticky bottom-0 z-40 border-t border-line px-4 py-3 lg:hidden">
-        <div className="flex gap-2 overflow-x-auto">
-          {items.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="t-meta whitespace-nowrap rounded-sm border border-line px-2.5 py-1 text-fg-muted"
-            >
-              {t(item.labelKey)}
-            </Link>
-          ))}
-        </div>
-      </div>
+      {/* 窄屏主导航：固定 5 格的底部标签栏 + 「更多」面板。
+          清单仍然只从 nav.ts 取，手机端不另维护一份。 */}
+      <MobileTabBar moreOpen={moreOpen} onMore={() => setMoreOpen((v) => !v)} />
+      <MoreSheet open={moreOpen} onClose={() => setMoreOpen(false)} />
     </div>
   );
 }

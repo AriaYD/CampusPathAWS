@@ -44,6 +44,7 @@ venv/
 .DS_Store
 .idea/
 .vscode/
+.obsidian/
 tmp/
 scratch/
 

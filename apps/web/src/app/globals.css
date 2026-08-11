@@ -348,3 +348,89 @@ label.btn:focus-within {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+
+/* ---------------------------------------------------------------
+   触摸设备的命中区（2026-08-10 移动端地基）
+
+   全站控件此前是按鼠标密度调的：`.btn` ≈33px、语言切换 ≈27px、
+   侧栏链接 ≈34px、开关 26px——都低于 iOS HIG 的 44pt / Material 的 48dp。
+
+   为什么用 `pointer: coarse` 而不是 `max-width`：
+   ① 该放大的是**手指**能不能点准，与屏幕宽窄无关（触屏笔记本同样受益）；
+   ② clay 令牌的紧凑密度是用户裁定过的，桌面端一个像素都不该动——
+      而跨页对齐门禁正是在 1280 桌面档逐像素比对的，用 max-width
+      会让门禁基线随之漂移。
+
+   命中区放大用 `min-height` 而不是加 padding：padding 会把视觉块撑胖，
+   破坏 clay 的比例；min-height + flex 居中让**视觉不变、命中区变大**。
+   --------------------------------------------------------------- */
+@media (pointer: coarse) {
+  .btn {
+    min-height: 44px;
+    padding-inline: 1rem;
+  }
+  .field,
+  input[type="text"], input[type="search"], input[type="number"],
+  input[type="date"], input[type="time"], input[type="email"], select {
+    min-height: 44px;
+    /* iOS 对 <16px 的输入框会自动放大整页——那一下缩放会把布局顶歪 */
+    font-size: max(1rem, 0.9375rem);
+  }
+  /* 语言切换、日历翻页箭头这类小药丸：命中区补到 44，视觉尺寸不动 */
+  .pressable {
+    touch-action: manipulation;
+  }
+  /* 侧栏与「更多」面板里的导航链接本就是 flex，补 min-height 即可。
+     **必须逐处点名，不能写成裸的 `a[data-nav-link]`**：那个选择器的特异性
+     （0,1,1）高于 Tailwind 工具类（0,1,0），会把底部标签栏的
+     `min-h-[56px]` 压成 44px——实测量到过 49px（内容自然高）与「更多」格
+     的 56px 并排，一眼看得出高低不齐。同族的坑还有 display：
+     一写 inline-flex 就会把标签栏的纵向布局整个掀翻。 */
+  [data-sidebar] a[data-nav-link],
+  [data-more-sheet] a[data-nav-link] { min-height: 44px; }
+  button[data-locale-option] {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* ---------------------------------------------------------------
+   安全区域：刘海、灵动岛与底部 Home 指示条
+   （生效前提是 layout.tsx 的 viewportFit: "cover"）
+   --------------------------------------------------------------- */
+@supports (padding: env(safe-area-inset-left)) {
+  body {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+}
+
+/* ---------------------------------------------------------------
+   窄屏字阶：标题两级改流体，正文不动
+   （`.t-display` 本就是 clamp；其余六级原本全是定值）
+   --------------------------------------------------------------- */
+@media (max-width: 640px) {
+  .t-title   { font-size: clamp(1.125rem, 4.4vw, 1.3125rem); }
+  .t-section { font-size: clamp(0.9375rem, 3.6vw, 1rem); }
+}
+
+/* ---------------------------------------------------------------
+   窄屏断词：**一个词就能把整页拽横**
+
+   实测出来的：/planner 的先修表达式落在一个 `.t-micro` 段落里，
+   `scrollWidth 406` vs `clientWidth 316`——它不换行，于是撑破 390px 视口，
+   连带把底部标签栏（`inset-x-0`）一起拉宽（Chrome 手机模拟会把布局视口
+   撑到内容宽度，fixed 元素跟着变宽）。**标签栏是受害者不是元凶**，
+   这个因果一开始被诊断反了。
+
+   本站有大量天然不可断的串：课程码 `COMP 2011`、先修表达式原文、
+   validation_id、机会 id、官方 URL。用 `anywhere` 而不是 `break-word`：
+   只有前者会同时影响 min-content 尺寸，flex/grid 子项才真的肯收缩。
+   桌面不适用（`≥lg` 有的是横向空间，断词只会让排版变丑）。
+   --------------------------------------------------------------- */
+@media (max-width: 1023px) {
+  body { overflow-wrap: anywhere; }
+  /* 表格类数字与等宽串保持整体可读，只在真的放不下时才断 */
+  .t-mono, .tabular-nums { overflow-wrap: break-word; }
+}

@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
    */
   allowedDevOrigins: ["127.0.0.1", "localhost"],
 
+  /**
+   * dev 指示器在手机宽度下**四个角都会压到东西**，实测挑代价最小的一个：
+   * bottom-left 压底部标签栏第一格（档案）、bottom-right 压「更多」格、
+   * top-right 压顶栏的「⋯」菜单——这三个都是**唯一入口**，被盖住就点不到。
+   * top-left 只压到 Logo 的左边缘，而 Logo 是回首页的**冗余**入口
+   * （标签栏本就有档案页），代价最小。
+   * 不设 `false`——它还负责显示编译/运行时错误，关掉等于把报错一起关了。
+   * 仅影响 dev；线上是生产构建，本就没有这颗指示器。
+   */
+  devIndicators: { position: "top-left" },
+
   async rewrites() {
     return [{ source: "/api/:path*", destination: `${API_ORIGIN}/:path*` }];
   },

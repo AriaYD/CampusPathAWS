@@ -69,3 +69,22 @@ export const GLOBAL_MUST = [
   "[data-sidebar]",
   "nav [data-nav-link]",
 ];
+
+/**
+ * 手机档专属不变量（390×844）。
+ *
+ * 底部标签栏是手机上**唯一**的主导航，它不在就等于导航没了。
+ */
+export const MOBILE_MUST = [
+  "[data-mobile-tabbar]",
+  "[data-mobile-tabbar] [data-nav-link]",
+];
+
+/**
+ * 手机档**不许可见**的选择器。
+ *
+ * 注意这是「可见性」而不是「存在性」：侧栏在窄屏是 `display:none` 却
+ * **仍在 DOM 里**，所以 `GLOBAL_MUST` 里的 `[data-sidebar]` 拿
+ * `querySelector` 判会假绿。手机档把它从 MUST 里摘掉，改到这里判可见。
+ */
+export const MOBILE_MUST_HIDDEN = ["[data-sidebar]"];

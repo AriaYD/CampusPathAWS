@@ -7,7 +7,7 @@ HKUST Google 黑客松参赛项目（命题：Gemini Enterprise for Higher Educa
 - MVP Study Case：Undergraduate → Direct Employment
 - 架构：6 语义 Agent（A0–A5）/ 9 个确定性服务，双平面 + 契约先行（详见 [ARCHITECTURE.md](ARCHITECTURE.md)）
 - 功能基线：F01–F27（零删减）
-- 交付形态：Web App（学生 / 校方双门户，简/繁/英三语）
+- 交付形态：Web App（学生 / 校方双门户，简/繁/英三语；桌面 + 移动端，PWA 建设中）
 
 ## 文档
 
@@ -68,8 +68,9 @@ HKUST_CampusPath/
 │
 ├── apps/web/                     # Next.js 16 前端（bun），学生/校方双门户
 │   ├── src/app/                  #   login + 学生 14 页 + 校方 6 页（publisher/console/review/plaza-admin/advisor-desk/wellbeing-desk）
-│   ├── src/components/           #   shell / nav（门户过滤+守卫）/ ui / primitives / add-to-plan / review-queue
+│   ├── src/components/           #   shell（含手机底部标签栏 + 「更多」面板）/ nav（门户过滤+守卫+标签栏槽位）/ nav-icons / ui / add-to-plan / review-queue
 │   ├── scripts/                  #   三道 UI 门禁：check-contrast / check-alignment / run-pages-must（各带 H5 自检）
+│   ├── scripts/lib/browser.mjs   #   门禁共用的 puppeteer 样板 + 视口两档（desktop 1280×900 / mobile 390×844）+ 无横向溢出断言
 │   ├── src/i18n/                 #   en.ts（类型源）+ zh-Hans + zh-Hant（生成物），三语切换持久化
 │   ├── src/lib/api.ts            #   契约类型化 API 客户端
 │   ├── src/lib/gate.ts           #   口令门 HMAC（middleware 与校验路由共用）

@@ -10,11 +10,9 @@
  * 前置：Chrome --remote-debugging-port=9222 + dev server :3100。
  * 用法：node scripts/check-alignment.mjs [--base http://127.0.0.1:3100]
  */
-import puppeteer from "puppeteer-core";
+import { openPage, baseFromArgv } from "./lib/browser.mjs";
 
-const base = process.argv.includes("--base")
-  ? process.argv[process.argv.indexOf("--base") + 1]
-  : "http://127.0.0.1:3100";
+const base = baseFromArgv();
 
 const STUDENT_PAGES = [
   "/profile", "/goals", "/gaps", "/for-you", "/square", "/timeline",
@@ -22,11 +20,10 @@ const STUDENT_PAGES = [
   "/memory", "/settings", "/onboarding",
 ];
 
-const browser = await puppeteer.connect({
-  browserURL: "http://127.0.0.1:9222",
-  defaultViewport: { width: 1280, height: 900 },
-});
-const page = await browser.newPage();
+// 逐像素比对**只在桌面档成立**：手机档没有侧栏、主内容宽度随视口变，
+// 拿同一套基线去比会得到一堆无意义的红。移动端的对应保证是
+// run-pages-must --viewport=mobile 的「无横向溢出」断言。
+const { browser, page } = await openPage("desktop");
 let failures = 0;
 
 try {

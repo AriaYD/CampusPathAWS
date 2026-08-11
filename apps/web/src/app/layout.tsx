@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Nunito } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
@@ -18,6 +18,27 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "CampusPath",
   description: "Growth pathways, with receipts — synthetic demo build",
+};
+
+/**
+ * 视口（Next 16 的 `viewport` 导出，与 metadata 分开——见
+ * `node_modules/next/dist/docs/…/generate-viewport.md`）。
+ *
+ * `viewportFit: "cover"` 是刘海屏 `env(safe-area-inset-*)` 生效的**前提**：
+ * 不写它，安全区域变量恒为 0，底部标签栏会压在 Home 指示条上。
+ *
+ * **刻意不设 `maximumScale` / `userScalable: false`**：禁缩放是无障碍反模式
+ * （ui-ux-pro-max §5 viewport-meta「never disable zoom」），
+ * 且评委在手机上很可能要放大看细节。
+ *
+ * `themeColor` 取奶油底 `--bg`，让 iOS/Android 的状态栏与页面同色，
+ * standalone 启动时不会露出一条突兀的白边。
+ */
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#faf9f5",
 };
 
 /**

@@ -59,6 +59,16 @@ export const zhHans: Record<keyof Dict, string> = {
   "chrome.languageShort": "中",
   "chrome.persona": "演示角色",
   "chrome.skipToContent": "跳到主要内容",
+  "chrome.more": "更多选项",
+  "chrome.close": "关闭",
+  "nav.more": "更多",
+  "nav.landmark.primary": "主导航",
+  "nav.landmark.sidebar": "分区导航",
+  "nav.tab.profile": "档案",
+  "nav.tab.goals": "目标",
+  "nav.tab.forYou": "推荐",
+  "nav.tab.actions": "规划",
+  "nav.tab.calendar": "日历",
 
   // —— 导航分组 ——
   "nav.group.start": "开始",

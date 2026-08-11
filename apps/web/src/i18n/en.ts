@@ -61,6 +61,19 @@ export const en = {
   "chrome.languageShort": "EN",
   "chrome.persona": "Demo persona",
   "chrome.skipToContent": "Skip to content",
+  // 窄屏顶栏的溢出菜单与底部标签栏第 5 格
+  "chrome.more": "More options",
+  "chrome.close": "Close",
+  "nav.more": "More",
+  // 两个 <nav> 地标必须各有其名，否则屏幕阅读器的地标列表里是两个同名项
+  "nav.landmark.primary": "Primary navigation",
+  "nav.landmark.sidebar": "Section navigation",
+  // 标签栏短名：一格约 78px，必须能整词放下
+  "nav.tab.profile": "Profile",
+  "nav.tab.goals": "Goals",
+  "nav.tab.forYou": "For You",
+  "nav.tab.actions": "Plan",
+  "nav.tab.calendar": "Calendar",
 
   // —— 导航分组 ——
   "nav.group.start": "Start",
