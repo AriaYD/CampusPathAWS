@@ -3561,11 +3561,14 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 cohort_dimensions=(cohort,),
                 covered_categories=covered, computed_at=now,
             )
-        counts = _opportunity_exposure_counts()
+        # 2026-08-11 用户裁定：曝光断层榜从界面撤下，这里也**不再填充**。
+        # 留着一个"算了但没人看"的字段，就是我刚在这批里修掉的那种假数
+        # （`build_exposure_gap_ranking` 此前从未被调用过）。
+        # 逐机会计数的能力仍在 `_opportunity_exposure_counts`，重议时接回来即可。
         return [
             aggregate_resource_coverage(
                 rows, period=p, scope="institution",
-                covered_categories=covered, exposure_counts=counts,
+                covered_categories=covered,
                 computed_at=now, aggregate_id=f"AGG-{p}",
             )
             for p in ([period] if period else periods)

@@ -79,8 +79,8 @@ export const PAGES = [
     // 让评委看到 `Insufficient evidence` 真的会出现，而不是一片漂亮数字。
     must: [
       "[data-view='utilisation']",
-      "[data-view='exposure-gap']",
       "[data-view='unmet']",
+      "[data-unmet-by-school]",
       "[data-view='cohort']",
       "[data-view='conversion']",
       "[data-provenance-note]",

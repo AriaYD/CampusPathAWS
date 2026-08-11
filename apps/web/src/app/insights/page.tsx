@@ -71,14 +71,14 @@ function ProvenanceNote({ rows }: { rows: { derived_cell_n: number; synthetic_ce
 export default function InsightsPage() {
   const { t } = useI18n();
   const [cohort, setCohort] = useState<Cohort>("school");
-  const [derivedOnly, setDerivedOnly] = useState(false);
 
-  const trend = useResource(
-    () => institution.resourceCoverage({ includeSynthetic: !derivedOnly }),
-    [derivedOnly]);
+  const trend = useResource(() => institution.resourceCoverage(), []);
   const cells = useResource(
-    () => institution.resourceCoverage({ cohort, includeSynthetic: !derivedOnly }),
-    [cohort, derivedOnly]);
+    () => institution.resourceCoverage({ cohort }), [cohort]);
+  // 供给缺口按学院拆：与分组对比用的是同一条聚合路径，但它自己固定按学院，
+  // 不跟着上面那个分组选择器走——「哪个学院缺什么」是一个独立的问题。
+  const bySchool = useResource(
+    () => institution.resourceCoverage({ cohort: "school" }), []);
   const conversion = useResource(() => institution.plazaConversion(), []);
 
   const latest: ResourceCoverageAggregate | null =
@@ -88,22 +88,12 @@ export default function InsightsPage() {
     <>
       <PageHeader titleKey="insights.title" leadKey="insights.lead" />
 
-      {/* 纯派生视图开关：冷启动下它会如实全格抑制——那是正确答案，不是坏了 */}
-      <div className="mb-5 flex flex-wrap items-center gap-3">
-        <Segmented
-          ariaLabel={t("insights.source")}
-          value={derivedOnly ? "derived" : "all"}
-          onChange={(v) => setDerivedOnly(v === "derived")}
-          options={[
-            { value: "all", label: t("insights.source.all") },
-            { value: "derived", label: t("insights.source.derived") },
-          ]}
-        />
-        <p className="t-micro max-w-[52ch] text-fg-faint">
-          {t("insights.source.note")}
-        </p>
-      </div>
-
+      {/* 2026-08-11 用户裁定：撤掉「仅真实推导」分段控件。
+          接入真实数据后所有来源本来就都是真实的，这个开关届时是死 UI；
+          而在演示环境里按下它会整页显示「样本不足」，评委只会读成"坏了"。
+          **诚实性不靠这个控件保证**——每个分区下方的 provenance 注脚照旧
+          写明「N 条真实推导 / M 条合成演示」，服务端的 `include_synthetic`
+          参数也保留（它是这条诚实性可被测试断言的地方）。 */}
       {/* ── 视图 1：全局利用率 + 趋势 ── */}
       <Card className="mb-5" data-view="utilisation">
         <SectionTitle>{t("insights.utilisation")}</SectionTitle>
@@ -117,6 +107,9 @@ export default function InsightsPage() {
               <Rate label={t("insights.gapCoverage")} value={latest.gap_coverage_rate} n={latest.cell_n} />
               <Metric label={t("insights.cellN")} value={latest.cell_n} />
             </Grid>
+            <p className="t-micro mt-3 max-w-[74ch] text-fg-faint" data-reach-note>
+              {t("insights.discovery.note")}
+            </p>
             {trend.data && trend.data.length > 1 && (
               <div className="mt-4" data-trend>
                 <p className="t-micro mb-1.5 text-fg-faint">{t("insights.trend")}</p>
@@ -134,32 +127,10 @@ export default function InsightsPage() {
         )}
       </Card>
 
-      {/* ── 视图 2：曝光断层榜 ── */}
-      <Card className="mb-5" data-view="exposure-gap">
-        <SectionTitle>{t("insights.exposureGap")}</SectionTitle>
-        <p className="t-meta mb-3 max-w-[70ch] text-fg-muted">
-          {t("insights.exposureGap.lead")}
-        </p>
-        {latest && latest.exposure_gap_ranking.length === 0 && (
-          <Empty messageKey="insights.exposureGap.empty" />
-        )}
-        <ul className="flex flex-col gap-2">
-          {(latest?.exposure_gap_ranking ?? []).slice(0, 20).map((row) => (
-            <li key={row.opportunity_id} data-exposure-gap={row.opportunity_id}
-                className="rounded-md border border-line bg-bg-sunk p-3">
-              <div className="flex flex-wrap items-baseline justify-between gap-2">
-                <span className="t-meta text-fg">{row.opportunity_id}</span>
-                <span className="t-micro tabular-nums text-fg-muted">
-                  {t("insights.eligibleN")} {row.eligible_n} ·{" "}
-                  {t("insights.seenN")} {row.seen_n} · {pct(row.exposure_rate)}
-                </span>
-              </div>
-            </li>
-          ))}
-        </ul>
-      </Card>
-
-      {/* ── 视图 3：供给缺口榜 ── */}
+      {/* ── 视图 2：供给缺口榜（全校 + 按学院拆）──
+          2026-08-11 用户裁定：只按能力类别分不够，要能看出**哪个学院**的
+          资源有缺口——「全校缺 network」和「工院缺 network 而商院不缺」
+          是两种完全不同的处置。逐学院的抑制沿用同一条 MIN_CELL_N 规则。 */}
       <Card className="mb-5" data-view="unmet">
         <SectionTitle>{t("insights.unmet")}</SectionTitle>
         <p className="t-meta mb-3 max-w-[70ch] text-fg-muted">{t("insights.unmet.lead")}</p>
@@ -180,6 +151,44 @@ export default function InsightsPage() {
             </li>
           ))}
         </ul>
+
+        {/* 逐学院：同一份缺口按学院拆开，每格自带自己的样本量与抑制。
+            全校层面看不出的偏科，在这一层才现形。 */}
+        <div className="mt-5" data-unmet-by-school>
+          <p className="t-micro mb-2 text-fg-faint">{t("insights.unmet.bySchool")}</p>
+          {bySchool.loading && <Loading />}
+          {bySchool.error && <Failure error={bySchool.error} />}
+          <Grid min={240}>
+            {(bySchool.data ?? []).map((cell) => {
+              const school = cell.aggregate_id.replace(/^AGG-/, "");
+              const rows = cell.unmet_requirement_ranking;
+              return (
+                <div key={cell.aggregate_id} data-unmet-school={school}
+                     className="rounded-md border border-line bg-bg-sunk p-3">
+                  <div className="t-meta mb-2 font-medium text-fg">{school}</div>
+                  {cell.cell_n < 5 ? (
+                    <InsufficientEvidence n={cell.cell_n} />
+                  ) : rows.length === 0 ? (
+                    <p className="t-micro text-fg-faint">{t("insights.unmet.none")}</p>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5">
+                      {rows.slice(0, 6).map((row) => (
+                        <li key={row.category} data-unmet-row={`${school}:${row.category}`}
+                            className="t-micro flex items-baseline justify-between gap-2 text-fg-muted">
+                          <span>{row.category}</span>
+                          <span className="tabular-nums">{row.occurrences}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="t-micro mt-2 text-fg-faint">
+                    {t("insights.cellN")} {cell.cell_n}
+                  </p>
+                </div>
+              );
+            })}
+          </Grid>
+        </div>
       </Card>
 
       {/* ── 视图 4：分组对比（抑制格必须看得见）── */}
