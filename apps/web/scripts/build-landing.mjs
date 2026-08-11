@@ -43,6 +43,18 @@ const esc = (s) =>
   String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;")
     .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
+/**
+ * 正文用的转义 + **行内加粗**。
+ *
+ * 产品介绍文档里那些 `**…**` 是作者标出来的重点，压平成普通文字就把
+ * "哪一句是要点"这件事丢了。**顺序不能反**：先转义再认 `**`——
+ * 反过来的话正文里的 `<` 会先被当成标签。
+ *
+ * 这也是 §10.2 那条 i18n 坑的正解：值里写了 `**粗体**` 却没人解析，
+ * 界面上就会原样出现两个星号。要么解析它，要么别写它。
+ */
+const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+
 /* ------------------------------------------------------------------ */
 /* 片段渲染                                                            */
 /* ------------------------------------------------------------------ */
@@ -53,7 +65,7 @@ const table = (t) => !t ? "" : `
             <thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
             <tbody>${t.rows.map((r) =>
               `<tr>${r.map((c, i) =>
-                `<td${i === 0 ? ' class="first"' : ""}>${esc(c)}</td>`).join("")}</tr>`
+                `<td${i === 0 ? ' class="first"' : ""}>${rich(c)}</td>`).join("")}</tr>`
             ).join("")}</tbody>
           </table>
         </div>`;
@@ -62,30 +74,39 @@ const cards = (list) => !list ? "" : `
         <div class="cards">${list.map((c) => `
           <article class="card">
             <h3>${esc(c.title)}</h3>
-            <p>${esc(c.body)}</p>
+            <p>${rich(c.body)}</p>
           </article>`).join("")}
         </div>`;
 
+/**
+ * 流程步骤。除 `body` 外还认 `bullets`（分列小点）与 `tail`（小点之后的收束句）——
+ * 加这两个是因为产品介绍文档里这一节本来就是**分点写的**，把它压成一段话
+ * 会让「拆解分三层」「学校拿到哪几组数据」这类**逐条的事实**读起来像一句概括。
+ */
 const steps = (list) => !list ? "" : `
         <ol class="steps">${list.map((s, i) => `
           <li>
             <span class="step-n" aria-hidden="true">${String(i + 1).padStart(2, "0")}</span>
             <div>
-              <h3>${esc(s.title)}</h3>
-              <p>${esc(s.body)}</p>
+              <h3>${esc(s.title)}</h3>${s.body ? `
+              <p>${rich(s.body)}</p>` : ""}${!s.bullets ? "" : `
+              <ul class="step-points">${s.bullets.map((b) =>
+                `\n                <li>${rich(b)}</li>`).join("")}
+              </ul>`}${s.tail ? `
+              <p>${rich(s.tail)}</p>` : ""}
             </div>
           </li>`).join("")}
         </ol>`;
 
 const paras = (list) => !list ? "" :
-  list.map((p) => `        <p class="lead">${esc(p)}</p>`).join("\n");
+  list.map((p) => `        <p class="lead">${rich(p)}</p>`).join("\n");
 
 /** 前置条件块。比 `note` 重一档：它不是补充说明，是**读者会追问的那件事**
  *  （"这套东西要接进学校的什么系统才成立"），所以给它边框与标题，别混进脚注。 */
 const callout = (c) => !c ? "" : `
         <aside class="callout">
           <p class="callout-title"><span aria-hidden="true">▲</span> ${esc(c.title)}</p>
-          <p>${esc(c.body)}</p>
+          <p>${rich(c.body)}</p>
         </aside>`;
 
 const section = (code) => (s) => `
@@ -94,7 +115,7 @@ const section = (code) => (s) => `
           <p class="kicker">${esc(s.kicker)}</p>
           <h2>${esc(s.title)}</h2>
 ${paras(s.body)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${callout(s.callout)}${
-  s.note ? `\n        <p class="note">${esc(s.note)}</p>` : ""}
+  s.note ? `\n        <p class="note">${rich(s.note)}</p>` : ""}
         </div>
       </section>`;
 
@@ -155,7 +176,7 @@ const pane = (code, d, mode) => {
           <div class="wrap">
             <p class="kicker">${esc(d.hero.kicker)}</p>
             <h1>${esc(d.hero.title)}</h1>
-            <p class="hero-lead">${esc(d.hero.lead)}</p>
+            <p class="hero-lead">${rich(d.hero.lead)}</p>
             <div class="hero-actions">
               <a class="btn btn-primary" ${ctaLink(mode)}
                  data-cta="hero">${esc(d.cta)} <span aria-hidden="true">→</span></a>
@@ -189,7 +210,7 @@ ${views}
             <div class="cta-mark" aria-hidden="true">◱</div>
             <div class="cta-text">
               <h2>${esc(d.ctaBand.title)}</h2>
-              <p>${esc(d.ctaBand.body)}</p>
+              <p>${rich(d.ctaBand.body)}</p>
               <p class="cta-note">${esc(d.ctaBand.note)}</p>
             </div>
             <div class="cta-act">
@@ -318,10 +339,26 @@ a{color:var(--accent-deep)}
 }
 
 /* ── Hero ── */
+/* 章节小标（kicker）。它对应产品介绍文档里的 ## 一级章节名，不是装饰性
+   的眉批——所以用强调色 + 浅底药丸把"这是一章的名字"标出来，
+   而不是继续用灰色小字（用户 2026-08-11 指出：灰得读不出它是标题）。 */
 .kicker{
-  font-size:12px; letter-spacing:.09em; text-transform:uppercase;
-  color:var(--fg-muted); font-weight:600; margin:0 0 10px;
+  display:inline-block;
+  font-size:12px; letter-spacing:.06em; font-weight:680; margin:0 0 12px;
+  color:var(--accent-deep); background:var(--accent-soft);
+  border-radius:999px; padding:3px 11px;
 }
+/* hero 的 kicker 是受众说明（"面向在校本科生 · 由大学部署"），不是章节名，
+   保持素净——同一个类两种角色时，把差异写清楚比再造一个类省事。 */
+.hero .kicker{
+  background:none; color:var(--fg-muted); font-weight:600; padding:0;
+  letter-spacing:.09em; text-transform:uppercase;
+}
+
+/* 行内加粗：只加重量、不换颜色。正文里已经有强调色在用（链接、kicker），
+   再给 strong 上色会让一段话出现三种"重要"。 */
+strong{font-weight:680; color:var(--fg)}
+.note strong,.step-points strong,.card strong,.callout strong{color:var(--fg)}
 .hero{padding:76px 0 56px; border-bottom:1px solid var(--line)}
 .hero h1{
   font-size:clamp(30px,5.4vw,52px); line-height:1.18; letter-spacing:-.02em;
@@ -407,6 +444,22 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 }
 .steps h3{font-size:16px; font-weight:640; margin:0 0 6px}
 .steps p{margin:0; color:var(--fg-muted); font-size:14.5px; max-width:76ch}
+.steps p + p{margin-top:8px}
+/* 步骤里的分列小点：跟正文同色同字号，只靠一个小方块把"这是逐条的事实"
+   与"这是一段说明"分开——加大字重或换色会把它抬到和步骤标题打架。 */
+.step-points{
+  margin:8px 0 0; padding:0; list-style:none; max-width:76ch;
+  display:grid; gap:5px;
+}
+.step-points li{
+  display:block; padding:0 0 0 15px; border:0; position:relative;
+  color:var(--fg-muted); font-size:14.5px;
+}
+.step-points li::before{
+  content:""; position:absolute; left:2px; top:.72em;
+  width:5px; height:5px; border-radius:1px; background:var(--accent);
+}
+.step-points + p{margin-top:10px}
 
 /* ── 页尾 CTA band：Consilium 的收口形状 ── */
 .cta-band{padding:56px 0; background:var(--bg)}

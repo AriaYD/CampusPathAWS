@@ -58,7 +58,7 @@ export const zhHans = {
       body: [
         "你设一个主目标和一个候选目标，系统从最新的几十份真实岗位数据里拆解出要什么能力，" +
           "再从全校海量资源里挑出补得上缺口的活动、课程和机会，排进你真实有空的时段。",
-        "产出的是一条带版本、带依据、随变化滚动更新的路径，不是一份聊完就关掉的建议清单。",
+        "产出的是**一条带版本、带依据、随变化滚动更新的路径**，不是一份聊完就关掉的建议清单。",
         "CampusPath 不替代导师、Career Center、学院顾问或 LMS——它是学校资源、外部机会" +
           "与学生个人发展之间的发现、匹配与编排层。",
       ],
@@ -72,14 +72,14 @@ export const zhHans = {
         {
           title: "对学校",
           body:
-            "把已经投入巨大成本、触达效率却很低的资源，变成可测量、可改进、可归因的成长资产；" +
+            "把已经投入巨大成本、触达效率却很低的资源，变成**可测量、可改进、可归因**的成长资产；" +
             "并第一次看到「资源池覆盖不了学生的哪些真实需求」。",
         },
         {
           title: "「学校资源」的口径",
           body:
-            "凡是因为学生的在校身份而能拿到的机会，都算学校资源——校友内推、企业来校招聘、" +
-            "合作方名额、跨校联盟活动。所以我们不分校内校外，只分：是否发现、是否够格、是否用上。",
+            "**凡是因为学生的在校身份而能拿到的机会，都算学校资源**——校友内推、企业来校招聘、" +
+            "合作方名额、跨校联盟活动。所以我们不分校内校外，只分：**是否发现、是否够格、是否用上**。",
         },
       ],
     },
@@ -89,7 +89,7 @@ export const zhHans = {
       title: "学生不是缺资源，而是难以把海量资源转化成自己的成长路径",
       body: [
         "一所大学里，每个学院有自己的活动，几百个社团各办各的，还有协会、实验室、研究中心、校企合作。" +
-          "这些机会散落在不同部门的官网上——每个官网的架构还都不一样。你得先找到真正的活动页，" +
+          "这些机会散落在不同部门的官网上——**每个官网的架构还都不一样**。你得先找到真正的活动页，" +
           "然后经常回去看，才不会错过。",
         "对一个课业本来就很重的学生来说，这基本做不到，除非你自己搭一套全量采集系统。" +
           "而且即使看到了，也常常撞上自己的时间，或者报完才发现根本不是自己想要的。",
@@ -114,7 +114,7 @@ export const zhHans = {
       kicker: "给谁用",
       title: "主界面给学生，另一半给学校",
       body: [
-        "五类目标导向人群——按「想走向哪里」划分，不是给学生永久贴标签。" +
+        "**五类目标导向人群**——按「想走向哪里」划分，不是给学生永久贴标签。" +
           "一个学生可以同时持有两个候选方向，并随实践改变权重。",
       ],
       table: {
@@ -138,7 +138,7 @@ export const zhHans = {
           "（咨询预约与紧急联系），以及其他校内系统。",
       },
       note:
-        "国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是「第六类人」，" +
+        "国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是**「第六类人」**，" +
         "而是每一种发展模式都必须尊重的个人约束——通过可插拔的 Context Pack 注入已有流程，" +
         "不复制一套新 Agent。",
       cards: [
@@ -156,7 +156,7 @@ export const zhHans = {
         },
         {
           title: "职业发展咨询顾问",
-          body: "只看学生主动预约的会面与想聊的主题，会后最多发 5 条关键建议。学生的反思原文、成绩、日历一律 403。",
+          body: "只看学生**主动预约**的会面与想聊的主题，会后最多发 5 条关键建议。学生的反思原文、成绩、日历一律 403。",
         },
         {
           title: "心理咨询室协调员",
@@ -182,7 +182,7 @@ export const zhHans = {
         {
           title: "个性化之外仍可自主发现",
           body:
-            "资讯广场展示校方全部审核通过的资源，可见性不由 AI 排序决定。" +
+            "资讯广场展示校方**全部审核通过的资源**，可见性不由 AI 排序决定。" +
             "任一条目都能点「为什么没推荐我」，给出规则引擎签发的凭据式解释。",
         },
         {
@@ -193,13 +193,13 @@ export const zhHans = {
         },
         {
           title: "从推荐走到行动的闭环",
-          body: "材料、日历、提醒、状态和替代方案连成一条；活动做完写反思，自动沉淀为成长证据。",
+          body: "材料、日历、提醒、状态和替代方案连成一条；活动做完写反思，自动沉淀为**成长证据**。",
         },
         {
           title: "不会一味 push 你",
           body:
             "睡眠被挤压且负荷持续偏高时，系统会预警而不是继续往日历里塞东西。" +
-            "这条安全护栏链路零大模型——判定归阈值，文案归固定模板。",
+            "这条安全护栏链路**零大模型**——判定归阈值，文案归固定模板。",
         },
       ],
     },
@@ -209,24 +209,24 @@ export const zhHans = {
       title: "它记住的不是你点了什么，是你为什么改主意",
       body: [
         "学生从入学到毕业会连续用四年甚至更久。系统必须记住：已修课程与项目、" +
-          "你明确拒绝过的方向和原因、哪些活动对你高价值哪些低价值、你做过的目标变更和取舍、" +
+          "**你明确拒绝过的方向和原因**、哪些活动对你高价值哪些低价值、你做过的目标变更和取舍、" +
           "你的节奏与精力偏好，以及哪些技能你已经拿到了、不该再重复安排。",
       ],
       table: {
         head: ["层", "存什么", "更新规则"],
         rows: [
-          ["L0 当前档案", "学业、经历、成果、技能、目标、偏好、容量与约束的当前有效状态", "只由权威来源或学生确认更新，每次变更留档案变更事件"],
-          ["L1 事件时间线", "参加、申请、完成、放弃、反馈、计划版本等事件", "只追加；错了用更正事件处理，不改历史"],
+          ["L0 当前档案", "学业、经历、成果、技能、目标、偏好、容量与约束的**当前有效状态**", "只由权威来源或学生确认更新，每次变更留档案变更事件"],
+          ["L1 事件时间线", "参加、申请、完成、放弃、反馈、计划版本等事件", "**只追加**；错了用更正事件处理，不改历史"],
           ["L2 语义记忆", "从经历里提炼的兴趣、模式与上下文", "带来源、时间、置信度与过期策略"],
-          ["L3 证据与笔记", "你的原始笔记、作品、证书、反思原文与附件", "你拥有；默认不向校方共享"],
+          ["L3 证据与笔记", "你的原始笔记、作品、证书、反思原文与附件", "**你拥有**；默认不向校方共享"],
         ],
       },
       cards: [
         {
           title: "记忆的安全规矩",
           body:
-            "区分「学生原话」「系统推断」「外部事实」，不把推断伪装成事实；新旧冲突时保留时间线、" +
-            "用 supersedes 表示更新，不静默覆盖；不把短期情绪写成永久性格标签。",
+            "区分「学生原话」「系统推断」「外部事实」，不把推断伪装成事实；新旧冲突时**保留时间线**、" +
+            "用 supersedes 表示更新，**不静默覆盖**；不把短期情绪写成永久性格标签。",
         },
         {
           title: "你随时可以反悔",
@@ -246,8 +246,8 @@ export const zhHans = {
         },
       ],
       note:
-        "关键设计：个人不适配与全局低质是分开的。「太基础」「太难」走个人契合标签，" +
-        "只调整你自己的推荐难度，不惩罚这个活动；「宣传夸大、内容空泛」达到样本阈值后" +
+        "**关键设计：个人不适配与全局低质是分开的。**「太基础」「太难」走个人契合标签，" +
+        "只调整你自己的推荐难度，**不惩罚这个活动**；「宣传夸大、内容空泛」达到样本阈值后" +
         "才降低该届次的置信度并进入复核。",
     },
     {
@@ -275,76 +275,120 @@ export const zhHans = {
       steps: [
         {
           title: "开通与授权",
-          body: "接入学校教务系统；授权个人日历（默认只读忙闲，不读事件正文）。系统这才知道你的课业状态与真实可支配时间。",
+          body:
+            "接入学校教务系统；授权个人日历（**默认只读忙闲，不读事件正文**）。" +
+            "系统这才知道你的在校学业课程状态、真实有多少时间。",
         },
         {
           title: "建立成长档案",
           body:
-            "上传简历，确定性解析后直接整理进「我的成长档案」总览，并弹窗逐条列出新增内容供你自行核对，" +
-            "任何一条都能当场撤销。国际生可在这里勾选身份，一个版本化的 Context Pack 会注入后续所有环节。",
+            "上传简历，系统确定性解析后直接整理进「我的成长档案」总览，并弹窗逐条列出新增内容" +
+            "供你自行核对，任何一条都能当场撤销。国际生可在这里勾选「我是国际生」，" +
+            "一个版本化的 Context Pack 会注入后续所有环节。",
         },
         {
           title: "目标工作室",
           body:
-            "设一个主目标 + 一个候选目标与推进配比，点「开始规划」。后台三段式：采集真实岗位数据 → 分析比对 → 目标拆解。" +
-            "拆解分三层：软实力、硬实力（绩点与核心课）、个人真实硬件实力（比赛、项目论文、实习、证书）。" +
-            "系统同时给出两个目标的共享缺口与分叉点——共享的先做，两条路都不亏。",
+            "设一个主目标 + 一个候选目标，设定两者的推进配比，点「开始规划」。后台三段式跑：" +
+            "**采集真实岗位数据 → 分析比对 → 目标拆解**。拆解结果分三层：",
+          bullets: [
+            "**软实力——**口才、领导力、影响力、团队协作；",
+            "**硬实力——**绩点与核心课绩点要求；",
+            "**个人真实硬件实力——**比赛与奖项、项目与论文、实习经历、证书与软件。",
+          ],
+          tail:
+            "每一条都能点开看它来自哪份岗位描述。系统同时给出两个目标的**共享缺口**与**分叉点**" +
+            "——共享的先做，两条路都不亏。",
         },
         {
           title: "发现",
-          body:
-            "资讯广场按主办方类别、主题、年级、资格、线上线下、截止时间筛选；已过期的归入独立分组并明确标注，" +
-            "不会混在「现在可以报名」里，也不会被推荐给你。「为你推荐」的每张卡都写明为什么推荐你，四态资格直接可见。",
+          bullets: [
+            "**资讯广场：**全校、各学院、社团、协会、实验室、教授、校企的机会都在这里，" +
+              "按十大主办方类别与主题、年级、资格、线上线下、截止时间等标签筛。" +
+              "已过期的归入独立分组并明确标注，不会混在「现在可以报名」里，也不会被推荐给你。",
+            "**为你推荐：**基于你的档案 + 目标拆解 + 记忆里的偏好挑出来的，每张卡写明**为什么推荐你**。" +
+              "四态资格在卡片上直接可见。",
+          ],
         },
         {
           title: "规划与批准",
           body:
-            "按未来两周 / 一个月 / 一学期 / 一学年四档铺开，并自动倒排提前量——大型比赛提前一两周到一个月、" +
-            "等级证书提前一两个月、语言类考试提前一年。规划完先弹窗给你审批，说明依据（你的目标、你的档案、" +
-            "记忆里的偏好），你批准了才写进日历。日历本身就是编辑器；改完是否重排，也问你。",
+            "报名的活动进入行动中心。系统按**未来两周 / 一个月 / 一学期 / 一学年**四档跨度铺开，" +
+            "并自动倒排提前量——大型比赛提前一两周到一个月准备、等级证书提前一两个月、" +
+            "语言类考试提前一年，就出现在对应跨度的日程里。" +
+            "**规划完先弹窗给你审批**，说明依据（你的目标、你的档案、记忆里的偏好），" +
+            "你批准了才写进日历。日历是周/月网格且**本身就是编辑器**：随时改时间、" +
+            "加睡眠与三餐保护块、加缓冲。改完是否重排，也问你。",
+          bullets: [
+            "你还可以按照个人的精力水平和时间空闲程度，自行设置规划安排的三档不同强度：" +
+              "轻负荷、均衡、进取。",
+            "行动中心里还有**选修课推荐**：必修按培养方案载入不做推荐，选修按你的档案、" +
+              "目标与所需技能推荐，附课程全名、简介、先修原文与教务系统跳转链接。",
+          ],
         },
         {
-          title: "护栏（零大模型）",
+          title: "护栏（安全护栏零大模型）",
           body:
-            "睡眠只看你自己声明的睡眠窗口和日历里占用它的安排——没声明就不推断，绝不从「日历上有空档」" +
-            "反推你在睡觉。过劳日 = 睡眠不足 7 小时且当天学习工作超过 11 小时；14 天内 ≥ 10 天预警，" +
-            "28 天内 ≥ 20 天要求填 ISI 与 PSS-10 两份量表。提醒最多两次，只对学生可见。",
+            "睡眠**只看你自己声明的睡眠窗口**和日历里占用它的安排——没声明就不推断，" +
+            "如实显示「数据覆盖 0 天」。**绝不从「日历上有空档」反推你在睡觉或在运动。**" +
+            "判定是一个纯计数模型（下列为实现中的实测阈值）：**过劳日** = 有效睡眠不足 7 小时" +
+            "且当天学习工作超过 11 小时；滚动 14 天内合格日 ≥ 10 天 → **第一层预警**；" +
+            "滚动 28 天内合格日 ≥ 20 天 → **第二层要求填两份量表**。",
+          bullets: [
+            "两份量表是 ISI（失眠严重程度）与 PSS-10（压力自评），用来区分「熬夜是个人习惯」" +
+              "还是「学业压力造成的」——这个区分很重要，两者该给的支持完全不同。",
+            "轻度 → 提示可联系你自己填写的辅导员；中度失眠或压力值偏高 → 引导预约心理咨询室时段。",
+            "最上面还有第三层：**紧急求助**按钮，跳过全部排队直连学校心理咨询专员" +
+              "（如有无端恶意占用，每学期 2 次，第 3 次停用一学期——但停用的响应里仍然附上热线）。",
+          ],
+          tail:
+            "提醒**最多两次**，只对学生可见，默认不进任何校方后台；" +
+            "非紧急的校方触达必须有你预先同意或当次主动请求。",
         },
         {
           title: "反思与沉淀",
           body:
-            "活动结束后写反思与四维评分，活动自动归档为成长证据。这一步同时产生北极星指标 VGA" +
-            "（Verified Growth Actions）——它不奖励点击、收藏、报名或忙碌本身，只数真正做成并留下证据的行动。",
+            "活动结束后写反思与四维评分。写完，活动自动归档为**成长证据**进入「成长动态跟踪」，" +
+            "挂在对应的能力细则下。这一步同时产生北极星指标 VGA（Verified Growth Actions）" +
+            "——**它不奖励点击、收藏、报名或忙碌本身**，只数真正做成并留下证据的行动。",
         },
         {
           title: "回到学校（闭环的另一半）",
-          body:
-            "管理端统一注册并监控所有信息源；社团、实验室、教授通过投稿台提交活动，审核通过才进广场；" +
-            "批准的活动自带二维码，到场扫码签到。于是学校拿到两组真实数据：谁真的来了、他们怎么评价。" +
-            "由此看清哪类活动更受欢迎、哪些领域有缺口、哪些专业资源不够。报告按周 / 月 / 学期 / 学年自动生成。",
+          bullets: [
+            "Career Center 管理端统一注册并监控所有信息源，看得到每个源的健康度，" +
+              "每天定时抓一次，也可以一键实时抓；",
+            "社团负责人、实验室、教授通过投稿台提交活动 → 进入审核队列 → 批准后才进资讯广场；",
+            "批准的活动**自带二维码**下发给主办方，活动开始时激活，到场的人扫码签到；",
+            "于是学校拿到几组真实数据：**谁真的来了**（签到）和**他们怎么评价**（匿名四维评分）等等；",
+            "由此看清：哪类活动更受欢迎、哪些活动质量高、真实好评率多少、" +
+              "**哪些领域有缺口、哪些专业的资源不够**；",
+            "报告按周 / 月 / 学期 / 学年自动生成，也可以随时手动生成一份；",
+            "活动结束两个月统计冻结、自动下架并归档。",
+          ],
         },
       ],
       note:
-        "闭环合上了：学生精准找到匹配目标的活动 → 参加 → 写反思 → 沉淀成证据推动下一轮规划；" +
-        "而这些反馈同时回到学校，让学校看到真实需求与趋势变化，据此补缺口、给高质量活动倾斜资源。",
+        "**闭环合上了**：学生从海量资源里精准找到匹配自己目标的活动 → 参加 → 写反思 → " +
+        "沉淀成证据推动下一轮规划；而这些反馈同时回到学校，让学校及时看到学生的真实需求与" +
+        "趋势变化，据此补缺口、给高质量活动倾斜资源。**互利，双向推动。**",
     },
     {
       id: "tech",
       kicker: "技术架构",
       title: "双平面 + 契约先行：类型不允许的数据，物理上流不过去",
       body: [
-        "语义平面：6 个语义 Agent（编排 / 学生上下文 / 学业 / 目标缺口 / 机会抽取 / 路径规划）" +
-          "——唯一允许调模型的那一层。",
-        "确定性平面：9 个零大模型的服务（规则与约束、容量与日历、Wellbeing 文案生成、状态与记忆、" +
+        "**语义平面：**6 个语义 Agent（编排 / 学生上下文 / 学业 / 目标缺口 / 机会抽取 / 路径规划）" +
+          "——**唯一允许调模型的那一层**。",
+        "**确定性平面：**9 个**零大模型**的服务（规则与约束、容量与日历、Wellbeing 文案生成、状态与记忆、" +
           "行动与同意、匿名聚合、事件监控与重规划、发布审核审计、连接器与目录）。判定、阈值、资格、" +
           "容量全在这一侧，可复现、可审计。",
-        "两个平面之间的每一次数据交换都由数据契约类型定形。",
+        "两个平面之间的每一次数据交换都由**数据契约类型**定形。",
       ],
       table: {
         head: ["#", "六条架构红线：每条都有对应的自动化测试，测试不过构建就失败"],
         rows: [
           ["1", "路径规划 Agent 是唯一做取舍的 Agent；其余只出事实与候选，输出类型里根本没有排序字段"],
-          ["2", "Wellbeing 安全护栏判断零大模型——判定归阈值，文案归固定模板；构建期禁止 import 模型 SDK"],
+          ["2", "Wellbeing 安全护栏判断**零大模型**——判定归阈值，文案归固定模板；构建期禁止 import 模型 SDK"],
           ["3", "日历凭据不进任何模型上下文——止步于容量服务，由类型层强制"],
           ["4", "机会抽取 Agent 的工具白名单只有两个；外部内容作为数据块传入，永不拼进 system prompt"],
           ["5", "每个计划条目必带规则引擎签发的校验凭据，缺失即被 API 拒绝"],
@@ -356,20 +400,20 @@ export const zhHans = {
           title: "Google 生态里的位置",
           body:
             "ADK 负责 Agent、工具、顺序/并行工作流与记忆；两个运行时部署在 Vertex AI Agent Engine；" +
-            "Cloud Run 跑学生 App API、适配器与定时任务；Moodle 沙箱通过自研只读 MCP 接入；" +
+            "Cloud Run 跑学生 App API、适配器与定时任务；Moodle 沙箱通过自研**只读 MCP** 接入；" +
             "日历走 Workspace API 的分项授权。",
         },
         {
           title: "模型可以换（架构承诺）",
           body:
-            "全系统的模型出口收敛在一个适配点上，Agent 层依赖的是一个只有单个方法的抽象接口。" +
+            "全系统的模型出口收敛在**一个适配点**上，Agent 层依赖的是一个只有单个方法的抽象接口。" +
             "换型号是部署配置，不改一行代码；换供应商（校方自有模型、其他云厂商、本地私有部署）" +
-            "只需为这个接口提供一个实现——6 个 Agent、9 个确定性服务、全部数据契约类型与红线测试零改动。",
+            "只需为这个接口提供一个实现——6 个 Agent、9 个确定性服务、全部**数据契约类型**与红线测试**零改动**。",
         },
         {
           title: "确定性平面不受影响",
           body:
-            "资格判定、容量计算、健康阈值、隐私抑制这些最需要稳定与可审计的部分本来就不调模型，" +
+            "资格判定、容量计算、健康阈值、隐私抑制这些最需要稳定与可审计的部分**本来就不调模型**，" +
             "不受任何模型更换影响。产品价值不依赖某一个特定模型——学校要用什么模型，是学校的决定。",
         },
       ],
@@ -398,7 +442,7 @@ export const zhHans = {
         {
           title: "校方只看聚合，不能下钻到人",
           body:
-            "任何视图的样本量低于阈值一律显示 Insufficient evidence 并抑制该格，不显示看似精确的数字；" +
+            "任何视图的样本量低于阈值一律显示 Insufficient evidence 并抑制该格，**不显示看似精确的数字**；" +
             "界面上没有「查看构成这个数字的学生」的入口，后端也不提供这种查询。",
         },
       ],
@@ -416,14 +460,14 @@ export const zhHans = {
         rows: [
           ["真实抓取的课程目录", "58 个学科 1,534 门课，先修表达式保留来源原文"],
           ["信息源注册表", "93 个源，其中 85 个是真实抓取，8 个为演示用合成源——两者在界面上一眼可分"],
-          ["数据契约类型", "177 个（92 条路径 / 111 个操作），前后端与 Agent 全部从同一份契约生成类型"],
+          ["**数据契约类型**", "177 个（92 条路径 / 111 个操作），前后端与 Agent 全部从同一份契约生成类型"],
           ["评测红线", "13 条 BLOCKER 全部通过（违反即失败）"],
           ["量化目标", "12 项中 11 项达标——未达标的那一项在报告里如实标红，不藏"],
           ["对照基线", "5 项，全确定性可复现"],
         ],
       },
       note:
-        "判定类指标要求双跑逐字节一致，且 Gold Label 与引擎故意分开实现——用同一份代码生成标签" +
+        "判定类指标要求双跑逐字节一致，且 Gold Label 与引擎**故意分开实现**——用同一份代码生成标签" +
         "又用它评测，等于自己给自己打分。学生、成绩、日历、机会与投稿数据一律为合成数据，" +
         "页面全站标注 Synthetic / Demo Data；已核实为真实公开来源的条目另有「官方」标记，两者不混。",
       cards: [
@@ -431,7 +475,7 @@ export const zhHans = {
           title: "现在还没做的，也写在这里",
           body:
             "当前以「本科生毕业后进入求职」这条线为主；第二个 Career Path Pack（博士毕业进产业）" +
-            "只预留了接口，未交付，前端不显示、不宣称；国际学生 Context Pack 已安装但状态是" +
+            "只预留了接口，**未交付**，前端不显示、不宣称；国际学生 Context Pack 已安装但状态是" +
             "「待政策复核」，复核通过前求值结果一律为「需要确认」；真实日历 OAuth 在演示中使用夹具数据。",
         },
         {
@@ -493,7 +537,7 @@ export const en = {
         "You set one primary goal and one candidate goal. The system reads dozens of live job postings, " +
           "works backwards to the capabilities they demand, then picks the activities, courses and " +
           "opportunities across campus that close those gaps — and schedules them into hours you actually have.",
-        "What comes out is a versioned, sourced path that keeps updating as you change. Not a list of " +
+        "What comes out is **a versioned, sourced path that keeps updating as you change**. Not a list of " +
           "suggestions you close and forget.",
         "CampusPath does not replace mentors, the Career Center, faculty advisors or the LMS. It is the " +
           "discovery, matching and orchestration layer between campus resources, outside opportunities " +
@@ -509,14 +553,14 @@ export const en = {
         {
           title: "For the university",
           body:
-            "Resources that cost a great deal and reach very few become measurable, improvable and " +
-            "attributable growth assets — and, for the first time, you can see which real student needs " +
+            "Resources that cost a great deal and reach very few become **measurable, improvable and " +
+            "attributable** growth assets — and, for the first time, you can see which real student needs " +
             "your resource pool does not cover.",
         },
         {
           title: "What counts as a campus resource",
           body:
-            "Anything a student can reach because of their enrolment: alumni referrals, employers " +
+            "**Anything a student can reach because of their enrolment**: alumni referrals, employers " +
             "recruiting on campus, partner quotas, inter-university events. So we don't split " +
             "on-campus from off-campus — only on discovered, eligible, and used.",
         },
@@ -529,7 +573,7 @@ export const en = {
       body: [
         "Every school runs its own events. Hundreds of societies run theirs. So do associations, labs, " +
           "research centres and corporate partners. All of it sits on different departmental websites, " +
-          "each with its own structure. You have to find the real listing page, then keep going back so you don't miss anything.",
+          "each with its own **structure**. You have to find the real listing page, then keep going back so you don't miss anything.",
         "For a student already carrying a full course load, that is not realistic — not unless you build " +
           "yourself a scraper. And even when you do see something, it often collides with your schedule, " +
           "or turns out to be the wrong thing only after you've signed up.",
@@ -555,7 +599,7 @@ export const en = {
       kicker: "Who it's for",
       title: "The main interface is for students; the other half is for the school",
       body: [
-        "Five goal-oriented modes — grouped by where someone wants to go, not permanent labels. " +
+        "**Five goal-oriented modes** — grouped by where someone wants to go, not permanent labels. " +
           "A student can hold two candidate directions at once and shift the weighting as they act.",
       ],
       table: {
@@ -579,7 +623,7 @@ export const en = {
       },
       note:
         "International status, finances, caregiving duties, health and energy, commuting, language and " +
-        "accessibility needs are not a sixth category of person. They are personal constraints every mode " +
+        "accessibility needs are not **a sixth category of person**. They are personal constraints every mode " +
         "must respect — injected into existing flows through pluggable Context Packs, not by cloning a new agent.",
       cards: [
         {
@@ -594,7 +638,7 @@ export const en = {
         },
         {
           title: "Career advisor",
-          body: "Sees only the meetings a student booked and what they want to discuss, then sends up to five key recommendations. Reflections, grades and calendars return 403.",
+          body: "Sees **only the meetings a student booked** and what they want to discuss, then sends up to five key recommendations. Reflections, grades and calendars return 403.",
         },
         {
           title: "Wellbeing coordinator",
@@ -621,25 +665,25 @@ export const en = {
         {
           title: "Browsing survives personalisation",
           body:
-            "The plaza shows every approved resource; visibility is not decided by AI ranking. Any listing " +
+            "The plaza shows **every approved resource**; visibility is not decided by AI ranking. Any listing " +
             "can be asked \"why wasn't this recommended to me\", and the answer is a credential issued by the rules engine.",
         },
         {
           title: "Real capacity first, tasks second",
           body:
-            "The calendar reads busy/free by default, not event titles. Before planning, the system counts " +
+            "The calendar reads **busy/free by default, not event titles**. Before planning, the system counts " +
             "classes, existing commitments, sleep and meal protection blocks, discretionary time and buffer — " +
             "and only schedules into hours you genuinely have.",
         },
         {
           title: "A loop from recommendation to action",
-          body: "Materials, calendar, reminders, status and fallbacks all connect; write a reflection afterwards and it settles into growth evidence.",
+          body: "Materials, calendar, reminders, status and fallbacks all connect; write a reflection afterwards and it settles into **growth evidence**.",
         },
         {
           title: "It won't just push you",
           body:
             "When sleep is being squeezed and load stays high, the system warns instead of adding more. " +
-            "That guardrail chain uses no language model at all — thresholds decide, fixed templates speak.",
+            "That guardrail chain uses **no language model at all** — thresholds decide, fixed templates speak.",
         },
       ],
     },
@@ -657,7 +701,7 @@ export const en = {
         head: ["Layer", "What it holds", "Update rule"],
         rows: [
           ["L0 Canonical profile", "The current valid state of studies, experience, outcomes, skills, goals, preferences, capacity and constraints", "Updated only by authoritative sources or your confirmation; every change leaves a change event"],
-          ["L1 Episodic timeline", "Attended, applied, completed, dropped, feedback, plan versions", "Append-only; mistakes are handled with correction events, never by editing history"],
+          ["L1 Episodic timeline", "Attended, applied, completed, dropped, feedback, plan versions", "**Append-only**; mistakes are handled with correction events, never by editing history"],
           ["L2 Semantic memory", "Interests, patterns and context distilled from experience", "Carries source, time, confidence and an expiry policy"],
           ["L3 Evidence & notes", "Your raw notes, work, certificates, reflection text and attachments", "Yours; not shared with the school by default"],
         ],
@@ -667,8 +711,8 @@ export const en = {
           title: "The rules memory follows",
           body:
             "Student's own words, system inference and external fact stay distinguishable — inference is " +
-            "never dressed up as fact. When old and new conflict, the timeline is preserved and the update " +
-            "supersedes rather than silently overwrites. A passing mood never becomes a permanent trait.",
+            "never dressed up as fact. When old and new conflict, the **timeline is preserved** and the update " +
+            "**supersedes rather than silently overwrites**. A passing mood never becomes a permanent trait.",
         },
         {
           title: "You can always take it back",
@@ -690,8 +734,8 @@ export const en = {
       ],
       note:
         "A deliberate split: personal mismatch and genuine low quality are separate. \"Too basic\" and " +
-        "\"too hard\" become a personal fit tag that adjusts your own difficulty and does not penalise the " +
-        "event. \"Overstated, thin content\" only lowers that occurrence's confidence once it clears a sample threshold, and then it goes to review.",
+        "\"too hard\" become a personal fit tag that adjusts your own difficulty and does not **penalise the " +
+        "event**. \"Overstated, thin content\" only lowers that occurrence's confidence once it clears a sample threshold, and then it goes to review.",
     },
     {
       id: "compare",
@@ -718,83 +762,132 @@ export const en = {
       steps: [
         {
           title: "Connect and consent",
-          body: "Link the student information system; authorise your calendar (busy/free only by default, never event bodies). Only then does the system know your academic state and the time you really have.",
+          body:
+            "Link the student information system; authorise your calendar (busy/free only by default, " +
+            "never event bodies). Only then does the system know what you are enrolled in and how much " +
+            "time you actually have.",
         },
         {
           title: "Build your profile",
           body:
             "Upload a résumé; deterministic parsing files it straight into your profile overview, then a " +
             "drawer lists every added line so you can check it — and undo any of them on the spot. " +
-            "International students can declare status here, and a versioned Context Pack flows into everything downstream.",
+            "International students can tick that status here, and a versioned Context Pack flows into " +
+            "everything downstream.",
         },
         {
           title: "Goal studio",
           body:
             "Set a primary goal, a candidate goal and the split between them, then press Start planning. " +
-            "Three stages run: gather live job postings → compare → decompose. The breakdown has three tiers: " +
-            "soft skills; hard academics (GPA and core courses); and demonstrable assets (competitions, projects " +
-            "and papers, internships, certificates). You also get the shared gaps and the fork points between " +
-            "your two goals — do the shared work first, and neither path loses.",
+            "Three stages run in the background: **gather live job postings → compare → decompose**. " +
+            "The breakdown has three tiers:",
+          bullets: [
+            "**Soft skills —** communication, leadership, influence, teamwork;",
+            "**Hard academics —** GPA and the GPA required in core courses;",
+            "**Demonstrable assets —** competitions and awards, projects and papers, internships, " +
+              "certificates and tooling.",
+          ],
+          tail:
+            "Every line opens to the job posting it came from. You also get the **shared gaps** and the **fork " +
+            "points** between your two goals — do the shared work first, and neither path loses.",
         },
         {
           title: "Discover",
-          body:
-            "The plaza filters by organiser category, theme, year, eligibility, format and deadline. Expired " +
-            "listings move into their own group, clearly marked — they never sit among things you can still " +
-            "sign up for, and they are never recommended. Every For You card states why it was recommended to you, with eligibility state visible.",
+          bullets: [
+            "**Information plaza:** everything from the university, its schools, societies, associations, labs, " +
+              "professors and corporate partners sits here, filtered by ten organiser categories plus theme, " +
+              "year, eligibility, format and deadline. Expired listings move into their own group, clearly " +
+              "marked — they never sit among things you can still sign up for, and they are never recommended.",
+            "**For You:** drawn from your profile + goal breakdown + the preferences in your memory, and every " +
+              "card states **why it was recommended to you**. The four eligibility states are visible on the card.",
+          ],
         },
         {
           title: "Plan, then approve",
           body:
-            "Four ranges — next two weeks, a month, a term, a year — with lead times worked backwards " +
-            "automatically: a week to a month for major competitions, one to two months for certifications, " +
-            "a year for language exams. The draft comes to you in a dialog first, stating what it was built on " +
-            "(your goals, your profile, the preferences in your memory), and only lands on your calendar once " +
-            "you approve. The calendar itself is the editor; whether an edit triggers a re-plan is also your call.",
+            "Anything you sign up for lands in the action centre. Four ranges — **next two weeks, a month, " +
+            "a term, a year** — with lead times worked backwards automatically: a week to a month for major " +
+            "competitions, one to two months for certifications, a year for language exams, each appearing " +
+            "in the range it belongs to. **The draft comes to you in a dialog first**, stating what it was built " +
+            "on (your goals, your profile, the preferences in your memory), and only lands on your calendar " +
+            "once you approve. The calendar is a week/month grid and **is itself the editor**: move things, add " +
+            "sleep and meal protection blocks, add buffers. Whether an edit triggers a re-plan is also your call.",
+          bullets: [
+            "You can also set the planning intensity yourself — light, balanced or ambitious — according to " +
+              "your energy and how much free time you have.",
+            "The action centre also **recommends electives**: required courses are loaded from the programme " +
+              "plan and never recommended, while electives are matched to your profile, goals and the skills " +
+              "you need — with the full course title, description, the original prerequisite text and a link " +
+              "into the registry.",
+          ],
         },
         {
           title: "Guardrails, with no language model",
           body:
-            "Sleep is read only from the window you declared and whatever occupies it — nothing is inferred " +
-            "when you haven't declared, and an empty calendar slot is never taken as evidence that you slept. " +
-            "An overloaded day means under 7 hours of sleep and over 11 hours of study or work; 10 such days " +
-            "in a rolling 14 raise a warning, 20 in 28 ask you to complete the ISI and PSS-10 scales. " +
-            "At most two reminders, visible only to the student.",
+            "Sleep is read **only from the window you declared** and whatever occupies it — nothing is inferred " +
+            "when you haven't declared, and it says \"0 days covered\" rather than guessing. An empty **calendar " +
+            "slot is never taken as evidence that you slept or exercised.** The judgement is pure counting " +
+            "(these are the thresholds in the build): **an overloaded day** means under 7 hours of effective " +
+            "sleep and over 11 hours of study or work; 10 such days in a rolling 14 raise the **first-tier " +
+            "warning**, 20 in a rolling 28 **ask you to complete two scales**.",
+          bullets: [
+            "The two scales are the ISI (insomnia severity) and PSS-10 (perceived stress), which separate " +
+              "\"late nights are a habit\" from \"this is academic pressure\" — the distinction matters, " +
+              "because the support each needs is completely different.",
+            "Mild → you are pointed at the counsellor you named yourself; moderate insomnia or high stress " +
+              "→ you are guided to book a counselling slot.",
+            "Above all of that sits a third tier: **an emergency button** that skips every queue and reaches " +
+              "the counselling service directly (against groundless misuse: twice a term, and a third use " +
+              "suspends it for a term — though the suspension notice still carries the hotline).",
+          ],
+          tail:
+            "**At most two reminders**, visible only to the student, and by default they reach no institutional " +
+            "console; any non-urgent outreach from the university needs your prior consent or your own request.",
         },
         {
           title: "Reflect and accumulate",
           body:
-            "Write a reflection and rate four dimensions; the activity files itself as growth evidence. " +
-            "This is also where the north-star metric comes from — Verified Growth Actions counts only actions " +
-            "genuinely completed with evidence behind them, never clicks, saves, sign-ups or busyness.",
+            "Write a reflection and rate four dimensions. Once written, the activity files itself as growth " +
+            "evidence into your growth tracker, attached to the specific capability it evidences. " +
+            "This is also where the north-star metric VGA (Verified Growth Actions) comes from — **it rewards " +
+            "neither clicks nor saves nor sign-ups nor busyness**, only things actually completed with evidence left behind.",
         },
         {
-          title: "Back to the school",
-          body:
-            "The admin console registers and monitors every information source. Societies, labs and faculty " +
-            "submit listings that reach the plaza only after review. Approved events carry a QR code, and " +
-            "attendance is scanned at the door. The school ends up with two real datasets: who actually came, " +
-            "and what they thought. From there: which formats draw people, where the gaps are, which programmes " +
-            "are under-resourced. Reports generate weekly, monthly, per term and per year.",
+          title: "Back to the university (the other half of the loop)",
+          bullets: [
+            "The Career Center console registers and monitors every source, with health per source, " +
+              "a scheduled daily crawl and a one-click live refresh;",
+            "Society leads, labs and professors submit through the publisher desk → the review queue → " +
+              "and only then does it reach the plaza;",
+            "An approved listing **carries its own QR code**, handed to the organiser and activated when the " +
+              "event starts; attendees scan to check in;",
+            "So the university gets real data: **who actually turned up** (check-in) and **how they rated it** " +
+              "(anonymous four-dimension scores), among others;",
+            "From which: which kinds of activity draw people, which are high quality, the real favourable " +
+              "rate, **where the gaps are and which programmes are under-resourced**;",
+            "Reports generate weekly / monthly / per term / per year, and can be generated on demand;",
+            "Two months after an event its statistics freeze, and it is delisted and archived.",
+          ],
         },
       ],
       note:
-        "The loop closes: a student finds work that matches their goal, does it, reflects, and that evidence " +
-        "drives the next round of planning — while the same feedback reaches the school, showing real demand " +
-        "and shifting trends so it can fill gaps and back what works.",
+        "**The loop closes**: a student finds, among thousands of listings, the ones that match their goal → " +
+        "takes part → reflects → and that becomes evidence driving the next round of planning; the same " +
+        "feedback returns to the university, showing real demand and how it is shifting, so gaps get filled " +
+        "and good activities get more resource. **Both sides gain, and each pushes the other.**",
     },
     {
       id: "tech",
       kicker: "Under the hood",
       title: "Two planes, contracts first: data the types forbid physically cannot flow",
       body: [
-        "The semantic plane: six agents (orchestration, student context, academics, goal gaps, opportunity " +
-          "extraction, path planning) — the only layer permitted to call a model.",
-        "The deterministic plane: nine services with no language model anywhere (rules and constraints, " +
+        "**The semantic plane:** six agents (orchestration, student context, academics, goal gaps, opportunity " +
+          "extraction, path planning) — **the only layer permitted to call a model**.",
+        "**The deterministic plane:** nine services with no language model anywhere (rules and constraints, " +
           "capacity and calendar, wellbeing copy, state and memory, actions and consent, anonymous aggregation, " +
           "monitoring and re-planning, publishing review and audit, connectors and catalog). Every judgement, " +
           "threshold, eligibility decision and capacity calculation lives here — reproducible and auditable.",
-        "Every exchange between the two planes is shaped by a data contract type.",
+        "Every exchange between the two planes is shaped by a **data contract type**.",
       ],
       table: {
         head: ["#", "Six architectural red lines — each has a test, and a failing test fails the build"],
@@ -813,12 +906,12 @@ export const en = {
           body:
             "ADK handles agents, tools, sequential and parallel workflows, and memory; two runtimes deploy to " +
             "Vertex AI Agent Engine; Cloud Run runs the student app API, adapters and scheduled jobs; the Moodle " +
-            "sandbox connects through a read-only MCP we built; the calendar uses per-scope Workspace API grants.",
+            "sandbox connects through a **read-only MCP** we built; the calendar uses per-scope Workspace API grants.",
         },
         {
           title: "The model is replaceable (an architectural commitment)",
           body:
-            "Every model call in the system converges on a single adapter, and the agent layer depends on an " +
+            "Every model call in the system converges on a **single adapter**, and the agent layer depends on an " +
             "abstract interface with one method. Changing model version is deployment config, not code. Changing " +
             "vendor — the university's own model, another cloud, an on-premise deployment — means writing one " +
             "implementation of that interface, with zero changes to the six agents, the nine deterministic " +
@@ -828,7 +921,7 @@ export const en = {
           title: "The deterministic plane doesn't move",
           body:
             "Eligibility, capacity, health thresholds and privacy suppression — the parts that most need to be " +
-            "stable and auditable — never call a model in the first place, so no model change touches them. " +
+            "stable and auditable — **never call a model** in the first place, so no model change touches them. " +
             "The product's value doesn't rest on any one model. Which model to run is the university's decision.",
         },
       ],
