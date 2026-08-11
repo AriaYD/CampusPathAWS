@@ -181,8 +181,12 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 .section:nth-of-type(even) th{background:var(--bg-sunk)}
 
 .steps{list-style:none; counter-reset:none; margin:28px 0 0; padding:0; display:grid; gap:2px}
-.steps li{display:flex; gap:18px; padding:18px 0; border-top:1px solid var(--line)}
-.steps li:last-child{border-bottom:1px solid var(--line)}
+/* 直接子级选择器是**必须的**：.steps li 会连步骤里的分列小点一起选中，
+   而 .steps li:last-child（0,2,1）比 .step-points li（0,1,1）特异性更高，
+   于是每组小点的最后一条会自己长出一条分割线——步骤之间该有的线，
+   跑到步骤**内部**去了（用户 2026-08-11 截图指出）。 */
+.steps > li{display:flex; gap:18px; padding:18px 0; border-top:1px solid var(--line)}
+.steps > li:last-child{border-bottom:1px solid var(--line)}
 .step-n{
   flex:0 0 auto; width:38px; font-variant-numeric:tabular-nums;
   font-size:13px; font-weight:700; color:var(--accent-deep); padding-top:2px;
