@@ -80,12 +80,20 @@ const steps = (list) => !list ? "" : `
 const paras = (list) => !list ? "" :
   list.map((p) => `        <p class="lead">${esc(p)}</p>`).join("\n");
 
+/** 前置条件块。比 `note` 重一档：它不是补充说明，是**读者会追问的那件事**
+ *  （"这套东西要接进学校的什么系统才成立"），所以给它边框与标题，别混进脚注。 */
+const callout = (c) => !c ? "" : `
+        <aside class="callout">
+          <p class="callout-title"><span aria-hidden="true">▲</span> ${esc(c.title)}</p>
+          <p>${esc(c.body)}</p>
+        </aside>`;
+
 const section = (code) => (s) => `
       <section id="${code}-${s.id}" class="section">
         <div class="wrap">
           <p class="kicker">${esc(s.kicker)}</p>
           <h2>${esc(s.title)}</h2>
-${paras(s.body)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${
+${paras(s.body)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${callout(s.callout)}${
   s.note ? `\n        <p class="note">${esc(s.note)}</p>` : ""}
         </div>
       </section>`;
@@ -288,6 +296,19 @@ a{color:var(--accent-deep)}
 .note{
   color:var(--fg-faint); max-width:76ch; font-size:14px; margin:22px 0 0;
   padding-left:14px; border-left:3px solid var(--accent-soft);
+}
+
+/* 前置条件块：比 .note 重一档但不抢章节标题的位置——陶土浅底 + 左侧实线，
+   与产品里的 .ai-note 同一语汇（"这句是系统在说明前提"）。 */
+.callout{
+  margin:26px 0 0; max-width:76ch; padding:14px 16px;
+  background:var(--accent-soft); border-left:3px solid var(--accent-deep);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+}
+.callout p{margin:0; color:var(--fg-muted); font-size:14.5px; line-height:1.62}
+.callout-title{
+  font-weight:680; color:var(--accent-deep) !important; font-size:13px !important;
+  letter-spacing:.02em; margin:0 0 6px !important;
 }
 
 .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:14px; margin-top:26px}

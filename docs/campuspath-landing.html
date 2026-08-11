@@ -131,6 +131,19 @@ a{color:var(--accent-deep)}
   padding-left:14px; border-left:3px solid var(--accent-soft);
 }
 
+/* 前置条件块：比 .note 重一档但不抢章节标题的位置——陶土浅底 + 左侧实线，
+   与产品里的 .ai-note 同一语汇（"这句是系统在说明前提"）。 */
+.callout{
+  margin:26px 0 0; max-width:76ch; padding:14px 16px;
+  background:var(--accent-soft); border-left:3px solid var(--accent-deep);
+  border-radius:0 var(--radius-sm) var(--radius-sm) 0;
+}
+.callout p{margin:0; color:var(--fg-muted); font-size:14.5px; line-height:1.62}
+.callout-title{
+  font-weight:680; color:var(--accent-deep) !important; font-size:13px !important;
+  letter-spacing:.02em; margin:0 0 6px !important;
+}
+
 .cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:14px; margin-top:26px}
 .card{
   background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius);
@@ -325,7 +338,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
           </article>
           <article class="card">
             <h3>Publisher（社团 / 实验室 / 学院）</h3>
-            <p>在授权组织与有效期内创建并提交投稿。不能直接公开发布、不能绕过审核、不能代表未授权组织。</p>
+            <p>Career Center 管理员端可授权部门负责人投稿权限，在授权组织与有效期内创建并提交投稿。不能直接公开发布、不能绕过审核、不能代表未授权组织。</p>
           </article>
           <article class="card">
             <h3>职业发展咨询顾问</h3>
@@ -336,6 +349,10 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
             <p>只接收学生同意或主动请求的最小化关怀联系。不能查看完整日历，也不能把容量信号当成诊断。</p>
           </article>
         </div>
+        <aside class="callout">
+          <p class="callout-title"><span aria-hidden="true">▲</span> 接入前提</p>
+          <p>这个平台需要接入学校系统才能发挥完整作用：学生的教学系统、教务系统（取大一到大四的教学计划安排）、Career Center 系统（顾问预约与 Job &amp; Internship）、学校及各学院部门的官网 API（订阅资源活动页更新）、心理咨询室系统（咨询预约与紧急联系），以及其他校内系统。</p>
+        </aside>
         <p class="note">国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是「第六类人」，而是每一种发展模式都必须尊重的个人约束——通过可插拔的 Context Pack 注入已有流程，不复制一套新 Agent。</p>
         </div>
       </section>
@@ -684,7 +701,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
           </article>
           <article class="card">
             <h3>Publisher（社團 / 實驗室 / 學院）</h3>
-            <p>在授權組織與有效期內創建並提交投稿。不能直接公開發布、不能繞過審核、不能代表未授權組織。</p>
+            <p>Career Center 管理員端可授權部門負責人投稿權限，在授權組織與有效期內創建並提交投稿。不能直接公開發布、不能繞過審核、不能代表未授權組織。</p>
           </article>
           <article class="card">
             <h3>職業發展諮詢顧問</h3>
@@ -695,6 +712,10 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
             <p>只接收學生同意或主動請求的最小化關懷聯繫。不能查看完整日曆，也不能把容量信號當成診斷。</p>
           </article>
         </div>
+        <aside class="callout">
+          <p class="callout-title"><span aria-hidden="true">▲</span> 接入前提</p>
+          <p>這個平台需要接入學校系統才能發揮完整作用：學生的教學系統、教務系統（取大一到大四的教學計劃安排）、Career Center 系統（顧問預約與 Job &amp; Internship）、學校及各學院部門的官網 API（訂閲資源活動頁更新）、心理諮詢室系統（諮詢預約與緊急聯繫），以及其他校內系統。</p>
+        </aside>
         <p class="note">國際身份、經濟條件、照護責任、健康與精力、通勤、語言、無障礙需求不是「第六類人」，而是每一種發展模式都必須尊重的個人約束——通過可插拔的 Context Pack 注入已有流程，不復制一套新 Agent。</p>
         </div>
       </section>
@@ -1043,7 +1064,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
           </article>
           <article class="card">
             <h3>Publisher (society / lab / school)</h3>
-            <p>Creates and submits listings within an authorised organisation and validity window. Cannot publish directly, bypass review, or act for an organisation they don't hold.</p>
+            <p>The Career Center admin console grants publishing rights to a department lead, who then creates and submits listings within that authorised organisation and validity window. Cannot publish directly, bypass review, or act for an organisation they don't hold.</p>
           </article>
           <article class="card">
             <h3>Career advisor</h3>
@@ -1054,6 +1075,10 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
             <p>Receives only the minimal outreach a student consented to or requested. No full calendar access, and capacity signals are never treated as a diagnosis.</p>
           </article>
         </div>
+        <aside class="callout">
+          <p class="callout-title"><span aria-hidden="true">▲</span> What it needs to be plugged into</p>
+          <p>The platform only reaches its full value once it is connected to university systems: the teaching system, the academic registry (year-one to year-four programme plans), the Career Center system (advisor booking and Job &amp; Internship), the public APIs of the university and each school or department (subscribing to resource and event updates), and the counselling service system (appointments and emergency contact) — among others.</p>
+        </aside>
         <p class="note">International status, finances, caregiving duties, health and energy, commuting, language and accessibility needs are not a sixth category of person. They are personal constraints every mode must respect — injected into existing flows through pluggable Context Packs, not by cloning a new agent.</p>
         </div>
       </section>

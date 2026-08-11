@@ -127,6 +127,16 @@ export const zhHans = {
           ["探索与方向未定", "暂时迷茫，希望通过实践逐步认识自己", "低成本、多样化的探索实验；用实际体验更新目标信心"],
         ],
       },
+      // 用户 2026-08-11 在产品介绍文档里加的那段整合前提，原样搬过来：
+      // 这不是免责声明，是**部署条件**——评委读完「校方那一半」就会问它。
+      callout: {
+        title: "接入前提",
+        body:
+          "这个平台需要接入学校系统才能发挥完整作用：学生的教学系统、教务系统" +
+          "（取大一到大四的教学计划安排）、Career Center 系统（顾问预约与 Job & Internship）、" +
+          "学校及各学院部门的官网 API（订阅资源活动页更新）、心理咨询室系统" +
+          "（咨询预约与紧急联系），以及其他校内系统。",
+      },
       note:
         "国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是「第六类人」，" +
         "而是每一种发展模式都必须尊重的个人约束——通过可插拔的 Context Pack 注入已有流程，" +
@@ -140,7 +150,9 @@ export const zhHans = {
         },
         {
           title: "Publisher（社团 / 实验室 / 学院）",
-          body: "在授权组织与有效期内创建并提交投稿。不能直接公开发布、不能绕过审核、不能代表未授权组织。",
+          body:
+            "Career Center 管理员端可授权部门负责人投稿权限，" +
+            "在授权组织与有效期内创建并提交投稿。不能直接公开发布、不能绕过审核、不能代表未授权组织。",
         },
         {
           title: "职业发展咨询顾问",
@@ -556,6 +568,15 @@ export const en = {
           ["Exploring", "Genuinely undecided, wanting practice to reveal direction", "Low-cost, varied experiments; lived experience updates interests and confidence"],
         ],
       },
+      callout: {
+        title: "What it needs to be plugged into",
+        body:
+          "The platform only reaches its full value once it is connected to university systems: the teaching " +
+          "system, the academic registry (year-one to year-four programme plans), the Career Center system " +
+          "(advisor booking and Job & Internship), the public APIs of the university and each school or " +
+          "department (subscribing to resource and event updates), and the counselling service system " +
+          "(appointments and emergency contact) — among others.",
+      },
       note:
         "International status, finances, caregiving duties, health and energy, commuting, language and " +
         "accessibility needs are not a sixth category of person. They are personal constraints every mode " +
@@ -569,7 +590,7 @@ export const en = {
         },
         {
           title: "Publisher (society / lab / school)",
-          body: "Creates and submits listings within an authorised organisation and validity window. Cannot publish directly, bypass review, or act for an organisation they don't hold.",
+          body: "The Career Center admin console grants publishing rights to a department lead, who then creates and submits listings within that authorised organisation and validity window. Cannot publish directly, bypass review, or act for an organisation they don't hold.",
         },
         {
           title: "Career advisor",
