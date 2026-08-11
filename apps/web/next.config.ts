@@ -30,7 +30,12 @@ const nextConfig: NextConfig = {
   devIndicators: { position: "top-left" },
 
   async rewrites() {
-    return [{ source: "/api/:path*", destination: `${API_ORIGIN}/:path*` }];
+    return [
+      { source: "/api/:path*", destination: `${API_ORIGIN}/:path*` },
+      // 宣传页随站点部署：`/landing` 是对外给人看的地址，
+      // 实体是 public/landing.html（生成物，`bun run landing` 产出）
+      { source: "/landing", destination: "/landing.html" },
+    ];
   },
 };
 

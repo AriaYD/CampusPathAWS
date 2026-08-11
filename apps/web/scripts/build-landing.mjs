@@ -476,6 +476,12 @@ const fragment = html
 const fragmentTarget = fileURLToPath(
   new URL("../../../docs/landing/artifact.html", import.meta.url));
 
+/** 第三个出口：随站点部署的那一份（Cloud Run 上 `/landing`）。
+ *  与 docs/ 那份**逐字节相同**——两处内容会漂移的唯一原因是有人手改了其中一份，
+ *  所以 `--check` 三份一起校验。 */
+const publicTarget = fileURLToPath(
+  new URL("../public/landing.html", import.meta.url));
+
 if (process.argv.includes("--check")) {
   let current = "";
   try {
@@ -494,10 +500,18 @@ if (process.argv.includes("--check")) {
     console.error("landing/artifact.html 与内容源不一致——重新生成");
     process.exit(1);
   }
-  console.log("campuspath-landing.html 一致");
+  let pub = "";
+  try { pub = readFileSync(publicTarget, "utf-8"); } catch {}
+  if (pub !== html) {
+    console.error("apps/web/public/landing.html 与 docs/ 那份不一致——重新生成，"
+      + "别只改一处（线上发出去的是 public/ 这份）");
+    process.exit(1);
+  }
+  console.log("campuspath-landing.html 一致（docs / artifact / public 三份）");
 } else {
   writeFileSync(target, html, "utf-8");
   writeFileSync(fragmentTarget, fragment, "utf-8");
+  writeFileSync(publicTarget, html, "utf-8");
   console.log(`已生成 campuspath-landing.html（三语，${html.length.toLocaleString()} 字节）`
-    + ` + landing/artifact.html（${fragment.length.toLocaleString()} 字节）`);
+    + ` + landing/artifact.html + apps/web/public/landing.html`);
 }

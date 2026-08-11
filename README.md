@@ -127,8 +127,16 @@ make check                      # preflight + 契约/Seed 一致性 + 全量测�
 - **Web**：https://campuspath-web-786160486093.asia-east2.run.app （rev 00022-8qq）
   （**访问口令门**，2026-08-02 取代 Google 邮箱白名单：口令只存 Cloud Run 环境变量
   `CAMPUSPATH_DEMO_PASSCODE`（本地 .env 同名），服务端校验 + HMAC httpOnly cookie，
-  页面与 `/api/*` 反代都在门内；口令值不进代码/文档/界面，向团队口头分发；
-  本地开发不设该变量门自动不存在）
+  页面与 `/api/*` 反代都在门内；本地开发不设该变量门自动不存在）
+- **宣传页**：`/landing`（随 web 一起部署，`apps/web/public/landing.html`）。
+  **它在门外**——middleware 的 `PUBLIC_PATHS` 显式放行，因为这一页的作用就是
+  把人领到门口；被门挡住等于没有。
+  ⚠️ **2026-08-10 用户裁定：体验口令直接印在这一页的两处 CTA 旁**
+  （`docs/landing/content.mjs` 的 `PASSCODE`）。这与此前"口令零出现在界面"的
+  口径**相反**——代价是：拿到这一页地址的人就等于拿到了门禁。要收回这个决定，
+  改 `content.mjs` 后 `bun run landing` 重新生成三份产物即可。
+  改宣传页内容 → 改 `docs/landing/content.mjs` → `bun run landing` →
+  **必须重新部署 web 才会生效**（它是构建期打进镜像的静态文件）
 - **API**：https://campuspath-api-786160486093.asia-east2.run.app （rev 00014-kv6；公网实例不含测试邮箱，联系人回落哑地址；
   `CHECKIN_SECRET` 挂 Secret Manager `campuspath-checkin-secret`；**max-instances=1**——巡检/签到/后台任务全是实例内存态，多实例会互相看不见）
 - **每日源巡检**：Cloud Run Job `campuspath-sources-refresh` + Cloud Scheduler `campuspath-sources-daily`（09:00 HKT；赠金 2026-09-27 到期前 `bash infra/sources_job.sh delete --apply` 清理）

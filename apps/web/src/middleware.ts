@@ -19,13 +19,20 @@ const noStore = (res: NextResponse): NextResponse => {
   return res;
 };
 
+/** 门前公开路径。加进来之前先想清楚：这一条会被任何人看到。 */
+const PUBLIC_PATHS = new Set(["/login", "/landing", "/landing.html"]);
+
 export async function middleware(request: NextRequest) {
   const passcode = process.env.CAMPUSPATH_DEMO_PASSCODE;
   const secret = process.env.AUTH_SECRET ?? passcode;
   if (!passcode || !secret) return noStore(NextResponse.next());
 
-  // 登录页本身放行——口令就在那里输入
-  if (request.nextUrl.pathname === "/login") return noStore(NextResponse.next());
+  // 登录页本身放行——口令就在那里输入。
+  // 宣传页同样放行：它是**把人领到门口**的东西，自己被门挡住就没有意义了
+  // （页面上印着体验口令，读者看完直接进门——2026-08-10 用户裁定）。
+  if (PUBLIC_PATHS.has(request.nextUrl.pathname)) {
+    return noStore(NextResponse.next());
+  }
 
   const cookie = request.cookies.get(COOKIE)?.value;
   if (cookie) {

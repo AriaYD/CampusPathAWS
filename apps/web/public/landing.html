@@ -1,0 +1,1379 @@
+<!doctype html>
+<html lang="zh-Hans" data-landing>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#faf9f5">
+<title>CampusPath · 一个目标 → 一条今天就能走的路</title>
+<meta name="description" content="以学生目标为中心的成长规划系统，与校方资源效能分析构成双闭环。港科大 Google 黑客松项目。">
+<style>
+:root{
+  /* Clay 令牌 v2.0，取自 apps/web/src/app/globals.css——宣传页与产品同一套色 */
+  --bg:#faf9f5; --bg-sunk:#f0eee6; --bg-card:#fffefb;
+  --fg:#29261b; --fg-muted:#5c5648; --fg-faint:#6b6455;
+  --line:#e0dbcd; --line-strong:#cdc6b4;
+  --accent:#d3714e; --accent-deep:#a04a2a; --accent-soft:#f6e3d8; --accent-fg:#fff;
+  --radius:12px; --radius-sm:8px;
+  --nav-h:60px;
+  --shadow:0 1px 2px rgb(41 38 27/.05), 0 4px 14px rgb(41 38 27/.05);
+  --wrap:1120px;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%; scroll-behavior:smooth; scroll-padding-top:calc(var(--nav-h) + 12px)}
+@media (prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:ui-sans-serif,-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",
+    "Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  font-size:16px; line-height:1.7; letter-spacing:.005em;
+  overflow-wrap:anywhere;
+}
+.wrap{max-width:var(--wrap); margin:0 auto; padding:0 24px}
+a{color:var(--accent-deep)}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:6px}
+
+/* ── 顶栏：品牌 / 章节锚点 / 语言 / 常驻 CTA（Consilium 的引导形状）── */
+.topbar{
+  position:sticky; top:0; z-index:50; height:var(--nav-h);
+  background:color-mix(in srgb,var(--bg) 88%,transparent);
+  backdrop-filter:saturate(1.6) blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.topbar .wrap{display:flex; align-items:center; gap:12px; height:100%}
+.brand{display:flex; align-items:center; gap:10px; text-decoration:none; color:var(--fg); flex:0 0 auto}
+.brand-mark{
+  width:30px; height:30px; border-radius:9px; flex:0 0 auto;
+  background:linear-gradient(150deg,var(--accent) 0%,var(--accent-deep) 100%);
+  display:grid; place-items:center; color:#fff; font-size:15px; font-weight:700;
+}
+.brand-name{font-weight:650; font-size:16px; line-height:1.15; letter-spacing:-.01em}
+.brand-sub{display:block; font-size:11px; color:var(--fg-muted); font-weight:450}
+.navlinks{display:flex; gap:2px; margin-inline:auto; overflow-x:auto; scrollbar-width:none}
+.navlinks::-webkit-scrollbar{display:none}
+.navlinks a{
+  padding:7px 8px; border-radius:8px; text-decoration:none; color:var(--fg-muted);
+  font-size:13px; white-space:nowrap; transition:background .15s,color .15s;
+}
+.navlinks a:hover{background:var(--bg-sunk); color:var(--fg)}
+.topbar-end{display:flex; align-items:center; gap:10px; flex:0 0 auto}
+.langsel{
+  appearance:none; border:1px solid var(--line-strong); background:var(--bg-card);
+  color:var(--fg); border-radius:8px; padding:6px 26px 6px 10px; font-size:13px;
+  font-family:inherit; cursor:pointer;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M1 1l4 4 4-4' fill='none' stroke='%235c5648' stroke-width='1.5'/></svg>");
+  background-repeat:no-repeat; background-position:right 9px center;
+}
+.btn{
+  display:inline-flex; align-items:center; gap:7px; border-radius:10px;
+  padding:9px 16px; font-size:14px; font-weight:550; text-decoration:none;
+  border:1px solid transparent; cursor:pointer; font-family:inherit;
+  transition:transform .12s ease, box-shadow .15s ease, background .15s ease;
+}
+.btn:active{transform:translateY(1px)}
+.btn-primary{background:var(--accent-deep); color:var(--accent-fg); box-shadow:var(--shadow)}
+.btn-primary:hover{background:#8f4125}
+.topbar .btn-primary{border-color:var(--accent-deep)}
+/* 窄屏顶栏只放得下短标签：全称在 390px 上实测右缘 437px，整块按钮伸到视口外
+   （body 不横向滚动，所以「无溢出」断言看不见它——按钮自己被切掉了）。 */
+[data-cta-short]{display:none}
+@media (max-width:640px){
+  [data-cta-full]{display:none}
+  [data-cta-short]{display:inline}
+  .topbar .btn{padding:9px 12px}
+  .langsel{padding:6px 22px 6px 8px; font-size:12px; max-width:104px}
+}
+
+/* ── Hero ── */
+.kicker{
+  font-size:12px; letter-spacing:.09em; text-transform:uppercase;
+  color:var(--fg-muted); font-weight:600; margin:0 0 10px;
+}
+.hero{padding:76px 0 56px; border-bottom:1px solid var(--line)}
+.hero h1{
+  font-size:clamp(30px,5.4vw,52px); line-height:1.18; letter-spacing:-.02em;
+  font-weight:700; margin:0 0 20px; max-width:19ch;
+}
+.hero-lead{font-size:clamp(15px,1.9vw,18px); color:var(--fg-muted); max-width:66ch; margin:0 0 28px}
+.hero-actions{display:flex; flex-wrap:wrap; align-items:center; gap:14px}
+.stats{display:flex; flex-wrap:wrap; gap:36px; margin:44px 0 0}
+.stats div{margin:0}
+.stats dt{font-size:clamp(24px,3.4vw,32px); font-weight:700; letter-spacing:-.02em; font-variant-numeric:tabular-nums}
+.stats dd{margin:2px 0 0; font-size:13px; color:var(--fg-muted)}
+
+/* ── 口令：用户 2026-08-10 要求印在 CTA 旁边 ── */
+.passcode{
+  display:inline-flex; align-items:center; gap:8px;
+  border:1px dashed var(--line-strong); border-radius:10px;
+  padding:6px 10px; background:var(--bg-card);
+}
+.passcode-label{font-size:12px; color:var(--fg-muted)}
+.passcode code{
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  font-size:13px; color:var(--accent-deep); font-weight:600; letter-spacing:.01em;
+}
+.copy{
+  border:none; background:transparent; cursor:pointer; color:var(--fg-muted);
+  font-size:14px; line-height:1; padding:4px; border-radius:6px;
+}
+.copy:hover{background:var(--bg-sunk); color:var(--fg)}
+.copy[data-copied]{color:#3a6b4e}
+
+/* ── 章节 ── */
+.section{padding:64px 0; border-bottom:1px solid var(--line)}
+.section:nth-of-type(even){background:var(--bg-sunk)}
+.section h2{
+  font-size:clamp(22px,3.2vw,32px); line-height:1.28; letter-spacing:-.015em;
+  font-weight:680; margin:0 0 18px; max-width:26ch;
+}
+.lead{color:var(--fg-muted); max-width:74ch; margin:0 0 14px; font-size:15.5px}
+.note{
+  color:var(--fg-faint); max-width:76ch; font-size:14px; margin:22px 0 0;
+  padding-left:14px; border-left:3px solid var(--accent-soft);
+}
+
+.cards{display:grid; grid-template-columns:repeat(auto-fit,minmax(258px,1fr)); gap:14px; margin-top:26px}
+.card{
+  background:var(--bg-card); border:1px solid var(--line); border-radius:var(--radius);
+  padding:18px 18px 16px; box-shadow:var(--shadow); margin:0;
+}
+.card h3{font-size:15px; font-weight:640; margin:0 0 8px; letter-spacing:-.005em}
+.card p{margin:0; font-size:14px; color:var(--fg-muted); line-height:1.65}
+
+.table-wrap{
+  margin-top:24px; overflow-x:auto; border:1px solid var(--line);
+  border-radius:var(--radius); background:var(--bg-card);
+}
+table{border-collapse:collapse; width:100%; min-width:520px; font-size:14px}
+th,td{text-align:start; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
+th{background:var(--bg-sunk); font-weight:620; font-size:13px; color:var(--fg); white-space:nowrap}
+tbody tr:last-child td{border-bottom:none}
+td.first{font-weight:600; color:var(--fg); white-space:nowrap}
+.section:nth-of-type(even) .table-wrap{background:var(--bg)}
+.section:nth-of-type(even) th{background:var(--bg-sunk)}
+
+.steps{list-style:none; counter-reset:none; margin:28px 0 0; padding:0; display:grid; gap:2px}
+.steps li{display:flex; gap:18px; padding:18px 0; border-top:1px solid var(--line)}
+.steps li:last-child{border-bottom:1px solid var(--line)}
+.step-n{
+  flex:0 0 auto; width:38px; font-variant-numeric:tabular-nums;
+  font-size:13px; font-weight:700; color:var(--accent-deep); padding-top:2px;
+}
+.steps h3{font-size:16px; font-weight:640; margin:0 0 6px}
+.steps p{margin:0; color:var(--fg-muted); font-size:14.5px; max-width:76ch}
+
+/* ── 页尾 CTA band：Consilium 的收口形状 ── */
+.cta-band{padding:56px 0; background:var(--bg)}
+.cta-inner{
+  display:flex; align-items:center; gap:26px; flex-wrap:wrap;
+  border:1px solid var(--line-strong); border-radius:16px;
+  background:linear-gradient(180deg,var(--bg-card) 0%,var(--accent-soft) 260%);
+  padding:26px 28px; box-shadow:var(--shadow);
+}
+.cta-mark{
+  flex:0 0 auto; width:44px; height:44px; border-radius:12px;
+  background:var(--accent-soft); color:var(--accent-deep);
+  display:grid; place-items:center; font-size:20px;
+}
+.cta-text{flex:1 1 320px}
+.cta-text h2{font-size:clamp(19px,2.4vw,24px); margin:0 0 6px; font-weight:680}
+.cta-text p{margin:0; color:var(--fg-muted); font-size:14.5px; max-width:62ch}
+.cta-note{margin-top:6px !important; font-size:13px !important; color:var(--fg-faint) !important}
+.cta-act{display:flex; flex-direction:column; align-items:flex-start; gap:10px; flex:0 0 auto}
+
+.foot{padding:34px 0 46px; border-top:1px solid var(--line); background:var(--bg-sunk)}
+.synthetic{
+  display:inline-block; font-size:12px; color:var(--fg-faint);
+  border:1px solid var(--line-strong); border-radius:999px; padding:4px 12px; margin:0 0 12px;
+}
+.foot .note{border:none; padding:0; margin:0; font-size:13px}
+
+/* ── 窄屏 ── */
+@media (max-width:1120px){
+  .navlinks{display:none}
+  .brand-sub{display:none}
+  .topbar .wrap{gap:10px}
+  .topbar-end{margin-inline-start:auto}
+}
+@media (max-width:640px){
+  .wrap{padding:0 18px}
+  .hero{padding:44px 0 36px}
+  .section{padding:44px 0}
+  .stats{gap:24px}
+  .cta-inner{padding:20px}
+  .cta-act{width:100%}
+  .cta-act .btn{width:100%; justify-content:center}
+  .passcode{width:100%; justify-content:space-between}
+  .hero-actions .btn{flex:1 1 auto; justify-content:center}
+}
+/* 触摸设备：命中区 ≥44px（iOS HIG / Material），桌面密度不动 */
+@media (pointer:coarse){
+  .btn{min-height:44px}
+  .langsel{min-height:44px}
+  .copy{min-width:44px; min-height:44px}
+  .navlinks a{min-height:44px; display:flex; align-items:center}
+}
+@media print{.topbar{display:none} .section{break-inside:avoid}}
+</style>
+</head>
+<body>
+<nav class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top">
+      <span class="brand-mark" aria-hidden="true">C</span>
+      <span>
+        <span class="brand-name">CampusPath</span>
+        <span class="brand-sub" data-brand-sub>校园成长路径</span>
+      </span>
+    </a>
+    <div class="navlinks" data-navlinks><a href="#zh-Hans-what">做什么</a><a href="#zh-Hans-pain">痛点</a><a href="#zh-Hans-who">给谁用</a><a href="#zh-Hans-value">能得到什么</a><a href="#zh-Hans-memory">记忆</a><a href="#zh-Hans-how">怎么用</a><a href="#zh-Hans-tech">技术</a></div>
+    <div class="topbar-end">
+      <select class="langsel" data-lang-select aria-label="Language">
+        <option value="zh-Hans">简体中文</option>
+        <option value="zh-Hant">繁體中文</option>
+        <option value="en">English</option>
+      </select>
+      <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+         data-cta="topbar" data-cta-label>
+        <span data-cta-full>试用 CampusPath</span
+        ><span data-cta-short>试用</span>
+        <span aria-hidden="true">→</span></a>
+    </div>
+  </div>
+</nav>
+
+<main id="top">
+
+    <div class="pane" data-lang-pane="zh-Hans" lang="zh-Hans">
+      <header class="hero">
+        <div class="wrap">
+          <p class="kicker">面向在校本科生 · 由大学部署</p>
+          <h1>一个目标 → 一条今天就能走的路，每一步都说得出为什么</h1>
+          <p class="hero-lead">以学生「你想成为谁」为中心的成长规划系统，与校方的资源效能分析构成双闭环：把目标拆成能力小目标，倒推成从今天到未来的每一步行动；学生的真实行动变成证据与记忆，再用这些新证据校准下一轮路径。而这些反馈同时回到学校，让资源投到真正缺的地方。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+               data-cta="hero">试用 CampusPath <span aria-hidden="true">→</span></a>
+            <span class="passcode" data-passcode>
+              <span class="passcode-label">体验口令</span>
+              <code>OceanMeetsTheSky!</code>
+              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                      aria-label="copy">⧉</button>
+            </span>
+          </div>
+          <dl class="stats">
+            <div><dt>1,534</dt><dd>门真实抓取的课程</dd></div>
+            <div><dt>93</dt><dd>个信息源（85 个真实抓取）</dd></div>
+            <div><dt>13/13</dt><dd>条评测红线通过</dd></div>
+          </dl>
+        </div>
+      </header>
+
+      <section id="zh-Hans-what" class="section">
+        <div class="wrap">
+          <p class="kicker">我们做什么</p>
+          <h2>一个学生校园成长规划操作系统，不是又一个活动聚合网站</h2>
+        <p class="lead">你设一个主目标和一个候选目标，系统从最新的几十份真实岗位数据里拆解出要什么能力，再从全校海量资源里挑出补得上缺口的活动、课程和机会，排进你真实有空的时段。</p>
+        <p class="lead">产出的是一条带版本、带依据、随变化滚动更新的路径，不是一份聊完就关掉的建议清单。</p>
+        <p class="lead">CampusPath 不替代导师、Career Center、学院顾问或 LMS——它是学校资源、外部机会与学生个人发展之间的发现、匹配与编排层。</p>
+        <div class="cards">
+          <article class="card">
+            <h3>对学生</h3>
+            <p>把长期方向倒推成当下可执行、且不挤压生活的路径；每条建议都说明补什么差距、形成什么证据、为什么是现在。</p>
+          </article>
+          <article class="card">
+            <h3>对学校</h3>
+            <p>把已经投入巨大成本、触达效率却很低的资源，变成可测量、可改进、可归因的成长资产；并第一次看到「资源池覆盖不了学生的哪些真实需求」。</p>
+          </article>
+          <article class="card">
+            <h3>「学校资源」的口径</h3>
+            <p>凡是因为学生的在校身份而能拿到的机会，都算学校资源——校友内推、企业来校招聘、合作方名额、跨校联盟活动。所以我们不分校内校外，只分：是否发现、是否够格、是否用上。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hans-pain" class="section">
+        <div class="wrap">
+          <p class="kicker">痛点</p>
+          <h2>学生不是缺资源，而是难以把海量资源转化成自己的成长路径</h2>
+        <p class="lead">一所大学里，每个学院有自己的活动，几百个社团各办各的，还有协会、实验室、研究中心、校企合作。这些机会散落在不同部门的官网上——每个官网的架构还都不一样。你得先找到真正的活动页，然后经常回去看，才不会错过。</p>
+        <p class="lead">对一个课业本来就很重的学生来说，这基本做不到，除非你自己搭一套全量采集系统。而且即使看到了，也常常撞上自己的时间，或者报完才发现根本不是自己想要的。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>成本</th><th>具体是什么</th></tr></thead>
+            <tbody><tr><td class="first">发现成本</td><td>不知道有哪些可信机会</td></tr><tr><td class="first">理解成本</td><td>看到了，却不知道具体资格与价值</td></tr><tr><td class="first">规划成本</td><td>不知道课程、经历和机会如何形成有依赖关系的路径</td></tr><tr><td class="first">执行成本</td><td>收藏很多，但没有转成行动、材料和日历</td></tr><tr><td class="first">纠偏成本</td><td>做完没有沉淀，系统下次仍重复安排无效或不适合的事</td></tr><tr><td class="first">容量管理成本</td><td>不知道成长任务如何排进真实日历，容易冲突、过载或挤压休息</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">还有一件更隐蔽的事：活动宣传通常只说「有什么」，很少说「适合谁、能补什么差距、时间投入值不值」；而学生做完之后的真实体验，几乎从不回到下一轮推荐和学校的资源改进里。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-who" class="section">
+        <div class="wrap">
+          <p class="kicker">给谁用</p>
+          <h2>主界面给学生，另一半给学校</h2>
+        <p class="lead">五类目标导向人群——按「想走向哪里」划分，不是给学生永久贴标签。一个学生可以同时持有两个候选方向，并随实践改变权重。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>模式</th><th>典型目标</th><th>系统重点</th></tr></thead>
+            <tbody><tr><td class="first">就业与职业发展</td><td>进入目标企业、行业、岗位或公共服务领域</td><td>岗位要求、技能证据、项目、实习、作品与招聘节奏</td></tr><tr><td class="first">学术与深造</td><td>读研、读博、进入研究领域、寻找导师</td><td>课程基础、研究方法、实验室、科研经历与申请时间线</td></tr><tr><td class="first">创业与创新</td><td>创办项目、验证需求、加入孵化器或组建团队</td><td>问题发现、比赛、原型、用户验证、导师、资金与团队</td></tr><tr><td class="first">兴趣与个人成长</td><td>艺术、体育、语言、公益、创作或其他长期兴趣</td><td>能力成长、社群、作品、体验质量，不强迫职业化</td></tr><tr><td class="first">探索与方向未定</td><td>暂时迷茫，希望通过实践逐步认识自己</td><td>低成本、多样化的探索实验；用实际体验更新目标信心</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Career Center 管理员</h3>
+            <p>授予/撤销投稿权限、管理审核队列与政策、配置连接器与凭据轮换。不能读学生私人档案、反思或日历，也看不到反馈者身份。</p>
+          </article>
+          <article class="card">
+            <h3>Publisher（社团 / 实验室 / 学院）</h3>
+            <p>在授权组织与有效期内创建并提交投稿。不能直接公开发布、不能绕过审核、不能代表未授权组织。</p>
+          </article>
+          <article class="card">
+            <h3>职业发展咨询顾问</h3>
+            <p>只看学生主动预约的会面与想聊的主题，会后最多发 5 条关键建议。学生的反思原文、成绩、日历一律 403。</p>
+          </article>
+          <article class="card">
+            <h3>心理咨询室协调员</h3>
+            <p>只接收学生同意或主动请求的最小化关怀联系。不能查看完整日历，也不能把容量信号当成诊断。</p>
+          </article>
+        </div>
+        <p class="note">国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是「第六类人」，而是每一种发展模式都必须尊重的个人约束——通过可插拔的 Context Pack 注入已有流程，不复制一套新 Agent。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-value" class="section">
+        <div class="wrap">
+          <p class="kicker">你能得到什么</p>
+          <h2>六件在别处拿不到的事</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>四态资格，不是「能 / 不能」</h3>
+            <p>大一学生看到只限大三的实习，不会被静默过滤掉，而是标为「未来可申请」，并告诉你这一年该补什么。四态：现在合格 / 未来可达 / 信息不足 / 本轮不适用。</p>
+          </article>
+          <article class="card">
+            <h3>每条建议都说得出为什么</h3>
+            <p>补什么差距、形成什么证据、为什么是现在。拆解出来的每一条都能点开溯源到岗位原文，不是模型编的。</p>
+          </article>
+          <article class="card">
+            <h3>个性化之外仍可自主发现</h3>
+            <p>资讯广场展示校方全部审核通过的资源，可见性不由 AI 排序决定。任一条目都能点「为什么没推荐我」，给出规则引擎签发的凭据式解释。</p>
+          </article>
+          <article class="card">
+            <h3>先看真实容量，再安排任务</h3>
+            <p>日历默认只读忙闲，不读事件标题。规划前先算课程、已有安排、睡眠与三餐保护块、可支配时间和缓冲，只在你真的有空的格子里排。</p>
+          </article>
+          <article class="card">
+            <h3>从推荐走到行动的闭环</h3>
+            <p>材料、日历、提醒、状态和替代方案连成一条；活动做完写反思，自动沉淀为成长证据。</p>
+          </article>
+          <article class="card">
+            <h3>不会一味 push 你</h3>
+            <p>睡眠被挤压且负荷持续偏高时，系统会预警而不是继续往日历里塞东西。这条安全护栏链路零大模型——判定归阈值，文案归固定模板。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hans-memory" class="section">
+        <div class="wrap">
+          <p class="kicker">越用越懂你</p>
+          <h2>它记住的不是你点了什么，是你为什么改主意</h2>
+        <p class="lead">学生从入学到毕业会连续用四年甚至更久。系统必须记住：已修课程与项目、你明确拒绝过的方向和原因、哪些活动对你高价值哪些低价值、你做过的目标变更和取舍、你的节奏与精力偏好，以及哪些技能你已经拿到了、不该再重复安排。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>层</th><th>存什么</th><th>更新规则</th></tr></thead>
+            <tbody><tr><td class="first">L0 当前档案</td><td>学业、经历、成果、技能、目标、偏好、容量与约束的当前有效状态</td><td>只由权威来源或学生确认更新，每次变更留档案变更事件</td></tr><tr><td class="first">L1 事件时间线</td><td>参加、申请、完成、放弃、反馈、计划版本等事件</td><td>只追加；错了用更正事件处理，不改历史</td></tr><tr><td class="first">L2 语义记忆</td><td>从经历里提炼的兴趣、模式与上下文</td><td>带来源、时间、置信度与过期策略</td></tr><tr><td class="first">L3 证据与笔记</td><td>你的原始笔记、作品、证书、反思原文与附件</td><td>你拥有；默认不向校方共享</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>记忆的安全规矩</h3>
+            <p>区分「学生原话」「系统推断」「外部事实」，不把推断伪装成事实；新旧冲突时保留时间线、用 supersedes 表示更新，不静默覆盖；不把短期情绪写成永久性格标签。</p>
+          </article>
+          <article class="card">
+            <h3>你随时可以反悔</h3>
+            <p>任何一条记忆都能搜索、纠正、锁定、删除、导出、暂停。读取时只召回与当前任务相关的最小上下文。</p>
+          </article>
+          <article class="card">
+            <h3>反思三轨分开建模</h3>
+            <p>你发生了什么变化 / 你想长期保留什么 / 活动本身是否兑现宣传——这是三件事。混在一起，学校就永远收不到有用的信号。</p>
+          </article>
+          <article class="card">
+            <h3>倒逼学生真的去总结</h3>
+            <p>反思必须先绑定一个具体对象才能创建，防止泛泛而谈。预约顾问的会面还有一层：写完并保存这次会面的反思，才能看到顾问给你的关键建议。</p>
+          </article>
+        </div>
+        <p class="note">关键设计：个人不适配与全局低质是分开的。「太基础」「太难」走个人契合标签，只调整你自己的推荐难度，不惩罚这个活动；「宣传夸大、内容空泛」达到样本阈值后才降低该届次的置信度并进入复核。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">和市面上的产品有什么不同</p>
+          <h2>别人给你一段回复，我们给你一条路径</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>产品类型</th><th>它们的重心</th><th>CampusPath 的区别</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>职业身份、网络、职位与内容</td><td>连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动</td></tr><tr><td class="first">Handshake</td><td>大学生职位、实习、雇主、招聘活动</td><td>不止展示机会，还把课程、研究、比赛、社团和实习组合成有依赖关系的动态能力路径</td></tr><tr><td class="first">职业测评产品</td><td>兴趣、价值观、职业匹配</td><td>测评只是输入：系统通过真实实践持续验证，而不是一次测完就定型</td></tr><tr><td class="first">简历 / 面试工具</td><td>简历反馈、面试学习与模拟</td><td>覆盖进入申请阶段之前数月或数年的能力建设与证据积累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>对话建议、简历与职业问答</td><td>有真实来源、资格状态、工具调用、长期记忆、时间约束、行动闭环和可量化评测</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">最短的一句话：别人给你一段回复，我们给你一条能落实到每日日历、能追溯来源、会随你变化滚动更新的路径，并且把结果回流给学校。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-how" class="section">
+        <div class="wrap">
+          <p class="kicker">怎么用</p>
+          <h2>一条真的闭合的环，学生端与校方端互为对方的输入</h2>
+
+        <ol class="steps">
+          <li>
+            <span class="step-n" aria-hidden="true">01</span>
+            <div>
+              <h3>开通与授权</h3>
+              <p>接入学校教务系统；授权个人日历（默认只读忙闲，不读事件正文）。系统这才知道你的课业状态与真实可支配时间。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">02</span>
+            <div>
+              <h3>建立成长档案</h3>
+              <p>上传简历，确定性解析后直接整理进「我的成长档案」总览，并弹窗逐条列出新增内容供你自行核对，任何一条都能当场撤销。国际生可在这里勾选身份，一个版本化的 Context Pack 会注入后续所有环节。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">03</span>
+            <div>
+              <h3>目标工作室</h3>
+              <p>设一个主目标 + 一个候选目标与推进配比，点「开始规划」。后台三段式：采集真实岗位数据 → 分析比对 → 目标拆解。拆解分三层：软实力、硬实力（绩点与核心课）、个人真实硬件实力（比赛、项目论文、实习、证书）。系统同时给出两个目标的共享缺口与分叉点——共享的先做，两条路都不亏。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">04</span>
+            <div>
+              <h3>发现</h3>
+              <p>资讯广场按主办方类别、主题、年级、资格、线上线下、截止时间筛选；已过期的归入独立分组并明确标注，不会混在「现在可以报名」里，也不会被推荐给你。「为你推荐」的每张卡都写明为什么推荐你，四态资格直接可见。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">05</span>
+            <div>
+              <h3>规划与批准</h3>
+              <p>按未来两周 / 一个月 / 一学期 / 一学年四档铺开，并自动倒排提前量——大型比赛提前一两周到一个月、等级证书提前一两个月、语言类考试提前一年。规划完先弹窗给你审批，说明依据（你的目标、你的档案、记忆里的偏好），你批准了才写进日历。日历本身就是编辑器；改完是否重排，也问你。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">06</span>
+            <div>
+              <h3>护栏（零大模型）</h3>
+              <p>睡眠只看你自己声明的睡眠窗口和日历里占用它的安排——没声明就不推断，绝不从「日历上有空档」反推你在睡觉。过劳日 = 睡眠不足 7 小时且当天学习工作超过 11 小时；14 天内 ≥ 10 天预警，28 天内 ≥ 20 天要求填 ISI 与 PSS-10 两份量表。提醒最多两次，只对学生可见。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">07</span>
+            <div>
+              <h3>反思与沉淀</h3>
+              <p>活动结束后写反思与四维评分，活动自动归档为成长证据。这一步同时产生北极星指标 VGA（Verified Growth Actions）——它不奖励点击、收藏、报名或忙碌本身，只数真正做成并留下证据的行动。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">08</span>
+            <div>
+              <h3>回到学校（闭环的另一半）</h3>
+              <p>管理端统一注册并监控所有信息源；社团、实验室、教授通过投稿台提交活动，审核通过才进广场；批准的活动自带二维码，到场扫码签到。于是学校拿到两组真实数据：谁真的来了、他们怎么评价。由此看清哪类活动更受欢迎、哪些领域有缺口、哪些专业资源不够。报告按周 / 月 / 学期 / 学年自动生成。</p>
+            </div>
+          </li>
+        </ol>
+        <p class="note">闭环合上了：学生精准找到匹配目标的活动 → 参加 → 写反思 → 沉淀成证据推动下一轮规划；而这些反馈同时回到学校，让学校看到真实需求与趋势变化，据此补缺口、给高质量活动倾斜资源。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-tech" class="section">
+        <div class="wrap">
+          <p class="kicker">技术架构</p>
+          <h2>双平面 + 契约先行：类型不允许的数据，物理上流不过去</h2>
+        <p class="lead">语义平面：6 个语义 Agent（编排 / 学生上下文 / 学业 / 目标缺口 / 机会抽取 / 路径规划）——唯一允许调模型的那一层。</p>
+        <p class="lead">确定性平面：9 个零大模型的服务（规则与约束、容量与日历、Wellbeing 文案生成、状态与记忆、行动与同意、匿名聚合、事件监控与重规划、发布审核审计、连接器与目录）。判定、阈值、资格、容量全在这一侧，可复现、可审计。</p>
+        <p class="lead">两个平面之间的每一次数据交换都由数据契约类型定形。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>六条架构红线：每条都有对应的自动化测试，测试不过构建就失败</th></tr></thead>
+            <tbody><tr><td class="first">1</td><td>路径规划 Agent 是唯一做取舍的 Agent；其余只出事实与候选，输出类型里根本没有排序字段</td></tr><tr><td class="first">2</td><td>Wellbeing 安全护栏判断零大模型——判定归阈值，文案归固定模板；构建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td>日历凭据不进任何模型上下文——止步于容量服务，由类型层强制</td></tr><tr><td class="first">4</td><td>机会抽取 Agent 的工具白名单只有两个；外部内容作为数据块传入，永不拼进 system prompt</td></tr><tr><td class="first">5</td><td>每个计划条目必带规则引擎签发的校验凭据，缺失即被 API 拒绝</td></tr><tr><td class="first">6</td><td>私人反思原文到校方聚合的路径在类型层不存在——不是「我们不传」，是传不过去</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Google 生态里的位置</h3>
+            <p>ADK 负责 Agent、工具、顺序/并行工作流与记忆；两个运行时部署在 Vertex AI Agent Engine；Cloud Run 跑学生 App API、适配器与定时任务；Moodle 沙箱通过自研只读 MCP 接入；日历走 Workspace API 的分项授权。</p>
+          </article>
+          <article class="card">
+            <h3>模型可以换（架构承诺）</h3>
+            <p>全系统的模型出口收敛在一个适配点上，Agent 层依赖的是一个只有单个方法的抽象接口。换型号是部署配置，不改一行代码；换供应商（校方自有模型、其他云厂商、本地私有部署）只需为这个接口提供一个实现——6 个 Agent、9 个确定性服务、全部数据契约类型与红线测试零改动。</p>
+          </article>
+          <article class="card">
+            <h3>确定性平面不受影响</h3>
+            <p>资格判定、容量计算、健康阈值、隐私抑制这些最需要稳定与可审计的部分本来就不调模型，不受任何模型更换影响。产品价值不依赖某一个特定模型——学校要用什么模型，是学校的决定。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hans-control" class="section">
+        <div class="wrap">
+          <p class="kicker">谁说了算</p>
+          <h2>系统给排序，你来拍板</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>学生自主</h3>
+            <p>你可以拒绝、修改、暂停、锁定任何一条路径；写日历、发消息、申请机会都需要你明确批准；探索型学生不会被逼着提前确定唯一职业目标。</p>
+          </article>
+          <article class="card">
+            <h3>档案由你确认</h3>
+            <p>证书、LMS 记录和 Agent 反思可以提出档案更新建议，但不能无提示地改写你的档案；「学生自报」「系统观察」「来源验证」始终分开标注。</p>
+          </article>
+          <article class="card">
+            <h3>证据优先于模型自信</h3>
+            <p>资格、截止日期、项目要求必须指向来源；不确定时显示「需要确认」，而不是编一个答案。</p>
+          </article>
+          <article class="card">
+            <h3>校方只看聚合，不能下钻到人</h3>
+            <p>任何视图的样本量低于阈值一律显示 Insufficient evidence 并抑制该格，不显示看似精确的数字；界面上没有「查看构成这个数字的学生」的入口，后端也不提供这种查询。</p>
+          </article>
+        </div>
+        <p class="note">这个产品不是什么：不是保证进入某家公司或学校的成功预测器；不是替学生做不可逆人生决定的自动决策系统；不是用活动数量或简历长度衡量成长的系统；不是医疗器械、心理诊断工具或自杀风险预测系统；不是仅凭日历空档就向学校报告学生的监控工具。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hans-numbers" class="section">
+        <div class="wrap">
+          <p class="kicker">真实的数字</p>
+          <h2>以香港科技大学的公开数据为例，下列均为实测值</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>项</th><th>数值</th></tr></thead>
+            <tbody><tr><td class="first">真实抓取的课程目录</td><td>58 个学科 1,534 门课，先修表达式保留来源原文</td></tr><tr><td class="first">信息源注册表</td><td>93 个源，其中 85 个是真实抓取，8 个为演示用合成源——两者在界面上一眼可分</td></tr><tr><td class="first">数据契约类型</td><td>177 个（92 条路径 / 111 个操作），前后端与 Agent 全部从同一份契约生成类型</td></tr><tr><td class="first">评测红线</td><td>13 条 BLOCKER 全部通过（违反即失败）</td></tr><tr><td class="first">量化目标</td><td>12 项中 11 项达标——未达标的那一项在报告里如实标红，不藏</td></tr><tr><td class="first">对照基线</td><td>5 项，全确定性可复现</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>现在还没做的，也写在这里</h3>
+            <p>当前以「本科生毕业后进入求职」这条线为主；第二个 Career Path Pack（博士毕业进产业）只预留了接口，未交付，前端不显示、不宣称；国际学生 Context Pack 已安装但状态是「待政策复核」，复核通过前求值结果一律为「需要确认」；真实日历 OAuth 在演示中使用夹具数据。</p>
+          </article>
+          <article class="card">
+            <h3>不宣称我们没有基线的事</h3>
+            <p>不能在没有真实基线的情况下宣称已经提高就业率或学业成果。上面所有目标都是试点假设。</p>
+          </article>
+        </div>
+        <p class="note">判定类指标要求双跑逐字节一致，且 Gold Label 与引擎故意分开实现——用同一份代码生成标签又用它评测，等于自己给自己打分。学生、成绩、日历、机会与投稿数据一律为合成数据，页面全站标注 Synthetic / Demo Data；已核实为真实公开来源的条目另有「官方」标记，两者不混。</p>
+        </div>
+      </section>
+
+      <section class="cta-band">
+        <div class="wrap">
+          <div class="cta-inner">
+            <div class="cta-mark" aria-hidden="true">◱</div>
+            <div class="cta-text">
+              <h2>打开你的成长路径？</h2>
+              <p>以学生身份从一个目标开始。走完 目标 → 发现 → 规划 → 批准 → 反思，带走一条能溯源的路径。</p>
+              <p class="cta-note">演示环境用合成数据，随时可以重来。</p>
+            </div>
+            <div class="cta-act">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="band">试用 CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">体验口令</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <div class="wrap">
+          <p class="synthetic">Synthetic / Demo Data · 学生、成绩、日历与机会数据均为合成</p>
+          <p class="note">本页内容取自产品介绍文档（2026-08-10）。产品定义以完整说明书为准；本页与实现不一致时以实现为准。</p>
+        </div>
+      </footer>
+    </div>
+
+    <div class="pane" data-lang-pane="zh-Hant" lang="zh-Hant" hidden>
+      <header class="hero">
+        <div class="wrap">
+          <p class="kicker">面向在校本科生 · 由大學部署</p>
+          <h1>一個目標 → 一條今天就能走的路，每一步都説得出為什麼</h1>
+          <p class="hero-lead">以學生「你想成為誰」為中心的成長規劃系統，與校方的資源效能分析構成雙閉環：把目標拆成能力小目標，倒推成從今天到未來的每一步行動；學生的真實行動變成證據與記憶，再用這些新證據校準下一輪路徑。而這些反饋同時回到學校，讓資源投到真正缺的地方。</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+               data-cta="hero">試用 CampusPath <span aria-hidden="true">→</span></a>
+            <span class="passcode" data-passcode>
+              <span class="passcode-label">體驗口令</span>
+              <code>OceanMeetsTheSky!</code>
+              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                      aria-label="copy">⧉</button>
+            </span>
+          </div>
+          <dl class="stats">
+            <div><dt>1,534</dt><dd>門真實抓取的課程</dd></div>
+            <div><dt>93</dt><dd>個信息源（85 個真實抓取）</dd></div>
+            <div><dt>13/13</dt><dd>條評測紅線通過</dd></div>
+          </dl>
+        </div>
+      </header>
+
+      <section id="zh-Hant-what" class="section">
+        <div class="wrap">
+          <p class="kicker">我們做什麼</p>
+          <h2>一個學生校園成長規劃操作系統，不是又一個活動聚合網站</h2>
+        <p class="lead">你設一個主目標和一個候選目標，系統從最新的幾十份真實崗位數據裏拆解出要什麼能力，再從全校海量資源裏挑出補得上缺口的活動、課程和機會，排進你真實有空的時段。</p>
+        <p class="lead">產出的是一條帶版本、帶依據、隨變化滾動更新的路徑，不是一份聊完就關掉的建議清單。</p>
+        <p class="lead">CampusPath 不替代導師、Career Center、學院顧問或 LMS——它是學校資源、外部機會與學生個人發展之間的發現、匹配與編排層。</p>
+        <div class="cards">
+          <article class="card">
+            <h3>對學生</h3>
+            <p>把長期方向倒推成當下可執行、且不擠壓生活的路徑；每條建議都説明補什麼差距、形成什麼證據、為什麼是現在。</p>
+          </article>
+          <article class="card">
+            <h3>對學校</h3>
+            <p>把已經投入巨大成本、觸達效率卻很低的資源，變成可測量、可改進、可歸因的成長資產；並第一次看到「資源池覆蓋不了學生的哪些真實需求」。</p>
+          </article>
+          <article class="card">
+            <h3>「學校資源」的口徑</h3>
+            <p>凡是因為學生的在校身份而能拿到的機會，都算學校資源——校友內推、企業來校招聘、合作方名額、跨校聯盟活動。所以我們不分校內校外，只分：是否發現、是否夠格、是否用上。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hant-pain" class="section">
+        <div class="wrap">
+          <p class="kicker">痛點</p>
+          <h2>學生不是缺資源，而是難以把海量資源轉化成自己的成長路徑</h2>
+        <p class="lead">一所大學裏，每個學院有自己的活動，幾百個社團各辦各的，還有協會、實驗室、研究中心、校企合作。這些機會散落在不同部門的官網上——每個官網的架構還都不一樣。你得先找到真正的活動頁，然後經常回去看，才不會錯過。</p>
+        <p class="lead">對一個課業本來就很重的學生來説，這基本做不到，除非你自己搭一套全量採集系統。而且即使看到了，也常常撞上自己的時間，或者報完才發現根本不是自己想要的。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>成本</th><th>具體是什麼</th></tr></thead>
+            <tbody><tr><td class="first">發現成本</td><td>不知道有哪些可信機會</td></tr><tr><td class="first">理解成本</td><td>看到了，卻不知道具體資格與價值</td></tr><tr><td class="first">規劃成本</td><td>不知道課程、經歷和機會如何形成有依賴關係的路徑</td></tr><tr><td class="first">執行成本</td><td>收藏很多，但沒有轉成行動、材料和日曆</td></tr><tr><td class="first">糾偏成本</td><td>做完沒有沉澱，系統下次仍重複安排無效或不適合的事</td></tr><tr><td class="first">容量管理成本</td><td>不知道成長任務如何排進真實日曆，容易衝突、過載或擠壓休息</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">還有一件更隱蔽的事：活動宣傳通常只説「有什麼」，很少説「適合誰、能補什麼差距、時間投入值不值」；而學生做完之後的真實體驗，幾乎從不回到下一輪推薦和學校的資源改進裏。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-who" class="section">
+        <div class="wrap">
+          <p class="kicker">給誰用</p>
+          <h2>主界面給學生，另一半給學校</h2>
+        <p class="lead">五類目標導向人羣——按「想走向哪裏」劃分，不是給學生永久貼標籤。一個學生可以同時持有兩個候選方向，並隨實踐改變權重。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>模式</th><th>典型目標</th><th>系統重點</th></tr></thead>
+            <tbody><tr><td class="first">就業與職業發展</td><td>進入目標企業、行業、崗位或公共服務領域</td><td>崗位要求、技能證據、項目、實習、作品與招聘節奏</td></tr><tr><td class="first">學術與深造</td><td>讀研、讀博、進入研究領域、尋找導師</td><td>課程基礎、研究方法、實驗室、科研經歷與申請時間線</td></tr><tr><td class="first">創業與創新</td><td>創辦項目、驗證需求、加入孵化器或組建團隊</td><td>問題發現、比賽、原型、用户驗證、導師、資金與團隊</td></tr><tr><td class="first">興趣與個人成長</td><td>藝術、體育、語言、公益、創作或其他長期興趣</td><td>能力成長、社羣、作品、體驗質量，不強迫職業化</td></tr><tr><td class="first">探索與方向未定</td><td>暫時迷茫，希望通過實踐逐步認識自己</td><td>低成本、多樣化的探索實驗；用實際體驗更新目標信心</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Career Center 管理員</h3>
+            <p>授予/撤銷投稿權限、管理審核隊列與政策、配置連接器與憑據輪換。不能讀學生私人檔案、反思或日曆，也看不到反饋者身份。</p>
+          </article>
+          <article class="card">
+            <h3>Publisher（社團 / 實驗室 / 學院）</h3>
+            <p>在授權組織與有效期內創建並提交投稿。不能直接公開發布、不能繞過審核、不能代表未授權組織。</p>
+          </article>
+          <article class="card">
+            <h3>職業發展諮詢顧問</h3>
+            <p>只看學生主動預約的會面與想聊的主題，會後最多發 5 條關鍵建議。學生的反思原文、成績、日曆一律 403。</p>
+          </article>
+          <article class="card">
+            <h3>心理諮詢室協調員</h3>
+            <p>只接收學生同意或主動請求的最小化關懷聯繫。不能查看完整日曆，也不能把容量信號當成診斷。</p>
+          </article>
+        </div>
+        <p class="note">國際身份、經濟條件、照護責任、健康與精力、通勤、語言、無障礙需求不是「第六類人」，而是每一種發展模式都必須尊重的個人約束——通過可插拔的 Context Pack 注入已有流程，不復制一套新 Agent。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-value" class="section">
+        <div class="wrap">
+          <p class="kicker">你能得到什麼</p>
+          <h2>六件在別處拿不到的事</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>四態資格，不是「能 / 不能」</h3>
+            <p>大一學生看到只限大三的實習，不會被靜默過濾掉，而是標為「未來可申請」，並告訴你這一年該補什麼。四態：現在合格 / 未來可達 / 信息不足 / 本輪不適用。</p>
+          </article>
+          <article class="card">
+            <h3>每條建議都説得出為什麼</h3>
+            <p>補什麼差距、形成什麼證據、為什麼是現在。拆解出來的每一條都能點開溯源到崗位原文，不是模型編的。</p>
+          </article>
+          <article class="card">
+            <h3>個性化之外仍可自主發現</h3>
+            <p>資訊廣場展示校方全部審核通過的資源，可見性不由 AI 排序決定。任一條目都能點「為什麼沒推薦我」，給出規則引擎簽發的憑據式解釋。</p>
+          </article>
+          <article class="card">
+            <h3>先看真實容量，再安排任務</h3>
+            <p>日曆默認只讀忙閒，不讀事件標題。規劃前先算課程、已有安排、睡眠與三餐保護塊、可支配時間和緩衝，只在你真的有空的格子裏排。</p>
+          </article>
+          <article class="card">
+            <h3>從推薦走到行動的閉環</h3>
+            <p>材料、日曆、提醒、狀態和替代方案連成一條；活動做完寫反思，自動沉澱為成長證據。</p>
+          </article>
+          <article class="card">
+            <h3>不會一味 push 你</h3>
+            <p>睡眠被擠壓且負荷持續偏高時，系統會預警而不是繼續往日曆裏塞東西。這條安全護欄鏈路零大模型——判定歸閾值，文案歸固定模板。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hant-memory" class="section">
+        <div class="wrap">
+          <p class="kicker">越用越懂你</p>
+          <h2>它記住的不是你點了什麼，是你為什麼改主意</h2>
+        <p class="lead">學生從入學到畢業會連續用四年甚至更久。系統必須記住：已修課程與項目、你明確拒絕過的方向和原因、哪些活動對你高價值哪些低價值、你做過的目標變更和取捨、你的節奏與精力偏好，以及哪些技能你已經拿到了、不該再重複安排。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>層</th><th>存什麼</th><th>更新規則</th></tr></thead>
+            <tbody><tr><td class="first">L0 當前檔案</td><td>學業、經歷、成果、技能、目標、偏好、容量與約束的當前有效狀態</td><td>只由權威來源或學生確認更新，每次變更留檔案變更事件</td></tr><tr><td class="first">L1 事件時間線</td><td>參加、申請、完成、放棄、反饋、計劃版本等事件</td><td>只追加；錯了用更正事件處理，不改歷史</td></tr><tr><td class="first">L2 語義記憶</td><td>從經歷裏提煉的興趣、模式與上下文</td><td>帶來源、時間、置信度與過期策略</td></tr><tr><td class="first">L3 證據與筆記</td><td>你的原始筆記、作品、證書、反思原文與附件</td><td>你擁有；默認不向校方共享</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>記憶的安全規矩</h3>
+            <p>區分「學生原話」「系統推斷」「外部事實」，不把推斷偽裝成事實；新舊衝突時保留時間線、用 supersedes 表示更新，不靜默覆蓋；不把短期情緒寫成永久性格標籤。</p>
+          </article>
+          <article class="card">
+            <h3>你隨時可以反悔</h3>
+            <p>任何一條記憶都能搜索、糾正、鎖定、刪除、導出、暫停。讀取時只召回與當前任務相關的最小上下文。</p>
+          </article>
+          <article class="card">
+            <h3>反思三軌分開建模</h3>
+            <p>你發生了什麼變化 / 你想長期保留什麼 / 活動本身是否兑現宣傳——這是三件事。混在一起，學校就永遠收不到有用的信號。</p>
+          </article>
+          <article class="card">
+            <h3>倒逼學生真的去總結</h3>
+            <p>反思必須先綁定一個具體對象才能創建，防止泛泛而談。預約顧問的會面還有一層：寫完並保存這次會面的反思，才能看到顧問給你的關鍵建議。</p>
+          </article>
+        </div>
+        <p class="note">關鍵設計：個人不適配與全局低質是分開的。「太基礎」「太難」走個人契合標籤，只調整你自己的推薦難度，不懲罰這個活動；「宣傳誇大、內容空泛」達到樣本閾值後才降低該屆次的置信度並進入複核。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">和市面上的產品有什麼不同</p>
+          <h2>別人給你一段回覆，我們給你一條路徑</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>產品類型</th><th>它們的重心</th><th>CampusPath 的區別</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>職業身份、網絡、職位與內容</td><td>連接課程、先修、校內資源、學生負荷與長期成長路徑：把機會變成校園行動</td></tr><tr><td class="first">Handshake</td><td>大學生職位、實習、僱主、招聘活動</td><td>不止展示機會，還把課程、研究、比賽、社團和實習組合成有依賴關係的動態能力路徑</td></tr><tr><td class="first">職業測評產品</td><td>興趣、價值觀、職業匹配</td><td>測評只是輸入：系統通過真實實踐持續驗證，而不是一次測完就定型</td></tr><tr><td class="first">簡歷 / 面試工具</td><td>簡歷反饋、面試學習與模擬</td><td>覆蓋進入申請階段之前數月或數年的能力建設與證據積累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>對話建議、簡歷與職業問答</td><td>有真實來源、資格狀態、工具調用、長期記憶、時間約束、行動閉環和可量化評測</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">最短的一句話：別人給你一段回覆，我們給你一條能落實到每日日曆、能追溯來源、會隨你變化滾動更新的路徑，並且把結果迴流給學校。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-how" class="section">
+        <div class="wrap">
+          <p class="kicker">怎麼用</p>
+          <h2>一條真的閉合的環，學生端與校方端互為對方的輸入</h2>
+
+        <ol class="steps">
+          <li>
+            <span class="step-n" aria-hidden="true">01</span>
+            <div>
+              <h3>開通與授權</h3>
+              <p>接入學校教務系統；授權個人日曆（默認只讀忙閒，不讀事件正文）。系統這才知道你的課業狀態與真實可支配時間。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">02</span>
+            <div>
+              <h3>建立成長檔案</h3>
+              <p>上傳簡歷，確定性解析後直接整理進「我的成長檔案」總覽，並彈窗逐條列出新增內容供你自行核對，任何一條都能當場撤銷。國際生可在這裏勾選身份，一個版本化的 Context Pack 會注入後續所有環節。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">03</span>
+            <div>
+              <h3>目標工作室</h3>
+              <p>設一個主目標 + 一個候選目標與推進配比，點「開始規劃」。後台三段式：採集真實崗位數據 → 分析比對 → 目標拆解。拆解分三層：軟實力、硬實力（績點與核心課）、個人真實硬件實力（比賽、項目論文、實習、證書）。系統同時給出兩個目標的共享缺口與分叉點——共享的先做，兩條路都不虧。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">04</span>
+            <div>
+              <h3>發現</h3>
+              <p>資訊廣場按主辦方類別、主題、年級、資格、線上線下、截止時間篩選；已過期的歸入獨立分組並明確標註，不會混在「現在可以報名」裏，也不會被推薦給你。「為你推薦」的每張卡都寫明為什麼推薦你，四態資格直接可見。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">05</span>
+            <div>
+              <h3>規劃與批准</h3>
+              <p>按未來兩週 / 一個月 / 一學期 / 一學年四檔鋪開，並自動倒排提前量——大型比賽提前一兩週到一個月、等級證書提前一兩個月、語言類考試提前一年。規劃完先彈窗給你審批，説明依據（你的目標、你的檔案、記憶裏的偏好），你批准了才寫進日曆。日曆本身就是編輯器；改完是否重排，也問你。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">06</span>
+            <div>
+              <h3>護欄（零大模型）</h3>
+              <p>睡眠只看你自己聲明的睡眠窗口和日曆裏佔用它的安排——沒聲明就不推斷，絕不從「日曆上有空檔」反推你在睡覺。過勞日 = 睡眠不足 7 小時且當天學習工作超過 11 小時；14 天內 ≥ 10 天預警，28 天內 ≥ 20 天要求填 ISI 與 PSS-10 兩份量表。提醒最多兩次，只對學生可見。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">07</span>
+            <div>
+              <h3>反思與沉澱</h3>
+              <p>活動結束後寫反思與四維評分，活動自動歸檔為成長證據。這一步同時產生北極星指標 VGA（Verified Growth Actions）——它不獎勵點擊、收藏、報名或忙碌本身，只數真正做成並留下證據的行動。</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">08</span>
+            <div>
+              <h3>回到學校（閉環的另一半）</h3>
+              <p>管理端統一註冊並監控所有信息源；社團、實驗室、教授通過投稿台提交活動，審核通過才進廣場；批准的活動自帶二維碼，到場掃碼簽到。於是學校拿到兩組真實數據：誰真的來了、他們怎麼評價。由此看清哪類活動更受歡迎、哪些領域有缺口、哪些專業資源不夠。報告按周 / 月 / 學期 / 學年自動生成。</p>
+            </div>
+          </li>
+        </ol>
+        <p class="note">閉環合上了：學生精準找到匹配目標的活動 → 參加 → 寫反思 → 沉澱成證據推動下一輪規劃；而這些反饋同時回到學校，讓學校看到真實需求與趨勢變化，據此補缺口、給高質量活動傾斜資源。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-tech" class="section">
+        <div class="wrap">
+          <p class="kicker">技術架構</p>
+          <h2>雙平面 + 契約先行：類型不允許的數據，物理上流不過去</h2>
+        <p class="lead">語義平面：6 個語義 Agent（編排 / 學生上下文 / 學業 / 目標缺口 / 機會抽取 / 路徑規劃）——唯一允許調模型的那一層。</p>
+        <p class="lead">確定性平面：9 個零大模型的服務（規則與約束、容量與日曆、Wellbeing 文案生成、狀態與記憶、行動與同意、匿名聚合、事件監控與重規劃、發佈審核審計、連接器與目錄）。判定、閾值、資格、容量全在這一側，可復現、可審計。</p>
+        <p class="lead">兩個平面之間的每一次數據交換都由數據契約類型定形。</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>六條架構紅線：每條都有對應的自動化測試，測試不過構建就失敗</th></tr></thead>
+            <tbody><tr><td class="first">1</td><td>路徑規劃 Agent 是唯一做取捨的 Agent；其餘只出事實與候選，輸出類型里根本沒有排序字段</td></tr><tr><td class="first">2</td><td>Wellbeing 安全護欄判斷零大模型——判定歸閾值，文案歸固定模板；構建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td>日曆憑據不進任何模型上下文——止步於容量服務，由類型層強制</td></tr><tr><td class="first">4</td><td>機會抽取 Agent 的工具白名單隻有兩個；外部內容作為數據塊傳入，永不拼進 system prompt</td></tr><tr><td class="first">5</td><td>每個計劃條目必帶規則引擎簽發的校驗憑據，缺失即被 API 拒絕</td></tr><tr><td class="first">6</td><td>私人反思原文到校方聚合的路徑在類型層不存在——不是「我們不傳」，是傳不過去</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Google 生態裏的位置</h3>
+            <p>ADK 負責 Agent、工具、順序/並行工作流與記憶；兩個運行時部署在 Vertex AI Agent Engine；Cloud Run 跑學生 App API、適配器與定時任務；Moodle 沙箱通過自研只讀 MCP 接入；日曆走 Workspace API 的分項授權。</p>
+          </article>
+          <article class="card">
+            <h3>模型可以換（架構承諾）</h3>
+            <p>全系統的模型出口收斂在一個適配點上，Agent 層依賴的是一個只有單個方法的抽象接口。換型號是部署配置，不改一行代碼；換供應商（校方自有模型、其他雲廠商、本地私有部署）只需為這個接口提供一個實現——6 個 Agent、9 個確定性服務、全部數據契約類型與紅線測試零改動。</p>
+          </article>
+          <article class="card">
+            <h3>確定性平面不受影響</h3>
+            <p>資格判定、容量計算、健康閾值、隱私抑制這些最需要穩定與可審計的部分本來就不調模型，不受任何模型更換影響。產品價值不依賴某一個特定模型——學校要用什麼模型，是學校的決定。</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="zh-Hant-control" class="section">
+        <div class="wrap">
+          <p class="kicker">誰説了算</p>
+          <h2>系統給排序，你來拍板</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>學生自主</h3>
+            <p>你可以拒絕、修改、暫停、鎖定任何一條路徑；寫日曆、發消息、申請機會都需要你明確批准；探索型學生不會被逼着提前確定唯一職業目標。</p>
+          </article>
+          <article class="card">
+            <h3>檔案由你確認</h3>
+            <p>證書、LMS 記錄和 Agent 反思可以提出檔案更新建議，但不能無提示地改寫你的檔案；「學生自報」「系統觀察」「來源驗證」始終分開標註。</p>
+          </article>
+          <article class="card">
+            <h3>證據優先於模型自信</h3>
+            <p>資格、截止日期、項目要求必須指向來源；不確定時顯示「需要確認」，而不是編一個答案。</p>
+          </article>
+          <article class="card">
+            <h3>校方只看聚合，不能下鑽到人</h3>
+            <p>任何視圖的樣本量低於閾值一律顯示 Insufficient evidence 並抑制該格，不顯示看似精確的數字；界面上沒有「查看構成這個數字的學生」的入口，後端也不提供這種查詢。</p>
+          </article>
+        </div>
+        <p class="note">這個產品不是什麼：不是保證進入某家公司或學校的成功預測器；不是替學生做不可逆人生決定的自動決策系統；不是用活動數量或簡歷長度衡量成長的系統；不是醫療器械、心理診斷工具或自殺風險預測系統；不是僅憑日曆空檔就向學校報告學生的監控工具。</p>
+        </div>
+      </section>
+
+      <section id="zh-Hant-numbers" class="section">
+        <div class="wrap">
+          <p class="kicker">真實的數字</p>
+          <h2>以香港科技大學的公開數據為例，下列均為實測值</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>項</th><th>數值</th></tr></thead>
+            <tbody><tr><td class="first">真實抓取的課程目錄</td><td>58 個學科 1,534 門課，先修表達式保留來源原文</td></tr><tr><td class="first">信息源註冊表</td><td>93 個源，其中 85 個是真實抓取，8 個為演示用合成源——兩者在界面上一眼可分</td></tr><tr><td class="first">數據契約類型</td><td>177 個（92 條路徑 / 111 個操作），前後端與 Agent 全部從同一份契約生成類型</td></tr><tr><td class="first">評測紅線</td><td>13 條 BLOCKER 全部通過（違反即失敗）</td></tr><tr><td class="first">量化目標</td><td>12 項中 11 項達標——未達標的那一項在報告裏如實標紅，不藏</td></tr><tr><td class="first">對照基線</td><td>5 項，全確定性可復現</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>現在還沒做的，也寫在這裏</h3>
+            <p>當前以「本科生畢業後進入求職」這條線為主；第二個 Career Path Pack（博士畢業進產業）只預留了接口，未交付，前端不顯示、不宣稱；國際學生 Context Pack 已安裝但狀態是「待政策複核」，複核通過前求值結果一律為「需要確認」；真實日曆 OAuth 在演示中使用夾具數據。</p>
+          </article>
+          <article class="card">
+            <h3>不宣稱我們沒有基線的事</h3>
+            <p>不能在沒有真實基線的情況下宣稱已經提高就業率或學業成果。上面所有目標都是試點假設。</p>
+          </article>
+        </div>
+        <p class="note">判定類指標要求雙跑逐字節一致，且 Gold Label 與引擎故意分開實現——用同一份代碼生成標籤又用它評測，等於自己給自己打分。學生、成績、日曆、機會與投稿數據一律為合成數據，頁面全站標註 Synthetic / Demo Data；已核實為真實公開來源的條目另有「官方」標記，兩者不混。</p>
+        </div>
+      </section>
+
+      <section class="cta-band">
+        <div class="wrap">
+          <div class="cta-inner">
+            <div class="cta-mark" aria-hidden="true">◱</div>
+            <div class="cta-text">
+              <h2>打開你的成長路徑？</h2>
+              <p>以學生身份從一個目標開始。走完 目標 → 發現 → 規劃 → 批准 → 反思，帶走一條能溯源的路徑。</p>
+              <p class="cta-note">演示環境用合成數據，隨時可以重來。</p>
+            </div>
+            <div class="cta-act">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="band">試用 CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">體驗口令</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <div class="wrap">
+          <p class="synthetic">Synthetic / Demo Data · 學生、成績、日曆與機會數據均為合成</p>
+          <p class="note">本頁內容取自產品介紹文檔（2026-08-10）。產品定義以完整説明書為準；本頁與實現不一致時以實現為準。</p>
+        </div>
+      </footer>
+    </div>
+
+    <div class="pane" data-lang-pane="en" lang="en" hidden>
+      <header class="hero">
+        <div class="wrap">
+          <p class="kicker">For undergraduates · deployed by the university</p>
+          <h1>One goal → a path you can start walking today, and every step says why</h1>
+          <p class="hero-lead">A growth-planning system built around the student's own question — who do you want to become — closed on the other side by the university's view of how well its resources actually land. Goals become capability gaps, gaps become steps on a real calendar, actions become evidence, and that evidence recalibrates the next round. The same feedback flows back to the school, so resources go where the gaps really are.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+               data-cta="hero">Try CampusPath <span aria-hidden="true">→</span></a>
+            <span class="passcode" data-passcode>
+              <span class="passcode-label">Demo passcode</span>
+              <code>OceanMeetsTheSky!</code>
+              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                      aria-label="copy">⧉</button>
+            </span>
+          </div>
+          <dl class="stats">
+            <div><dt>1,534</dt><dd>real courses, scraped</dd></div>
+            <div><dt>93</dt><dd>registered sources (85 real)</dd></div>
+            <div><dt>13/13</dt><dd>blocker checks passing</dd></div>
+          </dl>
+        </div>
+      </header>
+
+      <section id="en-what" class="section">
+        <div class="wrap">
+          <p class="kicker">What we do</p>
+          <h2>A growth-planning operating system for students — not another events aggregator</h2>
+        <p class="lead">You set one primary goal and one candidate goal. The system reads dozens of live job postings, works backwards to the capabilities they demand, then picks the activities, courses and opportunities across campus that close those gaps — and schedules them into hours you actually have.</p>
+        <p class="lead">What comes out is a versioned, sourced path that keeps updating as you change. Not a list of suggestions you close and forget.</p>
+        <p class="lead">CampusPath does not replace mentors, the Career Center, faculty advisors or the LMS. It is the discovery, matching and orchestration layer between campus resources, outside opportunities and a student's own development.</p>
+        <div class="cards">
+          <article class="card">
+            <h3>For students</h3>
+            <p>A long-range direction turned into steps you can take now without crowding out your life. Every suggestion states which gap it closes, what evidence it produces, and why now.</p>
+          </article>
+          <article class="card">
+            <h3>For the university</h3>
+            <p>Resources that cost a great deal and reach very few become measurable, improvable and attributable growth assets — and, for the first time, you can see which real student needs your resource pool does not cover.</p>
+          </article>
+          <article class="card">
+            <h3>What counts as a campus resource</h3>
+            <p>Anything a student can reach because of their enrolment: alumni referrals, employers recruiting on campus, partner quotas, inter-university events. So we don't split on-campus from off-campus — only on discovered, eligible, and used.</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="en-pain" class="section">
+        <div class="wrap">
+          <p class="kicker">Pain points</p>
+          <h2>Students aren't short of resources — they're short of a way to turn them into a path</h2>
+        <p class="lead">Every school runs its own events. Hundreds of societies run theirs. So do associations, labs, research centres and corporate partners. All of it sits on different departmental websites, each with its own structure. You have to find the real listing page, then keep going back so you don't miss anything.</p>
+        <p class="lead">For a student already carrying a full course load, that is not realistic — not unless you build yourself a scraper. And even when you do see something, it often collides with your schedule, or turns out to be the wrong thing only after you've signed up.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Cost</th><th>What it looks like</th></tr></thead>
+            <tbody><tr><td class="first">Discovery</td><td>Not knowing which credible opportunities exist</td></tr><tr><td class="first">Comprehension</td><td>Seeing one, but not knowing the eligibility or the value</td></tr><tr><td class="first">Planning</td><td>Not knowing how courses, experiences and opportunities depend on each other</td></tr><tr><td class="first">Execution</td><td>Plenty saved, none of it turned into actions, materials or calendar entries</td></tr><tr><td class="first">Correction</td><td>Nothing captured afterwards, so the next round repeats what didn't work</td></tr><tr><td class="first">Capacity</td><td>No sense of how growth tasks fit a real calendar — collisions, overload, lost rest</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">And something subtler: event promotion says what an event is, rarely who it suits, which gap it closes, or whether the hours are worth it. Meanwhile what students actually experienced almost never returns to the next round of recommendations, or to the school's decisions about resources.</p>
+        </div>
+      </section>
+
+      <section id="en-who" class="section">
+        <div class="wrap">
+          <p class="kicker">Who it's for</p>
+          <h2>The main interface is for students; the other half is for the school</h2>
+        <p class="lead">Five goal-oriented modes — grouped by where someone wants to go, not permanent labels. A student can hold two candidate directions at once and shift the weighting as they act.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Mode</th><th>Typical goal</th><th>What the system emphasises</th></tr></thead>
+            <tbody><tr><td class="first">Employment</td><td>A target company, industry, role or public service field</td><td>Role requirements, skill evidence, projects, internships, portfolio, hiring rhythm</td></tr><tr><td class="first">Academia</td><td>Master's, PhD, entering a research field, finding a supervisor</td><td>Course foundations, research methods, labs, research experience, application timelines</td></tr><tr><td class="first">Entrepreneurship</td><td>Starting something, validating demand, joining an incubator, building a team</td><td>Problem discovery, competitions, prototypes, user validation, mentors, funding, team</td></tr><tr><td class="first">Personal interest</td><td>Art, sport, language, public service, creative work</td><td>Capability growth, community, output, quality of experience — no forced professionalisation</td></tr><tr><td class="first">Exploring</td><td>Genuinely undecided, wanting practice to reveal direction</td><td>Low-cost, varied experiments; lived experience updates interests and confidence</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Career Center admin</h3>
+            <p>Grants and revokes publishing rights, runs the review queue and policy, configures connectors and rotates credentials. Cannot read student profiles, reflections or calendars, and never sees who left which feedback.</p>
+          </article>
+          <article class="card">
+            <h3>Publisher (society / lab / school)</h3>
+            <p>Creates and submits listings within an authorised organisation and validity window. Cannot publish directly, bypass review, or act for an organisation they don't hold.</p>
+          </article>
+          <article class="card">
+            <h3>Career advisor</h3>
+            <p>Sees only the meetings a student booked and what they want to discuss, then sends up to five key recommendations. Reflections, grades and calendars return 403.</p>
+          </article>
+          <article class="card">
+            <h3>Wellbeing coordinator</h3>
+            <p>Receives only the minimal outreach a student consented to or requested. No full calendar access, and capacity signals are never treated as a diagnosis.</p>
+          </article>
+        </div>
+        <p class="note">International status, finances, caregiving duties, health and energy, commuting, language and accessibility needs are not a sixth category of person. They are personal constraints every mode must respect — injected into existing flows through pluggable Context Packs, not by cloning a new agent.</p>
+        </div>
+      </section>
+
+      <section id="en-value" class="section">
+        <div class="wrap">
+          <p class="kicker">What you get</p>
+          <h2>Six things you won't get elsewhere</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>Four eligibility states, not yes/no</h3>
+            <p>A first-year looking at a third-year internship isn't silently filtered out. It's marked future-eligible, with what to build this year. Four states: eligible now, future-eligible, insufficient information, not applicable this round.</p>
+          </article>
+          <article class="card">
+            <h3>Every suggestion states its reason</h3>
+            <p>Which gap, what evidence, why now. Each line of a goal breakdown opens onto the job posting it came from — not something a model invented.</p>
+          </article>
+          <article class="card">
+            <h3>Browsing survives personalisation</h3>
+            <p>The plaza shows every approved resource; visibility is not decided by AI ranking. Any listing can be asked &quot;why wasn't this recommended to me&quot;, and the answer is a credential issued by the rules engine.</p>
+          </article>
+          <article class="card">
+            <h3>Real capacity first, tasks second</h3>
+            <p>The calendar reads busy/free by default, not event titles. Before planning, the system counts classes, existing commitments, sleep and meal protection blocks, discretionary time and buffer — and only schedules into hours you genuinely have.</p>
+          </article>
+          <article class="card">
+            <h3>A loop from recommendation to action</h3>
+            <p>Materials, calendar, reminders, status and fallbacks all connect; write a reflection afterwards and it settles into growth evidence.</p>
+          </article>
+          <article class="card">
+            <h3>It won't just push you</h3>
+            <p>When sleep is being squeezed and load stays high, the system warns instead of adding more. That guardrail chain uses no language model at all — thresholds decide, fixed templates speak.</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="en-memory" class="section">
+        <div class="wrap">
+          <p class="kicker">It learns you</p>
+          <h2>What it remembers isn't what you clicked — it's why you changed your mind</h2>
+        <p class="lead">A student uses this for four years or more. So the system has to remember completed courses and projects, the directions you explicitly turned down and why, which activities were worth your time and which weren't, the goal changes and trade-offs you made, your rhythm and energy preferences, and which skills you already have and shouldn't be scheduled for again.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Layer</th><th>What it holds</th><th>Update rule</th></tr></thead>
+            <tbody><tr><td class="first">L0 Canonical profile</td><td>The current valid state of studies, experience, outcomes, skills, goals, preferences, capacity and constraints</td><td>Updated only by authoritative sources or your confirmation; every change leaves a change event</td></tr><tr><td class="first">L1 Episodic timeline</td><td>Attended, applied, completed, dropped, feedback, plan versions</td><td>Append-only; mistakes are handled with correction events, never by editing history</td></tr><tr><td class="first">L2 Semantic memory</td><td>Interests, patterns and context distilled from experience</td><td>Carries source, time, confidence and an expiry policy</td></tr><tr><td class="first">L3 Evidence &amp; notes</td><td>Your raw notes, work, certificates, reflection text and attachments</td><td>Yours; not shared with the school by default</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>The rules memory follows</h3>
+            <p>Student's own words, system inference and external fact stay distinguishable — inference is never dressed up as fact. When old and new conflict, the timeline is preserved and the update supersedes rather than silently overwrites. A passing mood never becomes a permanent trait.</p>
+          </article>
+          <article class="card">
+            <h3>You can always take it back</h3>
+            <p>Any memory can be searched, corrected, locked, deleted, exported or paused. Recall pulls the minimum context the current task needs — never your whole history.</p>
+          </article>
+          <article class="card">
+            <h3>Reflection has three separate tracks</h3>
+            <p>What changed in you, what you want to keep long term, and whether the event delivered what it promised are three different things. Mixed together, the school never receives a usable signal.</p>
+          </article>
+          <article class="card">
+            <h3>It makes students actually reflect</h3>
+            <p>A reflection has to be bound to a specific object before it can exist, which rules out saying nothing at length. Advisor meetings add one more turn: write and save your reflection first, and only then do you see what the advisor wrote for you.</p>
+          </article>
+        </div>
+        <p class="note">A deliberate split: personal mismatch and genuine low quality are separate. &quot;Too basic&quot; and &quot;too hard&quot; become a personal fit tag that adjusts your own difficulty and does not penalise the event. &quot;Overstated, thin content&quot; only lowers that occurrence's confidence once it clears a sample threshold, and then it goes to review.</p>
+        </div>
+      </section>
+
+      <section id="en-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">How this is different</p>
+          <h2>Others hand you a reply; we hand you a path</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Product type</th><th>Their centre of gravity</th><th>Where CampusPath differs</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>Professional identity, network, jobs and content</td><td>Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions</td></tr><tr><td class="first">Handshake</td><td>Student jobs, internships, employers, careers events</td><td>Doesn't stop at listing: composes courses, research, competitions, societies and internships into a dependency-aware capability path</td></tr><tr><td class="first">Career assessments</td><td>Interests, values, occupational fit</td><td>The assessment is only an input — the system keeps validating it through real practice instead of fixing you in place after one test</td></tr><tr><td class="first">Résumé / interview tools</td><td>Résumé feedback, interview prep and mock rounds</td><td>Covers the months or years of capability building and evidence gathering before the application stage</td></tr><tr><td class="first">General AI career coaches</td><td>Conversational advice, résumé and career Q&amp;A</td><td>Real sources, eligibility states, tool calls, long-term memory, time constraints, an action loop and measurable evaluation</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">The short version: others give you a reply. We give you a path that lands on your calendar, traces back to its sources, keeps updating as you change, and returns its results to the school.</p>
+        </div>
+      </section>
+
+      <section id="en-how" class="section">
+        <div class="wrap">
+          <p class="kicker">How it works</p>
+          <h2>A loop that actually closes — each side is the other's input</h2>
+
+        <ol class="steps">
+          <li>
+            <span class="step-n" aria-hidden="true">01</span>
+            <div>
+              <h3>Connect and consent</h3>
+              <p>Link the student information system; authorise your calendar (busy/free only by default, never event bodies). Only then does the system know your academic state and the time you really have.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">02</span>
+            <div>
+              <h3>Build your profile</h3>
+              <p>Upload a résumé; deterministic parsing files it straight into your profile overview, then a drawer lists every added line so you can check it — and undo any of them on the spot. International students can declare status here, and a versioned Context Pack flows into everything downstream.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">03</span>
+            <div>
+              <h3>Goal studio</h3>
+              <p>Set a primary goal, a candidate goal and the split between them, then press Start planning. Three stages run: gather live job postings → compare → decompose. The breakdown has three tiers: soft skills; hard academics (GPA and core courses); and demonstrable assets (competitions, projects and papers, internships, certificates). You also get the shared gaps and the fork points between your two goals — do the shared work first, and neither path loses.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">04</span>
+            <div>
+              <h3>Discover</h3>
+              <p>The plaza filters by organiser category, theme, year, eligibility, format and deadline. Expired listings move into their own group, clearly marked — they never sit among things you can still sign up for, and they are never recommended. Every For You card states why it was recommended to you, with eligibility state visible.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">05</span>
+            <div>
+              <h3>Plan, then approve</h3>
+              <p>Four ranges — next two weeks, a month, a term, a year — with lead times worked backwards automatically: a week to a month for major competitions, one to two months for certifications, a year for language exams. The draft comes to you in a dialog first, stating what it was built on (your goals, your profile, the preferences in your memory), and only lands on your calendar once you approve. The calendar itself is the editor; whether an edit triggers a re-plan is also your call.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">06</span>
+            <div>
+              <h3>Guardrails, with no language model</h3>
+              <p>Sleep is read only from the window you declared and whatever occupies it — nothing is inferred when you haven't declared, and an empty calendar slot is never taken as evidence that you slept. An overloaded day means under 7 hours of sleep and over 11 hours of study or work; 10 such days in a rolling 14 raise a warning, 20 in 28 ask you to complete the ISI and PSS-10 scales. At most two reminders, visible only to the student.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">07</span>
+            <div>
+              <h3>Reflect and accumulate</h3>
+              <p>Write a reflection and rate four dimensions; the activity files itself as growth evidence. This is also where the north-star metric comes from — Verified Growth Actions counts only actions genuinely completed with evidence behind them, never clicks, saves, sign-ups or busyness.</p>
+            </div>
+          </li>
+          <li>
+            <span class="step-n" aria-hidden="true">08</span>
+            <div>
+              <h3>Back to the school</h3>
+              <p>The admin console registers and monitors every information source. Societies, labs and faculty submit listings that reach the plaza only after review. Approved events carry a QR code, and attendance is scanned at the door. The school ends up with two real datasets: who actually came, and what they thought. From there: which formats draw people, where the gaps are, which programmes are under-resourced. Reports generate weekly, monthly, per term and per year.</p>
+            </div>
+          </li>
+        </ol>
+        <p class="note">The loop closes: a student finds work that matches their goal, does it, reflects, and that evidence drives the next round of planning — while the same feedback reaches the school, showing real demand and shifting trends so it can fill gaps and back what works.</p>
+        </div>
+      </section>
+
+      <section id="en-tech" class="section">
+        <div class="wrap">
+          <p class="kicker">Under the hood</p>
+          <h2>Two planes, contracts first: data the types forbid physically cannot flow</h2>
+        <p class="lead">The semantic plane: six agents (orchestration, student context, academics, goal gaps, opportunity extraction, path planning) — the only layer permitted to call a model.</p>
+        <p class="lead">The deterministic plane: nine services with no language model anywhere (rules and constraints, capacity and calendar, wellbeing copy, state and memory, actions and consent, anonymous aggregation, monitoring and re-planning, publishing review and audit, connectors and catalog). Every judgement, threshold, eligibility decision and capacity calculation lives here — reproducible and auditable.</p>
+        <p class="lead">Every exchange between the two planes is shaped by a data contract type.</p>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>#</th><th>Six architectural red lines — each has a test, and a failing test fails the build</th></tr></thead>
+            <tbody><tr><td class="first">1</td><td>The planning agent is the only one that makes trade-offs; the rest emit facts and candidates, and their output types have no ranking field at all</td></tr><tr><td class="first">2</td><td>Wellbeing guardrails use no language model — thresholds judge, fixed templates speak; importing a model SDK at build time is forbidden</td></tr><tr><td class="first">3</td><td>Calendar credentials never enter any model context — they stop at the capacity service, enforced by the type layer</td></tr><tr><td class="first">4</td><td>The extraction agent has exactly two whitelisted tools; external content arrives as data and is never concatenated into a system prompt</td></tr><tr><td class="first">5</td><td>Every plan item must carry a validation credential issued by the rules engine, or the API rejects it</td></tr><tr><td class="first">6</td><td>There is no type-level path from private reflection text to school aggregates — not &quot;we don't send it&quot;, but it cannot be sent</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>Where it sits in Google's stack</h3>
+            <p>ADK handles agents, tools, sequential and parallel workflows, and memory; two runtimes deploy to Vertex AI Agent Engine; Cloud Run runs the student app API, adapters and scheduled jobs; the Moodle sandbox connects through a read-only MCP we built; the calendar uses per-scope Workspace API grants.</p>
+          </article>
+          <article class="card">
+            <h3>The model is replaceable (an architectural commitment)</h3>
+            <p>Every model call in the system converges on a single adapter, and the agent layer depends on an abstract interface with one method. Changing model version is deployment config, not code. Changing vendor — the university's own model, another cloud, an on-premise deployment — means writing one implementation of that interface, with zero changes to the six agents, the nine deterministic services, the contract types or the red-line tests.</p>
+          </article>
+          <article class="card">
+            <h3>The deterministic plane doesn't move</h3>
+            <p>Eligibility, capacity, health thresholds and privacy suppression — the parts that most need to be stable and auditable — never call a model in the first place, so no model change touches them. The product's value doesn't rest on any one model. Which model to run is the university's decision.</p>
+          </article>
+        </div>
+        </div>
+      </section>
+
+      <section id="en-control" class="section">
+        <div class="wrap">
+          <p class="kicker">You're in charge</p>
+          <h2>The system ranks; you decide</h2>
+
+        <div class="cards">
+          <article class="card">
+            <h3>Student autonomy</h3>
+            <p>You can reject, edit, pause or lock any path. Writing to your calendar, sending a message or applying to something all need your explicit approval. Students who are still exploring are never pushed to commit to a single career goal early.</p>
+          </article>
+          <article class="card">
+            <h3>Your profile, your confirmation</h3>
+            <p>Certificates, LMS records and agent reflections can propose profile updates, but cannot rewrite your profile without telling you. Self-reported, system-observed and source-verified stay labelled apart.</p>
+          </article>
+          <article class="card">
+            <h3>Evidence outranks model confidence</h3>
+            <p>Eligibility, deadlines and programme requirements must point at a source. When it's uncertain, the answer is &quot;needs confirmation&quot;, not an invented one.</p>
+          </article>
+          <article class="card">
+            <h3>The school sees aggregates and cannot drill down</h3>
+            <p>Any cell below the sample threshold shows Insufficient evidence and is suppressed — never a number that looks precise. There is no interface for &quot;show me the students behind this figure&quot;, and the backend offers no such query.</p>
+          </article>
+        </div>
+        <p class="note">What this product is not: a success predictor guaranteeing entry anywhere; an automated decision system making irreversible life choices for a student; a system measuring growth by activity count or résumé length; a medical device, psychological diagnostic or suicide-risk predictor; or a monitoring tool that reports on students from calendar gaps alone.</p>
+        </div>
+      </section>
+
+      <section id="en-numbers" class="section">
+        <div class="wrap">
+          <p class="kicker">The real numbers</p>
+          <h2>Measured against HKUST's public data — every figure below is an observed value</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Item</th><th>Value</th></tr></thead>
+            <tbody><tr><td class="first">Course catalog, really scraped</td><td>1,534 courses across 58 subjects, prerequisite expressions kept as source text</td></tr><tr><td class="first">Source registry</td><td>93 sources, 85 of them genuinely scraped and 8 synthetic for demos — distinguishable at a glance in the UI</td></tr><tr><td class="first">Data contract types</td><td>177 types (92 paths / 111 operations); frontend, backend and agents all generate from the same contract</td></tr><tr><td class="first">Blocker checks</td><td>13 of 13 passing (a violation is a failure)</td></tr><tr><td class="first">Quantified targets</td><td>11 of 12 met — the one that isn't is flagged red in the report, not hidden</td></tr><tr><td class="first">Comparison baselines</td><td>5, all deterministic and reproducible</td></tr></tbody>
+          </table>
+        </div>
+        <div class="cards">
+          <article class="card">
+            <h3>What isn't built yet, stated here too</h3>
+            <p>The current build centres on the undergraduate-to-employment line. A second career path pack (doctorate into industry) has an interface reserved but is not delivered — the frontend neither shows nor claims it. The international student Context Pack is installed but marked pending policy review, so until it clears, every evaluation returns &quot;needs confirmation&quot;. Real calendar OAuth uses fixtures in the demo.</p>
+          </article>
+          <article class="card">
+            <h3>We don't claim what we have no baseline for</h3>
+            <p>Nothing here claims improved employment or academic outcomes — there is no real baseline to claim it against. Every target above is a pilot hypothesis.</p>
+          </article>
+        </div>
+        <p class="note">Judgement metrics must produce byte-identical results across two runs, and the gold labels are implemented separately from the engine on purpose — generating labels with the same code you evaluate with is marking your own homework. Student, grade, calendar, opportunity and submission data are all synthetic, and every page is marked Synthetic / Demo Data; entries verified as real public sources carry an Official marker instead.</p>
+        </div>
+      </section>
+
+      <section class="cta-band">
+        <div class="wrap">
+          <div class="cta-inner">
+            <div class="cta-mark" aria-hidden="true">◱</div>
+            <div class="cta-text">
+              <h2>Open your own path?</h2>
+              <p>Start as a student with a single goal. Walk goal → discover → plan → approve → reflect, and leave with a path you can trace.</p>
+              <p class="cta-note">The demo runs on synthetic data — you can always start over.</p>
+            </div>
+            <div class="cta-act">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="band">Try CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">Demo passcode</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="foot">
+        <div class="wrap">
+          <p class="synthetic">Synthetic / Demo Data · student, grade, calendar and opportunity data are all synthetic</p>
+          <p class="note">Drawn from the product overview document (2026-08-10). The full specification defines the product; where this page and the implementation disagree, the implementation wins.</p>
+        </div>
+      </footer>
+    </div>
+</main>
+
+<script>
+(function () {
+  var KEY = "campuspath.landing.locale";
+  var NAV = {"zh-Hans":{"nav":[["what","做什么"],["pain","痛点"],["who","给谁用"],["value","能得到什么"],["memory","记忆"],["how","怎么用"],["tech","技术"]],"cta":"试用 CampusPath","short":"试用","sub":"校园成长路径","lang":"zh-Hans"},"zh-Hant":{"nav":[["what","做什麼"],["pain","痛點"],["who","給誰用"],["value","能得到什麼"],["memory","記憶"],["how","怎麼用"],["tech","技術"]],"cta":"試用 CampusPath","short":"試用","sub":"校園成長路徑","lang":"zh-Hant"},"en":{"nav":[["what","What we do"],["pain","Pain points"],["who","Who it's for"],["value","What you get"],["memory","Memory"],["how","How it works"],["tech","Tech"]],"cta":"Try CampusPath","short":"Try","sub":"Campus growth pathways","lang":"en"}};
+  var sel = document.querySelector("[data-lang-select]");
+  var links = document.querySelector("[data-navlinks]");
+  var ctaLabel = document.querySelector("[data-cta-label]");
+  var sub = document.querySelector("[data-brand-sub]");
+
+  function apply(code) {
+    if (!NAV[code]) code = "zh-Hans";
+    document.querySelectorAll("[data-lang-pane]").forEach(function (p) {
+      p.hidden = p.getAttribute("data-lang-pane") !== code;
+    });
+    document.documentElement.lang = NAV[code].lang;
+    links.innerHTML = NAV[code].nav.map(function (n) {
+      return '<a href="#' + code + "-" + n[0] + '">' + n[1] + "</a>";
+    }).join("");
+    ctaLabel.querySelector("[data-cta-full]").textContent = NAV[code].cta;
+    ctaLabel.querySelector("[data-cta-short]").textContent = NAV[code].short;
+    sub.textContent = NAV[code].sub;
+    sel.value = code;
+    try { localStorage.setItem(KEY, code); } catch (e) {}
+  }
+
+  var stored = null;
+  try { stored = localStorage.getItem(KEY); } catch (e) {}
+  // 没存过就跟随浏览器语言：繁体地区给繁体，非中文给英文
+  if (!stored) {
+    var l = (navigator.language || "").toLowerCase();
+    stored = l.indexOf("zh") === 0
+      ? (/hant|tw|hk|mo/.test(l) ? "zh-Hant" : "zh-Hans")
+      : (l.indexOf("zh") === -1 && l ? "en" : "zh-Hans");
+  }
+  apply(stored);
+  sel.addEventListener("change", function () { apply(sel.value); });
+
+  document.addEventListener("click", function (e) {
+    var b = e.target.closest("[data-copy]");
+    if (!b) return;
+    var done = function () {
+      b.setAttribute("data-copied", "1");
+      b.textContent = "✓";
+      setTimeout(function () {
+        b.removeAttribute("data-copied");
+        b.textContent = "⧉";
+      }, 1600);
+    };
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(b.getAttribute("data-copy")).then(done, function () {});
+    }
+  });
+})();
+</script>
+</body>
+</html>
