@@ -182,6 +182,13 @@ class OpportunityAdminEdit(CampusPathModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     official_url: str | None = Field(default=None, max_length=500)
+    #: 「编辑推荐」的**人工**置位理由（D，2026-08-10）。
+    #: 给值 = 置位；给 `"none"` = 撤销（回落到读时自动派生）；不给 = 不动。
+    #: 只收人工理由——`high_verified_student_value` 是自动派生的专属值，
+    #: curator 不能手签一个「学生给了高分」，那是数据说的话不是人说的话。
+    curation_reason: Literal[
+        "verified_by_school", "strategic_campus_priority", "none"
+    ] | None = None
 
 
 class SourceKind(StrEnum):

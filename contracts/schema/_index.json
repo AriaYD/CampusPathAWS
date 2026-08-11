@@ -1,5 +1,5 @@
 {
-  "contracts_version": "1.37.0",
+  "contracts_version": "1.38.0",
   "models": [
     "AcademicProgram",
     "AcademicState",

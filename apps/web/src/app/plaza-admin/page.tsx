@@ -84,6 +84,7 @@ export default function PlazaAdminPage() {
     setNotice(null);
     try {
       await institution.editOpportunity(opportunityId, {
+        curation_reason: null,          // 本次不动徽章
         title: draft.title.trim() || null,
         deadline: draft.deadline ? `${draft.deadline}T23:59:00Z` : null,
         starts_at: null,
@@ -91,6 +92,31 @@ export default function PlazaAdminPage() {
         official_url: null,
       });
       setEditing(null);
+      catalog.reload();
+    } catch (err) {
+      setNotice((err as Error).message);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  /**
+   * 「编辑推荐」的人工置位 / 撤销（D，2026-08-10）。
+   *
+   * curator 只能签**人的判断**（校方已核验 / 本学期重点）；
+   * `high_verified_student_value` 是数据说的话，契约层就拒收——
+   * 所以这里的下拉只有三个选项，没有第四个。
+   * 撤销 = 传 `"none"`，回落到读时自动派生（分够样本够它会自己回来）。
+   */
+  async function setCuration(opportunityId: string, reason: string) {
+    setBusy(opportunityId);
+    setNotice(null);
+    try {
+      await institution.editOpportunity(opportunityId, {
+        // 其余字段一律 null = 本次不改（服务端按 `is not None` 过滤）
+        title: null, deadline: null, starts_at: null, ends_at: null, official_url: null,
+        curation_reason: reason as "verified_by_school" | "strategic_campus_priority" | "none",
+      });
       catalog.reload();
     } catch (err) {
       setNotice((err as Error).message);
@@ -213,6 +239,31 @@ export default function PlazaAdminPage() {
                       </Button>
                       {opp.publication_status !== "withdrawn" && view === "live" && (
                         <>
+                          {/* 编辑推荐：自动派生的显示为只读注记（那是数据说的话），
+                              人工置位/撤销走这个下拉 */}
+                          <select
+                            className="field t-meta"
+                            aria-label={t("console.plaza.curation")}
+                            data-plaza-curation={opp.opportunity_id}
+                            data-curation-set-by={opp.curation?.set_by ?? "none"}
+                            disabled={busy === opp.opportunity_id
+                              || opp.curation?.set_by === "auto"}
+                            value={opp.curation?.set_by === "curator"
+                              ? opp.curation.reason : "none"}
+                            onChange={(e) => setCuration(opp.opportunity_id, e.target.value)}
+                          >
+                            <option value="none">
+                              {opp.curation?.set_by === "auto"
+                                ? t("console.plaza.curation.auto")
+                                : t("console.plaza.curation.none")}
+                            </option>
+                            <option value="verified_by_school">
+                              {t("square.curation.verified_by_school")}
+                            </option>
+                            <option value="strategic_campus_priority">
+                              {t("square.curation.strategic_campus_priority")}
+                            </option>
+                          </select>
                           <Button
                             variant="ghost"
                             data-plaza-edit={opp.opportunity_id}

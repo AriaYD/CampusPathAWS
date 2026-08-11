@@ -3,6 +3,23 @@
   "additionalProperties": false,
   "description": "B10（2026-08-01 用户裁定）：审核批准后的生命周期管理——\n活动取消/改期时，Career Center 可直接修改或下架已发布条目。\n全部字段可选：只改给了值的。",
   "properties": {
+    "curation_reason": {
+      "anyOf": [
+        {
+          "enum": [
+            "verified_by_school",
+            "strategic_campus_priority",
+            "none"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Curation Reason"
+    },
     "deadline": {
       "anyOf": [
         {

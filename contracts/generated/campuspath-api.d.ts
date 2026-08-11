@@ -4639,6 +4639,11 @@ export interface components {
          */
         OpportunityAdminEdit: {
             /**
+             * Curation Reason
+             * @default null
+             */
+            curation_reason: ("verified_by_school" | "strategic_campus_priority" | "none") | null;
+            /**
              * Deadline
              * @default null
              */

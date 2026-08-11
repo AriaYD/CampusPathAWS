@@ -2639,6 +2639,16 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         """B10（用户裁定 2026-08-01）：批准后的生命周期管理——改期/改名/改链接。
         只改给了值的字段；model_copy 走重校验（common.py 覆写），改坏即 422。"""
         patch = {k: v for k, v in edit.model_dump().items() if v is not None}
+        # 「编辑推荐」的人工置位 / 撤销（D，2026-08-10）。
+        # `"none"` 是**显式撤销**——不能用 None 表示，那和「本次不改」撞了。
+        # 撤销后回落到读时自动派生：分够样本够它会自己回来，这是对的
+        # （curator 撤的是「人工加权」，不是「学生给的高分」）。
+        reason = patch.pop("curation_reason", None)
+        if reason is not None:
+            patch["curation"] = None if reason == "none" else CurationBadge(
+                reason=CurationReason(reason), set_by="curator",
+                set_at=datetime.now(timezone.utc),
+            )
         if "title" in patch:
             # 展示层优先读 title_localized——改了 title 不清掉旧双语值，
             # 界面会继续显示旧名（实测踩到）。清空后回落到新 title。

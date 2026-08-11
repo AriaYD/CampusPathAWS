@@ -240,3 +240,51 @@ def test_plaza_never_ships_a_score_alongside_the_badge(deps, client):
     for row in rows:
         leaked = forbidden & set(row) | forbidden & set(row.get("curation") or {})
         assert not leaked, f"{row['opportunity_id']} 的广场对象带出了分数字段：{leaked}"
+
+
+def test_curator_badge_wins_over_auto_and_can_be_revoked(deps, client):
+    """人工置位优先于自动派生，且可显式撤销回落到自动。
+
+    三段：① curator 给一条**没有任何反馈**的机会贴「校方已核验」→ 徽章在，
+    `set_by=curator`；② 给同一条灌满高分反馈 → 徽章**仍是人工那个**
+    （自动派生不许覆盖人的判断，§6.12）；③ curator 撤销 → 回落到自动派生，
+    这时因为分够样本够，徽章以 `set_by=auto` 回来——撤的是「人工加权」，
+    不是「学生给的高分」。
+    """
+    from campuspath_contracts.aggregation import MIN_CELL_N
+
+    target = _live(deps, 5)
+    oid = target.opportunity_id
+    assert _badge_of(client, oid) is None, "样例前提：它本来没有徽章"
+
+    r = call(client, "PUT", f"/v1/catalog/opportunities/{oid}",
+             role=ActorRole.CAREER_CENTER_ADMIN,
+             json={"curation_reason": "verified_by_school"})
+    assert r.status_code == 200, r.text
+    badge = _badge_of(client, oid)
+    assert badge["reason"] == "verified_by_school" and badge["set_by"] == "curator"
+
+    _rate(deps, target, n=MIN_CELL_N, score=5, tag="override")
+    badge = _badge_of(client, oid)
+    assert badge["set_by"] == "curator", "自动派生覆盖了 curator 的人工置位"
+
+    r = call(client, "PUT", f"/v1/catalog/opportunities/{oid}",
+             role=ActorRole.CAREER_CENTER_ADMIN,
+             json={"curation_reason": "none"})
+    assert r.status_code == 200, r.text
+    badge = _badge_of(client, oid)
+    assert badge is not None and badge["set_by"] == "auto", (
+        "撤销人工置位后应回落到自动派生（此时分够样本够）"
+    )
+
+
+def test_curator_cannot_hand_sign_the_automatic_reason(deps, client):
+    """`high_verified_student_value` 是数据说的话，curator 不能手签。
+
+    契约层用 Literal 收窄取值——不是靠服务端记得判断。
+    """
+    oid = _live(deps, 6).opportunity_id
+    r = call(client, "PUT", f"/v1/catalog/opportunities/{oid}",
+             role=ActorRole.CAREER_CENTER_ADMIN,
+             json={"curation_reason": "high_verified_student_value"})
+    assert r.status_code == 422, f"契约应拒收自动理由，实际 {r.status_code}"
