@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRole } from "@/app/providers";
 import { useI18n, localized, pickLang } from "@/i18n";
@@ -110,8 +111,6 @@ export default function ConsolePage() {
   }
   // 审查 #3：Source Health 八项指标面板不可随注册表卡消失（F22 零删减）
   const health = useResource(() => institution.sourceHealth(), [role]);
-  const coverage = useResource(() => institution.resourceCoverage(), [role]);
-  const quality = useResource(() => institution.eventQuality(), [role]);
   const probes = useResource(
     () =>
       Promise.all(
@@ -364,54 +363,23 @@ export default function ConsolePage() {
         </div>
       </Card>
 
-      {/* ── 匿名聚合：只出总量，不可下钻 ─────────────────── */}
-      <div className="mb-5 grid gap-5 lg:grid-cols-2">
-        <Card>
-          <SectionTitle>{t("console.coverage")}</SectionTitle>
-          <p className="t-meta mb-3 text-fg-faint">{t("console.coverage.explain")}</p>
-          {coverage.loading && <Loading />}
-          {coverage.error && <Failure error={coverage.error} />}
-          {coverage.data?.length === 0 && <Empty />}
-          <ul className="flex flex-col gap-2">
-            {coverage.data?.map((row) => (
-              <li
-                key={row.aggregate_id}
-                data-coverage={row.aggregate_id}
-                className="t-meta flex justify-between text-fg-muted"
-              >
-                <span>
-                  {row.period} · {row.scope}
-                </span>
-                <span className="tabular-nums">
-                  n={row.cell_n} ·{" "}
-                  {row.gap_coverage_rate === null
-                    ? "—"
-                    : `${Math.round(row.gap_coverage_rate * 100)}%`}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-
-        <Card>
-          <SectionTitle>{t("console.quality")}</SectionTitle>
-          {quality.loading && <Loading />}
-          {quality.error && <Failure error={quality.error} />}
-          {quality.data?.length === 0 && <Empty />}
-          <ul className="flex flex-col gap-2">
-            {quality.data?.slice(0, 8).map((row) => (
-              <li
-                key={row.aggregate_id}
-                data-quality={row.aggregate_id}
-                className="t-meta flex justify-between text-fg-muted"
-              >
-                <span>{row.series_id ?? row.occurrence_id}</span>
-                <span className="tabular-nums">n={row.verified_n}</span>
-              </li>
-            ))}
-          </ul>
-        </Card>
-      </div>
+      {/* ── 聚合洞察搬去 /insights（2026-08-11 用户裁定，兑现 P0 计划第 3 条）──
+          这里原本有两张极简聚合卡，读的是**同一个无参 `resourceCoverage()`**
+          与**同一个 `eventQuality()`**，却只渲染三项比率里的一项、五个维度里的零个。
+          严格的子集重复没有价值；更糟的是样本不足时它渲染 `"—"`，
+          而 `/insights` 明令那种情况必须写 `Insufficient evidence`——
+          同一个数字在两页遵守不同的诚实规则，比重复危险。
+          控制台从此只管运维：源注册表 + 健康度 + 隔离探针。 */}
+      <Card className="mb-5" data-insights-link-card>
+        <SectionTitle>{t("console.insights.title")}</SectionTitle>
+        <p className="t-meta mb-3 max-w-[70ch] text-fg-muted">
+          {t("console.insights.lead")}
+        </p>
+        <Link href="/insights" data-insights-link
+              className="pressable btn btn-secondary t-meta">
+          {t("console.insights.cta")} →
+        </Link>
+      </Card>
 
       {/* ── 隔离探针：主动去撞墙，把状态码摆出来 ─────────── */}
       <Card>

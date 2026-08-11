@@ -1039,10 +1039,9 @@ export const en = {
   "console.freshness": "Freshness",
   "console.brokenLinks": "Broken links",
   "console.schemaCoverage": "Schema coverage",
-  "console.coverage": "Resource coverage",
-  "console.coverage.explain":
-    "Cells below the sample threshold are suppressed before they reach this page — filtering harder will not reveal a smaller group.",
-  "console.quality": "Event quality trend",
+  "console.insights.title": "Resource impact insights",
+  "console.insights.lead": "Utilisation, supply gaps (institution-wide and by school), plaza conversion and the full data report all live on that page. This console stays operational: source registry, health, isolation probes.",
+  "console.insights.cta": "Open resource impact insights",
   "console.isolation": "Isolation probe",
   "console.isolation.explain":
     "These requests are made deliberately, as the current role, against endpoints this role must never reach. A green row means the server refused. A red row is a real leak, and this panel is where you would see it first.",

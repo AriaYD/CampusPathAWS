@@ -1029,10 +1029,9 @@ export const zhHans: Record<keyof Dict, string> = {
   "console.freshness": "新鲜度",
   "console.brokenLinks": "断链率",
   "console.schemaCoverage": "字段覆盖率",
-  "console.coverage": "资源覆盖",
-  "console.coverage.explain":
-    "低于样本阈值的格在到达本页之前就被抑制了——再往细里筛也不会露出更小的群体。",
-  "console.quality": "活动质量趋势",
+  "console.insights.title": "资源效能洞察",
+  "console.insights.lead": "利用率、供给缺口（全校与按学院）、广场转化与完整数据报告都在那一页。控制台只管运维：源注册表、健康度与隔离探针。",
+  "console.insights.cta": "打开资源效能洞察",
   "console.isolation": "隔离探针",
   "console.isolation.explain":
     "下面这些请求是**故意**以当前身份发出的，目标是这个角色绝不该够到的端点。绿色表示服务端拒绝了。红色就是真的泄漏，而这块面板是你最先看到它的地方。",
