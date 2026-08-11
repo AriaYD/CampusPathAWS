@@ -433,4 +433,12 @@ label.btn:focus-within {
   body { overflow-wrap: anywhere; }
   /* 表格类数字与等宽串保持整体可读，只在真的放不下时才断 */
   .t-mono, .tabular-nums { overflow-wrap: break-word; }
+  /* 但**控件标签不许拦腰断词**（2026-08-10 用户报障）：`anywhere` 让
+     "Overview" 在分段控件里断成 "Overvie / w"。正文断词是为了不撑破容器，
+     按钮不需要——按钮该做的是把自己缩小或让容器滚动，不是把词切开。
+     这里只还原断行规则，不动任何尺寸。 */
+  button, .btn, [data-nav-link], [role="tab"], [data-page-tab], label {
+    overflow-wrap: normal;
+    word-break: normal;
+  }
 }

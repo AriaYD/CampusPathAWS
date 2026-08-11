@@ -496,13 +496,17 @@ export default function GoalsPage() {
   return (
     <>
       <PageHeader titleKey="goals.title" leadKey="goals.lead">
-        {/* R10-7：目标设定之后 AI 才有规划依据——「开始规划」从开通页搬来 */}
+        {/* R10-7：目标设定之后 AI 才有规划依据，所以这个入口留在目标页。
+            2026-08-10 用户报障 + Fable 裁定：它此前叫「开始规划」却**只是导航**，
+            与规划页那个真发起草案的按钮同名同属性——界面在说谎，门禁也会
+            按 DOM 顺序命中错的那个。改成老实的「去规划」，并指向
+            `/timeline`（真正的发起处；原先指 `/planner` 是选修课分页，指错了）。 */}
         <Link
-          href="/planner"
-          data-start-planning
+          href="/timeline"
+          data-goto-planning
           className="pressable btn btn-primary t-body font-medium"
         >
-          {t("goals.startPlanning")}
+          {t("goals.gotoPlanning")}
         </Link>
       </PageHeader>
 

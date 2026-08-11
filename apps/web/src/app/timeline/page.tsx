@@ -181,7 +181,6 @@ export function ActivityPlanContent({ standalone = false }: { standalone?: boole
         />
       </PageHeader>
 
-      <PathwayApprovalGate plan={plan} />
 
       {/* S1 三档强度选择（2026-08-03，用户复裁定样式）：**不是导航**，
           不用 Segmented——mist 色系标签药丸与分页控件明确区隔；
@@ -212,6 +211,8 @@ export function ActivityPlanContent({ standalone = false }: { standalone?: boole
           </span>
         )}
       </div>
+
+      <PathwayApprovalGate plan={plan} />
 
       {/* G4 成长曲线 */}
       <Card className="mb-5">

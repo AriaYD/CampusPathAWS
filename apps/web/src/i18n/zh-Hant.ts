@@ -130,7 +130,7 @@ export const zhHant: Record<keyof Dict, string> = {
   "onboarding.contacts.saved": "已保存——隨時可回來修改。",
   "onboarding.finish": "開始規劃",
   "onboarding.nextGoals": "授權與聯繫人就緒後，去「目標工作室」設定目標——那裏有「開始規劃」。AI 需要先認識你（檔案 + 目標），規劃才有依據。",
-  "goals.startPlanning": "開始規劃",
+  "goals.gotoPlanning": "去規劃",
   "onboarding.done.title": "都設好了",
   "onboarding.done.lead": "以上沒有一項是不可更改的。設置與隱私裏有同樣的開關，另加導出與刪除。",
   "profile.tab.overview": "總覽",

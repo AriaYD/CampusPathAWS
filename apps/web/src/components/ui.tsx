@@ -260,11 +260,14 @@ export function Metric({
         ? "var(--color-moss-600)"
         : "var(--fg)";
   return (
-    <div>
+    // min-w-0：不加它，flex 子项的最小宽度是内容宽度，父容器再怎么收缩都没用——
+    // 2026-08-10 用户报障的英文档案卡溢出就是这条（"DEVELOPMENT MODE /
+    // Exploration" 比中文的"发展模式/探索中"宽得多，卡片被顶穿）。
+    <div className="min-w-0">
       <div className="t-micro text-fg-faint">{label}</div>
       <div className="mt-1 flex items-baseline gap-1">
         <span
-          className="tabular-nums"
+          className="tabular-nums break-words"
           style={{ color, fontSize: "1.5rem", fontWeight: 700, letterSpacing: "-0.02em", fontFamily: "var(--font-display, ui-sans-serif), var(--font-sans)" }}
         >
           {value}

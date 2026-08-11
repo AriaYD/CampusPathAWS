@@ -530,7 +530,7 @@ export default function ProfilePage() {
             <Card>
               {/* 专业名占满剩余宽度（用户裁定：不许挤成三行窄条）；
                   年级/学分/发展模式收成右侧一排紧凑指标。 */}
-              <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-4">
+              <div className="flex flex-wrap items-end justify-between gap-x-5 gap-y-4 lg:gap-x-10">
                 <div className="min-w-[240px] flex-1">
                   <div className="t-micro text-fg-faint">{t("profile.programme")}</div>
                   <div className="t-title mt-1 text-fg">
@@ -541,7 +541,7 @@ export default function ProfilePage() {
                       : profile.data.program_id}
                   </div>
                 </div>
-                <div className="flex shrink-0 flex-wrap gap-x-10 gap-y-4">
+                <div className="flex min-w-0 flex-wrap gap-x-5 gap-y-4 lg:shrink-0 lg:gap-x-10">
                   <Metric label={t("profile.year")} value={profile.data.year} />
                   <Metric
                     label={t("profile.credits")}

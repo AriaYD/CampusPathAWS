@@ -157,7 +157,7 @@ export const zhHans: Record<keyof Dict, string> = {
   "onboarding.contacts.saved": "已保存——随时可回来修改。",
   "onboarding.finish": "开始规划",
   "onboarding.nextGoals": "授权与联系人就绪后，去「目标工作室」设定目标——那里有「开始规划」。AI 需要先认识你（档案 + 目标），规划才有依据。",
-  "goals.startPlanning": "开始规划",
+  "goals.gotoPlanning": "去规划",
   "onboarding.done.title": "都设好了",
   "onboarding.done.lead":
     "以上没有一项是不可更改的。设置与隐私里有同样的开关，另加导出与删除。",

@@ -34,8 +34,20 @@ export const PAGES = [
   { path: "/gaps", must: ["[data-unknowns]"] },
   {
     path: "/timeline",
-    // 三个时间视图与 G4 成长曲线
-    must: ["[data-trajectory]", "[data-trajectory-chart]", "[data-plan-items]", "[data-plan-item]"],
+    // 三个时间视图与 G4 成长曲线。
+    //
+    // 2026-08-10（P3-G）：计划条目**不再无条件存在**——规划要学生批准才落盘，
+    // 所以新学生进来看到的是「开始规划」空态。把 `[data-plan-item]` 留作硬性
+    // MUST 会让这道门禁的绿取决于跑之前有没有人手动批准过一版（本轮实测就
+    // 撞上了：P3 收尾时它是绿的，只因为我刚在浏览器里批准过）——那是假绿。
+    //
+    // 改成或选：**要么有计划、要么有开始规划的入口**。空白页仍然是失败，
+    // 断言的力度没有被削弱，只是不再依赖会话状态。
+    must: [
+      "[data-trajectory]",
+      "[data-trajectory-chart]",
+      "[data-plan-item],[data-never-planned]",
+    ],
   },
   {
     path: "/planner",

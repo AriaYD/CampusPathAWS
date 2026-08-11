@@ -123,7 +123,7 @@ export default function GapsPage() {
       {/* ── 北极星指标 VGA（Spec §17.1）：可爱质感星星 + 本月数（用户裁定
           样式）。数字全部来自服务端派生端点，0 如实显示 0。 ── */}
       <Card className="mb-5" data-vga>
-        <div className="flex flex-wrap items-center gap-x-10 gap-y-4">
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-4 lg:gap-x-10">
           <div className="flex items-center gap-4">
             <svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true"
                  style={{ filter: "drop-shadow(0 3px 7px rgb(240 181 69 / 0.45))" }}>

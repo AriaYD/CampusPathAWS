@@ -163,7 +163,7 @@ export const en = {
   "onboarding.contacts.saved": "Saved - come back and edit any time.",
   "onboarding.finish": "Start planning",
   "onboarding.nextGoals": "Once consents and contacts are set, head to Goal Studio to set your goals — the Start Planning button lives there. The AI plans only after it knows you (profile + goals).",
-  "goals.startPlanning": "Start planning",
+  "goals.gotoPlanning": "Go to planning",
   "onboarding.done.title": "You are set",
   "onboarding.done.lead":
     "Nothing above is permanent. Settings & Privacy has the same switches plus export and deletion.",
