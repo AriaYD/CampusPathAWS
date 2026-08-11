@@ -20,6 +20,7 @@ HKUST Google 黑客松参赛项目（命题：Gemini Enterprise for Higher Educa
 | [PROGRESS.md](PROGRESS.md) | 进度审计：断点、决策时间线、待确认项（只记已验证事实） |
 | [docs/demo-runbook.md](docs/demo-runbook.md) | Demo 运行手册：Spec §19 十七步对照与彩排清单 |
 | [docs/campuspath-visual.html](docs/campuspath-visual.html) | 交互式项目说明网页源码（五分页：项目背景 / 功能清单 / Agent 架构 / Workflow / 技术实现） |
+| [docs/campuspath-landing.html](docs/campuspath-landing.html) | **产品宣传页**（三语，自包含单文件；顶栏常驻「试用」CTA + 页尾 CTA band + 体验口令）。**生成物**：改 `docs/landing/content.mjs` 后跑 `bun run landing`，`bun run landing:check` 守一致性——**禁止手改 HTML**，繁体由 OpenCC 转出不手写 |
 | [contracts/README.md](contracts/README.md) | 契约层：Schema 唯一真相来源，以及它强制了哪些红线 |
 | [seed/DATA_DICTIONARY.md](seed/DATA_DICTIONARY.md) | 合成数据字典 |
 | [infra/README.md](infra/README.md) | GCP 基础设施脚本（bootstrap / verify / moodle / cost） |
@@ -89,7 +90,7 @@ HKUST_CampusPath/
 ├── eval/campuspath_eval/         # make eval：13 BLOCKER / 12 TARGET / 5 BASELINE
 ├── infra/                        # GCP 脚本（默认 dry-run）：bootstrap/verify/moodle/cost/agent_engine（运行时 status/query/delete）
 ├── scripts/                      # preflight（14 项自检）、pre-commit 密钥拦截、install-hooks
-├── docs/                         # demo-runbook、verification/ 浏览器实测截图、visual 网页
+├── docs/                         # demo-runbook、verification/ 浏览器实测截图、visual 网页、landing 宣传页（生成物 + content 源）
 └── .claude/                      # hooks（上下文交接引擎）、skills、handoff
 ```
 

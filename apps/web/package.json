@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "i18n:hant": "bun scripts/gen-zh-hant.ts",
-    "i18n:hant:check": "bun scripts/gen-zh-hant.ts --check"
+    "i18n:hant:check": "bun scripts/gen-zh-hant.ts --check",
+    "landing": "bun scripts/build-landing.mjs",
+    "landing:check": "bun scripts/build-landing.mjs --check"
   },
   "dependencies": {
     "motion": "^12.43.0",
