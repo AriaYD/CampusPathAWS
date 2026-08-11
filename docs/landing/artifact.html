@@ -179,6 +179,19 @@ tbody tr:last-child td{border-bottom:none}
 td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 .section:nth-of-type(even) .table-wrap{background:var(--bg)}
 .section:nth-of-type(even) th{background:var(--bg-sunk)}
+/* 我们自己那一列。底色 + 左侧一道强调线把它与"它们的重心"分开；
+   表头再加重一档，让"这一列是谁在说话"从第一行就成立。
+   .section:nth-of-type(even) th 也会命中这一格，所以 th.ours 要写在它后面。 */
+td.ours{background:var(--accent-soft)}
+th.ours,
+.section:nth-of-type(even) th.ours{
+  /* 表头**不再加深**：加深到 accent-soft 78% + accent 时，13px 粗体的
+     accent-deep 只有 3.93:1，够不上 AA 的 4.5（13px 也不算"大字"）。
+     与单元格同底、靠左侧强调线与字重区分，实测 4.82:1。 */
+  background:var(--accent-soft);
+  color:var(--accent-deep);
+}
+td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
 .steps{list-style:none; counter-reset:none; margin:28px 0 0; padding:0; display:grid; gap:2px}
 /* 直接子级选择器是**必须的**：.steps li 会连步骤里的分列小点一起选中，
@@ -363,7 +376,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>成本</th><th>具体是什么</th></tr></thead>
-            <tbody><tr><td class="first">发现成本</td><td>不知道有哪些可信机会</td></tr><tr><td class="first">理解成本</td><td>看到了，却不知道具体资格与价值</td></tr><tr><td class="first">规划成本</td><td>不知道课程、经历和机会如何形成有依赖关系的路径</td></tr><tr><td class="first">执行成本</td><td>收藏很多，但没有转成行动、材料和日历</td></tr><tr><td class="first">纠偏成本</td><td>做完没有沉淀，系统下次仍重复安排无效或不适合的事</td></tr><tr><td class="first">容量管理成本</td><td>不知道成长任务如何排进真实日历，容易冲突、过载或挤压休息</td></tr></tbody>
+            <tbody><tr><td class="first">发现成本</td><td class="">不知道有哪些可信机会</td></tr><tr><td class="first">理解成本</td><td class="">看到了，却不知道具体资格与价值</td></tr><tr><td class="first">规划成本</td><td class="">不知道课程、经历和机会如何形成有依赖关系的路径</td></tr><tr><td class="first">执行成本</td><td class="">收藏很多，但没有转成行动、材料和日历</td></tr><tr><td class="first">纠偏成本</td><td class="">做完没有沉淀，系统下次仍重复安排无效或不适合的事</td></tr><tr><td class="first">容量管理成本</td><td class="">不知道成长任务如何排进真实日历，容易冲突、过载或挤压休息</td></tr></tbody>
           </table>
         </div>
         <p class="note">还有一件更隐蔽的事：活动宣传通常只说「有什么」，很少说「适合谁、能补什么差距、时间投入值不值」；而学生做完之后的真实体验，几乎从不回到下一轮推荐和学校的资源改进里。</p>
@@ -381,7 +394,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>模式</th><th>典型目标</th><th>系统重点</th></tr></thead>
-            <tbody><tr><td class="first">就业与职业发展</td><td>进入目标企业、行业、岗位或公共服务领域</td><td>岗位要求、技能证据、项目、实习、作品与招聘节奏</td></tr><tr><td class="first">学术与深造</td><td>读研、读博、进入研究领域、寻找导师</td><td>课程基础、研究方法、实验室、科研经历与申请时间线</td></tr><tr><td class="first">创业与创新</td><td>创办项目、验证需求、加入孵化器或组建团队</td><td>问题发现、比赛、原型、用户验证、导师、资金与团队</td></tr><tr><td class="first">兴趣与个人成长</td><td>艺术、体育、语言、公益、创作或其他长期兴趣</td><td>能力成长、社群、作品、体验质量，不强迫职业化</td></tr><tr><td class="first">探索与方向未定</td><td>暂时迷茫，希望通过实践逐步认识自己</td><td>低成本、多样化的探索实验；用实际体验更新目标信心</td></tr></tbody>
+            <tbody><tr><td class="first">就业与职业发展</td><td class="">进入目标企业、行业、岗位或公共服务领域</td><td class="">岗位要求、技能证据、项目、实习、作品与招聘节奏</td></tr><tr><td class="first">学术与深造</td><td class="">读研、读博、进入研究领域、寻找导师</td><td class="">课程基础、研究方法、实验室、科研经历与申请时间线</td></tr><tr><td class="first">创业与创新</td><td class="">创办项目、验证需求、加入孵化器或组建团队</td><td class="">问题发现、比赛、原型、用户验证、导师、资金与团队</td></tr><tr><td class="first">兴趣与个人成长</td><td class="">艺术、体育、语言、公益、创作或其他长期兴趣</td><td class="">能力成长、社群、作品、体验质量，不强迫职业化</td></tr><tr><td class="first">探索与方向未定</td><td class="">暂时迷茫，希望通过实践逐步认识自己</td><td class="">低成本、多样化的探索实验；用实际体验更新目标信心</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -454,8 +467,8 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>产品类型</th><th>它们的重心</th><th>CampusPath 的区别</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>职业身份、网络、职位与内容</td><td>连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动</td></tr><tr><td class="first">Handshake</td><td>大学生职位、实习、雇主、招聘活动</td><td>不止展示机会，还把课程、研究、比赛、社团和实习组合成有依赖关系的动态能力路径</td></tr><tr><td class="first">职业测评产品</td><td>兴趣、价值观、职业匹配</td><td>测评只是输入：系统通过真实实践持续验证，而不是一次测完就定型</td></tr><tr><td class="first">简历 / 面试工具</td><td>简历反馈、面试学习与模拟</td><td>覆盖进入申请阶段之前数月或数年的能力建设与证据积累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>对话建议、简历与职业问答</td><td>有真实来源、资格状态、工具调用、长期记忆、时间约束、行动闭环和可量化评测</td></tr></tbody>
+            <thead><tr><th>产品类型</th><th>它们的重心</th><th class="ours">CampusPath 的区别</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td class="">职业身份、网络、职位与内容</td><td class=" ours">连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动</td></tr><tr><td class="first">Handshake</td><td class="">大学生职位、实习、雇主、招聘活动</td><td class=" ours">不止展示机会，还把课程、研究、比赛、社团和实习组合成有依赖关系的动态能力路径</td></tr><tr><td class="first">职业测评产品</td><td class="">兴趣、价值观、职业匹配</td><td class=" ours">测评只是输入：系统通过真实实践持续验证，而不是一次测完就定型</td></tr><tr><td class="first">简历 / 面试工具</td><td class="">简历反馈、面试学习与模拟</td><td class=" ours">覆盖进入申请阶段之前数月或数年的能力建设与证据积累</td></tr><tr><td class="first">通用 AI Career Coach</td><td class="">对话建议、简历与职业问答</td><td class=" ours">有真实来源、资格状态、工具调用、长期记忆、时间约束、行动闭环和可量化评测</td></tr></tbody>
           </table>
         </div>
         <p class="note">最短的一句话：别人给你一段回复，我们给你一条能落实到每日日历、能追溯来源、会随你变化滚动更新的路径，并且把结果回流给学校。</p>
@@ -473,7 +486,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>层</th><th>存什么</th><th>更新规则</th></tr></thead>
-            <tbody><tr><td class="first">L0 当前档案</td><td>学业、经历、成果、技能、目标、偏好、容量与约束的<strong>当前有效状态</strong></td><td>只由权威来源或学生确认更新，每次变更留档案变更事件</td></tr><tr><td class="first">L1 事件时间线</td><td>参加、申请、完成、放弃、反馈、计划版本等事件</td><td><strong>只追加</strong>；错了用更正事件处理，不改历史</td></tr><tr><td class="first">L2 语义记忆</td><td>从经历里提炼的兴趣、模式与上下文</td><td>带来源、时间、置信度与过期策略</td></tr><tr><td class="first">L3 证据与笔记</td><td>你的原始笔记、作品、证书、反思原文与附件</td><td><strong>你拥有</strong>；默认不向校方共享</td></tr></tbody>
+            <tbody><tr><td class="first">L0 当前档案</td><td class="">学业、经历、成果、技能、目标、偏好、容量与约束的<strong>当前有效状态</strong></td><td class="">只由权威来源或学生确认更新，每次变更留档案变更事件</td></tr><tr><td class="first">L1 事件时间线</td><td class="">参加、申请、完成、放弃、反馈、计划版本等事件</td><td class=""><strong>只追加</strong>；错了用更正事件处理，不改历史</td></tr><tr><td class="first">L2 语义记忆</td><td class="">从经历里提炼的兴趣、模式与上下文</td><td class="">带来源、时间、置信度与过期策略</td></tr><tr><td class="first">L3 证据与笔记</td><td class="">你的原始笔记、作品、证书、反思原文与附件</td><td class=""><strong>你拥有</strong>；默认不向校方共享</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -608,7 +621,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>六条架构红线：每条都有对应的自动化测试，测试不过构建就失败</th></tr></thead>
-            <tbody><tr><td class="first">1</td><td>路径规划 Agent 是唯一做取舍的 Agent；其余只出事实与候选，输出类型里根本没有排序字段</td></tr><tr><td class="first">2</td><td>Wellbeing 安全护栏判断<strong>零大模型</strong>——判定归阈值，文案归固定模板；构建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td>日历凭据不进任何模型上下文——止步于容量服务，由类型层强制</td></tr><tr><td class="first">4</td><td>机会抽取 Agent 的工具白名单只有两个；外部内容作为数据块传入，永不拼进 system prompt</td></tr><tr><td class="first">5</td><td>每个计划条目必带规则引擎签发的校验凭据，缺失即被 API 拒绝</td></tr><tr><td class="first">6</td><td>私人反思原文到校方聚合的路径在类型层不存在——不是「我们不传」，是传不过去</td></tr></tbody>
+            <tbody><tr><td class="first">1</td><td class="">路径规划 Agent 是唯一做取舍的 Agent；其余只出事实与候选，输出类型里根本没有排序字段</td></tr><tr><td class="first">2</td><td class="">Wellbeing 安全护栏判断<strong>零大模型</strong>——判定归阈值，文案归固定模板；构建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td class="">日历凭据不进任何模型上下文——止步于容量服务，由类型层强制</td></tr><tr><td class="first">4</td><td class="">机会抽取 Agent 的工具白名单只有两个；外部内容作为数据块传入，永不拼进 system prompt</td></tr><tr><td class="first">5</td><td class="">每个计划条目必带规则引擎签发的校验凭据，缺失即被 API 拒绝</td></tr><tr><td class="first">6</td><td class="">私人反思原文到校方聚合的路径在类型层不存在——不是「我们不传」，是传不过去</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -663,7 +676,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>项</th><th>数值</th></tr></thead>
-            <tbody><tr><td class="first">真实抓取的课程目录</td><td>58 个学科 1,534 门课，先修表达式保留来源原文</td></tr><tr><td class="first">信息源注册表</td><td>93 个源，其中 85 个是真实抓取，8 个为演示用合成源——两者在界面上一眼可分</td></tr><tr><td class="first"><strong>数据契约类型</strong></td><td>177 个（92 条路径 / 111 个操作），前后端与 Agent 全部从同一份契约生成类型</td></tr><tr><td class="first">评测红线</td><td>13 条 BLOCKER 全部通过（违反即失败）</td></tr><tr><td class="first">量化目标</td><td>12 项中 11 项达标——未达标的那一项在报告里如实标红，不藏</td></tr><tr><td class="first">对照基线</td><td>5 项，全确定性可复现</td></tr></tbody>
+            <tbody><tr><td class="first">真实抓取的课程目录</td><td class="">58 个学科 1,534 门课，先修表达式保留来源原文</td></tr><tr><td class="first">信息源注册表</td><td class="">93 个源，其中 85 个是真实抓取，8 个为演示用合成源——两者在界面上一眼可分</td></tr><tr><td class="first"><strong>数据契约类型</strong></td><td class="">177 个（92 条路径 / 111 个操作），前后端与 Agent 全部从同一份契约生成类型</td></tr><tr><td class="first">评测红线</td><td class="">13 条 BLOCKER 全部通过（违反即失败）</td></tr><tr><td class="first">量化目标</td><td class="">12 项中 11 项达标——未达标的那一项在报告里如实标红，不藏</td></tr><tr><td class="first">对照基线</td><td class="">5 项，全确定性可复现</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -774,7 +787,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>成本</th><th>具體是什麼</th></tr></thead>
-            <tbody><tr><td class="first">發現成本</td><td>不知道有哪些可信機會</td></tr><tr><td class="first">理解成本</td><td>看到了，卻不知道具體資格與價值</td></tr><tr><td class="first">規劃成本</td><td>不知道課程、經歷和機會如何形成有依賴關係的路徑</td></tr><tr><td class="first">執行成本</td><td>收藏很多，但沒有轉成行動、材料和日曆</td></tr><tr><td class="first">糾偏成本</td><td>做完沒有沉澱，系統下次仍重複安排無效或不適合的事</td></tr><tr><td class="first">容量管理成本</td><td>不知道成長任務如何排進真實日曆，容易衝突、過載或擠壓休息</td></tr></tbody>
+            <tbody><tr><td class="first">發現成本</td><td class="">不知道有哪些可信機會</td></tr><tr><td class="first">理解成本</td><td class="">看到了，卻不知道具體資格與價值</td></tr><tr><td class="first">規劃成本</td><td class="">不知道課程、經歷和機會如何形成有依賴關係的路徑</td></tr><tr><td class="first">執行成本</td><td class="">收藏很多，但沒有轉成行動、材料和日曆</td></tr><tr><td class="first">糾偏成本</td><td class="">做完沒有沉澱，系統下次仍重複安排無效或不適合的事</td></tr><tr><td class="first">容量管理成本</td><td class="">不知道成長任務如何排進真實日曆，容易衝突、過載或擠壓休息</td></tr></tbody>
           </table>
         </div>
         <p class="note">還有一件更隱蔽的事：活動宣傳通常只説「有什麼」，很少説「適合誰、能補什麼差距、時間投入值不值」；而學生做完之後的真實體驗，幾乎從不回到下一輪推薦和學校的資源改進裏。</p>
@@ -792,7 +805,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>模式</th><th>典型目標</th><th>系統重點</th></tr></thead>
-            <tbody><tr><td class="first">就業與職業發展</td><td>進入目標企業、行業、崗位或公共服務領域</td><td>崗位要求、技能證據、項目、實習、作品與招聘節奏</td></tr><tr><td class="first">學術與深造</td><td>讀研、讀博、進入研究領域、尋找導師</td><td>課程基礎、研究方法、實驗室、科研經歷與申請時間線</td></tr><tr><td class="first">創業與創新</td><td>創辦項目、驗證需求、加入孵化器或組建團隊</td><td>問題發現、比賽、原型、用户驗證、導師、資金與團隊</td></tr><tr><td class="first">興趣與個人成長</td><td>藝術、體育、語言、公益、創作或其他長期興趣</td><td>能力成長、社羣、作品、體驗質量，不強迫職業化</td></tr><tr><td class="first">探索與方向未定</td><td>暫時迷茫，希望通過實踐逐步認識自己</td><td>低成本、多樣化的探索實驗；用實際體驗更新目標信心</td></tr></tbody>
+            <tbody><tr><td class="first">就業與職業發展</td><td class="">進入目標企業、行業、崗位或公共服務領域</td><td class="">崗位要求、技能證據、項目、實習、作品與招聘節奏</td></tr><tr><td class="first">學術與深造</td><td class="">讀研、讀博、進入研究領域、尋找導師</td><td class="">課程基礎、研究方法、實驗室、科研經歷與申請時間線</td></tr><tr><td class="first">創業與創新</td><td class="">創辦項目、驗證需求、加入孵化器或組建團隊</td><td class="">問題發現、比賽、原型、用户驗證、導師、資金與團隊</td></tr><tr><td class="first">興趣與個人成長</td><td class="">藝術、體育、語言、公益、創作或其他長期興趣</td><td class="">能力成長、社羣、作品、體驗質量，不強迫職業化</td></tr><tr><td class="first">探索與方向未定</td><td class="">暫時迷茫，希望通過實踐逐步認識自己</td><td class="">低成本、多樣化的探索實驗；用實際體驗更新目標信心</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -865,8 +878,8 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>產品類型</th><th>它們的重心</th><th>CampusPath 的區別</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>職業身份、網絡、職位與內容</td><td>連接課程、先修、校內資源、學生負荷與長期成長路徑：把機會變成校園行動</td></tr><tr><td class="first">Handshake</td><td>大學生職位、實習、僱主、招聘活動</td><td>不止展示機會，還把課程、研究、比賽、社團和實習組合成有依賴關係的動態能力路徑</td></tr><tr><td class="first">職業測評產品</td><td>興趣、價值觀、職業匹配</td><td>測評只是輸入：系統通過真實實踐持續驗證，而不是一次測完就定型</td></tr><tr><td class="first">簡歷 / 面試工具</td><td>簡歷反饋、面試學習與模擬</td><td>覆蓋進入申請階段之前數月或數年的能力建設與證據積累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>對話建議、簡歷與職業問答</td><td>有真實來源、資格狀態、工具調用、長期記憶、時間約束、行動閉環和可量化評測</td></tr></tbody>
+            <thead><tr><th>產品類型</th><th>它們的重心</th><th class="ours">CampusPath 的區別</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td class="">職業身份、網絡、職位與內容</td><td class=" ours">連接課程、先修、校內資源、學生負荷與長期成長路徑：把機會變成校園行動</td></tr><tr><td class="first">Handshake</td><td class="">大學生職位、實習、僱主、招聘活動</td><td class=" ours">不止展示機會，還把課程、研究、比賽、社團和實習組合成有依賴關係的動態能力路徑</td></tr><tr><td class="first">職業測評產品</td><td class="">興趣、價值觀、職業匹配</td><td class=" ours">測評只是輸入：系統通過真實實踐持續驗證，而不是一次測完就定型</td></tr><tr><td class="first">簡歷 / 面試工具</td><td class="">簡歷反饋、面試學習與模擬</td><td class=" ours">覆蓋進入申請階段之前數月或數年的能力建設與證據積累</td></tr><tr><td class="first">通用 AI Career Coach</td><td class="">對話建議、簡歷與職業問答</td><td class=" ours">有真實來源、資格狀態、工具調用、長期記憶、時間約束、行動閉環和可量化評測</td></tr></tbody>
           </table>
         </div>
         <p class="note">最短的一句話：別人給你一段回覆，我們給你一條能落實到每日日曆、能追溯來源、會隨你變化滾動更新的路徑，並且把結果迴流給學校。</p>
@@ -884,7 +897,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>層</th><th>存什麼</th><th>更新規則</th></tr></thead>
-            <tbody><tr><td class="first">L0 當前檔案</td><td>學業、經歷、成果、技能、目標、偏好、容量與約束的<strong>當前有效狀態</strong></td><td>只由權威來源或學生確認更新，每次變更留檔案變更事件</td></tr><tr><td class="first">L1 事件時間線</td><td>參加、申請、完成、放棄、反饋、計劃版本等事件</td><td><strong>只追加</strong>；錯了用更正事件處理，不改歷史</td></tr><tr><td class="first">L2 語義記憶</td><td>從經歷裏提煉的興趣、模式與上下文</td><td>帶來源、時間、置信度與過期策略</td></tr><tr><td class="first">L3 證據與筆記</td><td>你的原始筆記、作品、證書、反思原文與附件</td><td><strong>你擁有</strong>；默認不向校方共享</td></tr></tbody>
+            <tbody><tr><td class="first">L0 當前檔案</td><td class="">學業、經歷、成果、技能、目標、偏好、容量與約束的<strong>當前有效狀態</strong></td><td class="">只由權威來源或學生確認更新，每次變更留檔案變更事件</td></tr><tr><td class="first">L1 事件時間線</td><td class="">參加、申請、完成、放棄、反饋、計劃版本等事件</td><td class=""><strong>只追加</strong>；錯了用更正事件處理，不改歷史</td></tr><tr><td class="first">L2 語義記憶</td><td class="">從經歷裏提煉的興趣、模式與上下文</td><td class="">帶來源、時間、置信度與過期策略</td></tr><tr><td class="first">L3 證據與筆記</td><td class="">你的原始筆記、作品、證書、反思原文與附件</td><td class=""><strong>你擁有</strong>；默認不向校方共享</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1019,7 +1032,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>六條架構紅線：每條都有對應的自動化測試，測試不過構建就失敗</th></tr></thead>
-            <tbody><tr><td class="first">1</td><td>路徑規劃 Agent 是唯一做取捨的 Agent；其餘只出事實與候選，輸出類型里根本沒有排序字段</td></tr><tr><td class="first">2</td><td>Wellbeing 安全護欄判斷<strong>零大模型</strong>——判定歸閾值，文案歸固定模板；構建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td>日曆憑據不進任何模型上下文——止步於容量服務，由類型層強制</td></tr><tr><td class="first">4</td><td>機會抽取 Agent 的工具白名單隻有兩個；外部內容作為數據塊傳入，永不拼進 system prompt</td></tr><tr><td class="first">5</td><td>每個計劃條目必帶規則引擎簽發的校驗憑據，缺失即被 API 拒絕</td></tr><tr><td class="first">6</td><td>私人反思原文到校方聚合的路徑在類型層不存在——不是「我們不傳」，是傳不過去</td></tr></tbody>
+            <tbody><tr><td class="first">1</td><td class="">路徑規劃 Agent 是唯一做取捨的 Agent；其餘只出事實與候選，輸出類型里根本沒有排序字段</td></tr><tr><td class="first">2</td><td class="">Wellbeing 安全護欄判斷<strong>零大模型</strong>——判定歸閾值，文案歸固定模板；構建期禁止 import 模型 SDK</td></tr><tr><td class="first">3</td><td class="">日曆憑據不進任何模型上下文——止步於容量服務，由類型層強制</td></tr><tr><td class="first">4</td><td class="">機會抽取 Agent 的工具白名單隻有兩個；外部內容作為數據塊傳入，永不拼進 system prompt</td></tr><tr><td class="first">5</td><td class="">每個計劃條目必帶規則引擎簽發的校驗憑據，缺失即被 API 拒絕</td></tr><tr><td class="first">6</td><td class="">私人反思原文到校方聚合的路徑在類型層不存在——不是「我們不傳」，是傳不過去</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1074,7 +1087,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>項</th><th>數值</th></tr></thead>
-            <tbody><tr><td class="first">真實抓取的課程目錄</td><td>58 個學科 1,534 門課，先修表達式保留來源原文</td></tr><tr><td class="first">信息源註冊表</td><td>93 個源，其中 85 個是真實抓取，8 個為演示用合成源——兩者在界面上一眼可分</td></tr><tr><td class="first"><strong>數據契約類型</strong></td><td>177 個（92 條路徑 / 111 個操作），前後端與 Agent 全部從同一份契約生成類型</td></tr><tr><td class="first">評測紅線</td><td>13 條 BLOCKER 全部通過（違反即失敗）</td></tr><tr><td class="first">量化目標</td><td>12 項中 11 項達標——未達標的那一項在報告裏如實標紅，不藏</td></tr><tr><td class="first">對照基線</td><td>5 項，全確定性可復現</td></tr></tbody>
+            <tbody><tr><td class="first">真實抓取的課程目錄</td><td class="">58 個學科 1,534 門課，先修表達式保留來源原文</td></tr><tr><td class="first">信息源註冊表</td><td class="">93 個源，其中 85 個是真實抓取，8 個為演示用合成源——兩者在界面上一眼可分</td></tr><tr><td class="first"><strong>數據契約類型</strong></td><td class="">177 個（92 條路徑 / 111 個操作），前後端與 Agent 全部從同一份契約生成類型</td></tr><tr><td class="first">評測紅線</td><td class="">13 條 BLOCKER 全部通過（違反即失敗）</td></tr><tr><td class="first">量化目標</td><td class="">12 項中 11 項達標——未達標的那一項在報告裏如實標紅，不藏</td></tr><tr><td class="first">對照基線</td><td class="">5 項，全確定性可復現</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1185,7 +1198,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>Cost</th><th>What it looks like</th></tr></thead>
-            <tbody><tr><td class="first">Discovery</td><td>Not knowing which credible opportunities exist</td></tr><tr><td class="first">Comprehension</td><td>Seeing one, but not knowing the eligibility or the value</td></tr><tr><td class="first">Planning</td><td>Not knowing how courses, experiences and opportunities depend on each other</td></tr><tr><td class="first">Execution</td><td>Plenty saved, none of it turned into actions, materials or calendar entries</td></tr><tr><td class="first">Correction</td><td>Nothing captured afterwards, so the next round repeats what didn't work</td></tr><tr><td class="first">Capacity</td><td>No sense of how growth tasks fit a real calendar — collisions, overload, lost rest</td></tr></tbody>
+            <tbody><tr><td class="first">Discovery</td><td class="">Not knowing which credible opportunities exist</td></tr><tr><td class="first">Comprehension</td><td class="">Seeing one, but not knowing the eligibility or the value</td></tr><tr><td class="first">Planning</td><td class="">Not knowing how courses, experiences and opportunities depend on each other</td></tr><tr><td class="first">Execution</td><td class="">Plenty saved, none of it turned into actions, materials or calendar entries</td></tr><tr><td class="first">Correction</td><td class="">Nothing captured afterwards, so the next round repeats what didn't work</td></tr><tr><td class="first">Capacity</td><td class="">No sense of how growth tasks fit a real calendar — collisions, overload, lost rest</td></tr></tbody>
           </table>
         </div>
         <p class="note">And something subtler: event promotion says what an event is, rarely who it suits, which gap it closes, or whether the hours are worth it. Meanwhile what students actually experienced almost never returns to the next round of recommendations, or to the school's decisions about resources.</p>
@@ -1203,7 +1216,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>Mode</th><th>Typical goal</th><th>What the system emphasises</th></tr></thead>
-            <tbody><tr><td class="first">Employment</td><td>A target company, industry, role or public service field</td><td>Role requirements, skill evidence, projects, internships, portfolio, hiring rhythm</td></tr><tr><td class="first">Academia</td><td>Master's, PhD, entering a research field, finding a supervisor</td><td>Course foundations, research methods, labs, research experience, application timelines</td></tr><tr><td class="first">Entrepreneurship</td><td>Starting something, validating demand, joining an incubator, building a team</td><td>Problem discovery, competitions, prototypes, user validation, mentors, funding, team</td></tr><tr><td class="first">Personal interest</td><td>Art, sport, language, public service, creative work</td><td>Capability growth, community, output, quality of experience — no forced professionalisation</td></tr><tr><td class="first">Exploring</td><td>Genuinely undecided, wanting practice to reveal direction</td><td>Low-cost, varied experiments; lived experience updates interests and confidence</td></tr></tbody>
+            <tbody><tr><td class="first">Employment</td><td class="">A target company, industry, role or public service field</td><td class="">Role requirements, skill evidence, projects, internships, portfolio, hiring rhythm</td></tr><tr><td class="first">Academia</td><td class="">Master's, PhD, entering a research field, finding a supervisor</td><td class="">Course foundations, research methods, labs, research experience, application timelines</td></tr><tr><td class="first">Entrepreneurship</td><td class="">Starting something, validating demand, joining an incubator, building a team</td><td class="">Problem discovery, competitions, prototypes, user validation, mentors, funding, team</td></tr><tr><td class="first">Personal interest</td><td class="">Art, sport, language, public service, creative work</td><td class="">Capability growth, community, output, quality of experience — no forced professionalisation</td></tr><tr><td class="first">Exploring</td><td class="">Genuinely undecided, wanting practice to reveal direction</td><td class="">Low-cost, varied experiments; lived experience updates interests and confidence</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1276,8 +1289,8 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 
         <div class="table-wrap">
           <table>
-            <thead><tr><th>Product type</th><th>Their centre of gravity</th><th>Where CampusPath differs</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>Professional identity, network, jobs and content</td><td>Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions</td></tr><tr><td class="first">Handshake</td><td>Student jobs, internships, employers, careers events</td><td>Doesn't stop at listing: composes courses, research, competitions, societies and internships into a dependency-aware capability path</td></tr><tr><td class="first">Career assessments</td><td>Interests, values, occupational fit</td><td>The assessment is only an input — the system keeps validating it through real practice instead of fixing you in place after one test</td></tr><tr><td class="first">Résumé / interview tools</td><td>Résumé feedback, interview prep and mock rounds</td><td>Covers the months or years of capability building and evidence gathering before the application stage</td></tr><tr><td class="first">General AI career coaches</td><td>Conversational advice, résumé and career Q&amp;A</td><td>Real sources, eligibility states, tool calls, long-term memory, time constraints, an action loop and measurable evaluation</td></tr></tbody>
+            <thead><tr><th>Product type</th><th>Their centre of gravity</th><th class="ours">Where CampusPath differs</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td class="">Professional identity, network, jobs and content</td><td class=" ours">Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions</td></tr><tr><td class="first">Handshake</td><td class="">Student jobs, internships, employers, careers events</td><td class=" ours">Doesn't stop at listing: composes courses, research, competitions, societies and internships into a dependency-aware capability path</td></tr><tr><td class="first">Career assessments</td><td class="">Interests, values, occupational fit</td><td class=" ours">The assessment is only an input — the system keeps validating it through real practice instead of fixing you in place after one test</td></tr><tr><td class="first">Résumé / interview tools</td><td class="">Résumé feedback, interview prep and mock rounds</td><td class=" ours">Covers the months or years of capability building and evidence gathering before the application stage</td></tr><tr><td class="first">General AI career coaches</td><td class="">Conversational advice, résumé and career Q&amp;A</td><td class=" ours">Real sources, eligibility states, tool calls, long-term memory, time constraints, an action loop and measurable evaluation</td></tr></tbody>
           </table>
         </div>
         <p class="note">The short version: others give you a reply. We give you a path that lands on your calendar, traces back to its sources, keeps updating as you change, and returns its results to the school.</p>
@@ -1295,7 +1308,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>Layer</th><th>What it holds</th><th>Update rule</th></tr></thead>
-            <tbody><tr><td class="first">L0 Canonical profile</td><td>The current valid state of studies, experience, outcomes, skills, goals, preferences, capacity and constraints</td><td>Updated only by authoritative sources or your confirmation; every change leaves a change event</td></tr><tr><td class="first">L1 Episodic timeline</td><td>Attended, applied, completed, dropped, feedback, plan versions</td><td><strong>Append-only</strong>; mistakes are handled with correction events, never by editing history</td></tr><tr><td class="first">L2 Semantic memory</td><td>Interests, patterns and context distilled from experience</td><td>Carries source, time, confidence and an expiry policy</td></tr><tr><td class="first">L3 Evidence &amp; notes</td><td>Your raw notes, work, certificates, reflection text and attachments</td><td>Yours; not shared with the school by default</td></tr></tbody>
+            <tbody><tr><td class="first">L0 Canonical profile</td><td class="">The current valid state of studies, experience, outcomes, skills, goals, preferences, capacity and constraints</td><td class="">Updated only by authoritative sources or your confirmation; every change leaves a change event</td></tr><tr><td class="first">L1 Episodic timeline</td><td class="">Attended, applied, completed, dropped, feedback, plan versions</td><td class=""><strong>Append-only</strong>; mistakes are handled with correction events, never by editing history</td></tr><tr><td class="first">L2 Semantic memory</td><td class="">Interests, patterns and context distilled from experience</td><td class="">Carries source, time, confidence and an expiry policy</td></tr><tr><td class="first">L3 Evidence &amp; notes</td><td class="">Your raw notes, work, certificates, reflection text and attachments</td><td class="">Yours; not shared with the school by default</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1430,7 +1443,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>#</th><th>Six architectural red lines — each has a test, and a failing test fails the build</th></tr></thead>
-            <tbody><tr><td class="first">1</td><td>The planning agent is the only one that makes trade-offs; the rest emit facts and candidates, and their output types have no ranking field at all</td></tr><tr><td class="first">2</td><td>Wellbeing guardrails use no language model — thresholds judge, fixed templates speak; importing a model SDK at build time is forbidden</td></tr><tr><td class="first">3</td><td>Calendar credentials never enter any model context — they stop at the capacity service, enforced by the type layer</td></tr><tr><td class="first">4</td><td>The extraction agent has exactly two whitelisted tools; external content arrives as data and is never concatenated into a system prompt</td></tr><tr><td class="first">5</td><td>Every plan item must carry a validation credential issued by the rules engine, or the API rejects it</td></tr><tr><td class="first">6</td><td>There is no type-level path from private reflection text to school aggregates — not &quot;we don't send it&quot;, but it cannot be sent</td></tr></tbody>
+            <tbody><tr><td class="first">1</td><td class="">The planning agent is the only one that makes trade-offs; the rest emit facts and candidates, and their output types have no ranking field at all</td></tr><tr><td class="first">2</td><td class="">Wellbeing guardrails use no language model — thresholds judge, fixed templates speak; importing a model SDK at build time is forbidden</td></tr><tr><td class="first">3</td><td class="">Calendar credentials never enter any model context — they stop at the capacity service, enforced by the type layer</td></tr><tr><td class="first">4</td><td class="">The extraction agent has exactly two whitelisted tools; external content arrives as data and is never concatenated into a system prompt</td></tr><tr><td class="first">5</td><td class="">Every plan item must carry a validation credential issued by the rules engine, or the API rejects it</td></tr><tr><td class="first">6</td><td class="">There is no type-level path from private reflection text to school aggregates — not &quot;we don't send it&quot;, but it cannot be sent</td></tr></tbody>
           </table>
         </div>
         <div class="cards">
@@ -1485,7 +1498,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <div class="table-wrap">
           <table>
             <thead><tr><th>Item</th><th>Value</th></tr></thead>
-            <tbody><tr><td class="first">Course catalog, really scraped</td><td>1,534 courses across 58 subjects, prerequisite expressions kept as source text</td></tr><tr><td class="first">Source registry</td><td>93 sources, 85 of them genuinely scraped and 8 synthetic for demos — distinguishable at a glance in the UI</td></tr><tr><td class="first">Data contract types</td><td>177 types (92 paths / 111 operations); frontend, backend and agents all generate from the same contract</td></tr><tr><td class="first">Blocker checks</td><td>13 of 13 passing (a violation is a failure)</td></tr><tr><td class="first">Quantified targets</td><td>11 of 12 met — the one that isn't is flagged red in the report, not hidden</td></tr><tr><td class="first">Comparison baselines</td><td>5, all deterministic and reproducible</td></tr></tbody>
+            <tbody><tr><td class="first">Course catalog, really scraped</td><td class="">1,534 courses across 58 subjects, prerequisite expressions kept as source text</td></tr><tr><td class="first">Source registry</td><td class="">93 sources, 85 of them genuinely scraped and 8 synthetic for demos — distinguishable at a glance in the UI</td></tr><tr><td class="first">Data contract types</td><td class="">177 types (92 paths / 111 operations); frontend, backend and agents all generate from the same contract</td></tr><tr><td class="first">Blocker checks</td><td class="">13 of 13 passing (a violation is a failure)</td></tr><tr><td class="first">Quantified targets</td><td class="">11 of 12 met — the one that isn't is flagged red in the report, not hidden</td></tr><tr><td class="first">Comparison baselines</td><td class="">5, all deterministic and reproducible</td></tr></tbody>
           </table>
         </div>
         <div class="cards">

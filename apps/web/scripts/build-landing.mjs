@@ -59,13 +59,23 @@ const rich = (s) => esc(s).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 /* 片段渲染                                                            */
 /* ------------------------------------------------------------------ */
 
+/**
+ * 表格。`ours`（列序号，从 0 数）把**我们自己这一列**标出来。
+ *
+ * 对比表里三列长得一模一样时，"它们的重心"与"CampusPath 的区别"很容易被
+ * 顺着读成同一件事——用户 2026-08-11 指出这正是会看错的地方。
+ * 给那一列上底色是**区分立场**，不是装饰：读者一眼就知道哪一列是我们说的话。
+ * 不做成"永远高亮最后一列"：痛点成本表、四层记忆表的最后一列并不是我们的立场。
+ */
 const table = (t) => !t ? "" : `
         <div class="table-wrap">
           <table>
-            <thead><tr>${t.head.map((h) => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+            <thead><tr>${t.head.map((h, i) =>
+              `<th${i === t.ours ? ' class="ours"' : ""}>${esc(h)}</th>`).join("")}</tr></thead>
             <tbody>${t.rows.map((r) =>
               `<tr>${r.map((c, i) =>
-                `<td${i === 0 ? ' class="first"' : ""}>${rich(c)}</td>`).join("")}</tr>`
+                `<td class="${i === 0 ? "first" : ""}${i === t.ours ? " ours" : ""}">${rich(c)}</td>`
+              ).join("")}</tr>`
             ).join("")}</tbody>
           </table>
         </div>`;
@@ -434,6 +444,19 @@ tbody tr:last-child td{border-bottom:none}
 td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 .section:nth-of-type(even) .table-wrap{background:var(--bg)}
 .section:nth-of-type(even) th{background:var(--bg-sunk)}
+/* 我们自己那一列。底色 + 左侧一道强调线把它与"它们的重心"分开；
+   表头再加重一档，让"这一列是谁在说话"从第一行就成立。
+   .section:nth-of-type(even) th 也会命中这一格，所以 th.ours 要写在它后面。 */
+td.ours{background:var(--accent-soft)}
+th.ours,
+.section:nth-of-type(even) th.ours{
+  /* 表头**不再加深**：加深到 accent-soft 78% + accent 时，13px 粗体的
+     accent-deep 只有 3.93:1，够不上 AA 的 4.5（13px 也不算"大字"）。
+     与单元格同底、靠左侧强调线与字重区分，实测 4.82:1。 */
+  background:var(--accent-soft);
+  color:var(--accent-deep);
+}
+td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
 .steps{list-style:none; counter-reset:none; margin:28px 0 0; padding:0; display:grid; gap:2px}
 /* 直接子级选择器是**必须的**：.steps li 会连步骤里的分列小点一起选中，

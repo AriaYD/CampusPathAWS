@@ -255,6 +255,7 @@ export const zhHans = {
       kicker: "和市面上的产品有什么不同",
       title: "别人给你一段回复，我们给你一条路径",
       table: {
+        ours: 2,
         head: ["产品类型", "它们的重心", "CampusPath 的区别"],
         rows: [
           ["LinkedIn", "职业身份、网络、职位与内容", "连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动"],
@@ -742,6 +743,7 @@ export const en = {
       kicker: "How this is different",
       title: "Others hand you a reply; we hand you a path",
       table: {
+        ours: 2,
         head: ["Product type", "Their centre of gravity", "Where CampusPath differs"],
         rows: [
           ["LinkedIn", "Professional identity, network, jobs and content", "Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions"],
