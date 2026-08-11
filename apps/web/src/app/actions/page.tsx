@@ -14,6 +14,7 @@ import {
   withinWindow,
 } from "@/lib/plan-window";
 import { useResource } from "@/lib/useResource";
+import { PathwayApprovalGate, usePathwayPlan } from "@/components/pathway-approval";
 import {
   Card,
   CredentialChip,
@@ -162,8 +163,9 @@ export function ActionsContent() {
   const proposals = useResource(() => api.scheduleProposals(studentId), [studentId]);
   // 强度必须与课外规划页同源（storedIntensity）——两页才读的是同一份规划
   const [intensity] = useState<string>(storedIntensity);
-  const pathway = useResource(
-    () => api.pathway(studentId, intensity), [studentId, intensity]);
+  // G（2026-08-10）：与课外规划页共用同一份规划与同一条批准流
+  const plan = usePathwayPlan(studentId, intensity);
+  const pathway = plan.pathway;
   // 审计红-3（2026-08-02）：批准时日历写入 403 的恢复入口曾是组件内存态，
   // 离开页面即永久丢失。现从服务端可观测状态**派生**：已批准的提案 ∩
   // 日历里没有对应 AB-…plan-OPP-… 真实块 ⇒ 「待写入日历」，页面加载即渲染。
@@ -199,6 +201,8 @@ export function ActionsContent() {
   return (
     <>
       <PageHeader titleKey="actions.title" leadKey="actions.lead" />
+
+      <PathwayApprovalGate plan={plan} />
 
       {/* Q（2026-07-31）：Advisor 预约挪到行动中心置顶——它就是一个"要去做的行动" */}
       <AdvisorBookingPanel />

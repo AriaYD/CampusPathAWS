@@ -13,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from campuspath_contracts.profile import (
+    AppliedChange,
     ConsentRecord,
     ConsentScope,
     EnergyProfile,
@@ -21,8 +22,10 @@ from campuspath_contracts.profile import (
     Note,
     ProfileChangeEvent,
     ProfileUpdateProposal,
+    ProfileWriteOrigin,
     ProposalStatus,
     ProposedChange,
+    ResumeUploadResult,
     SkillRecord,
     SkillLevel,
     SkillSourceType,
@@ -163,6 +166,78 @@ def test_note_and_evidence_are_separate_entities():
     """Profile 只引用 id，不复制内容——这样 Profile 变更不会带走原记录。"""
     assert "text" in Note.model_fields
     assert "text" not in EvidenceRecord.model_fields
+
+
+# --------------------------------------------------------------------------
+# 直写通道（2026-08-10 用户裁定 F）：学生本人上传官方模板 = 学生自述
+# --------------------------------------------------------------------------
+
+
+def _applied(**kw) -> AppliedChange:
+    base = dict(
+        change_id="AC-1",
+        student_id="S-001",
+        origin=ProfileWriteOrigin.STUDENT_UPLOAD,
+        entity_type="experience",
+        summary="实习 · 某公司 数据分析实习生",
+        applied_at=NOW,
+    )
+    base.update(kw)
+    return AppliedChange(**base)
+
+
+def test_direct_write_accepts_student_upload():
+    result = ResumeUploadResult(
+        proposal_id="PROP-RESUME-1", student_id="S-001",
+        profile_version=2, applied=(_applied(),),
+    )
+    assert result.applied[0].origin is ProfileWriteOrigin.STUDENT_UPLOAD
+
+
+def test_direct_write_rejects_agent_inferred_change():
+    """已知会失败的样例：把 A1 推断塞进直写通道——B3 豁免只给学生自述。"""
+    with pytest.raises(ValidationError) as excinfo:
+        ResumeUploadResult(
+            proposal_id="PROP-REFL-1", student_id="S-001", profile_version=2,
+            applied=(_applied(origin=ProfileWriteOrigin.AGENT_PROPOSAL),),
+        )
+    assert "B3" in str(excinfo.value)
+
+
+def test_direct_write_rejects_student_edit_origin_too():
+    """自助编辑走的是另一条端点；混进上传结果里说明来源标错了。"""
+    with pytest.raises(ValidationError):
+        ResumeUploadResult(
+            proposal_id="PROP-RESUME-1", student_id="S-001", profile_version=2,
+            applied=(_applied(origin=ProfileWriteOrigin.STUDENT_EDIT),),
+        )
+
+
+def test_empty_result_is_a_parser_defect_not_an_empty_result():
+    with pytest.raises(ValidationError):
+        ResumeUploadResult(
+            proposal_id="PROP-RESUME-1", student_id="S-001", profile_version=2,
+        )
+
+
+def test_skipped_only_result_is_legitimate():
+    """全都是档案里已有的条目——写入 0 条，但解析器确实读懂了模板。"""
+    result = ResumeUploadResult(
+        proposal_id="PROP-RESUME-1", student_id="S-001", profile_version=1,
+        skipped=("技能「Python」已在档案中",),
+    )
+    assert result.applied == ()
+
+
+def test_undo_keeps_the_record():
+    """撤销不是删除——"这条后来被撤了"本身就是审计要回答的问题。"""
+    undone = _applied(undone_at=NOW)
+    assert undone.undone_at == NOW and undone.change_id == "AC-1"
+
+
+def test_a_live_change_has_no_undo_stamp():
+    """默认值不能假装"撤过了"；台账行的两种状态必须分得开。"""
+    assert _applied().undone_at is None
 
 
 # --------------------------------------------------------------------------

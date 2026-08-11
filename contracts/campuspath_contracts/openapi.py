@@ -222,6 +222,18 @@ _STUDENT: tuple[Endpoint, ...] = (
         errors=((422, "unbacked_validation_id"),),
     ),
     Endpoint(
+        "POST", "/v1/students/{student_id}/pathway/draft",
+        "生成规划草案（**不落盘**）：按目标 + 档案 + 记忆偏好排一版，"
+        "连同与现行版本的差异一并返回，等学生批准（2026-08-10 用户裁定 G）",
+        "PathwayDraft", errors=((422, "unknown_intensity"), (404, "no_goal")),
+    ),
+    Endpoint(
+        "POST", "/v1/students/{student_id}/pathway/draft/{draft_id}/decision",
+        "学生对草案的裁决：adopt 才写入已采纳版本，discard 丢弃；两者都只能做一次",
+        "PathwayDraft",
+        errors=((404, "unknown_draft"), (409, "draft_already_decided")),
+    ),
+    Endpoint(
         "GET", "/v1/students/{student_id}/pathway",
         "当前路径版本。D1 的三个时间视图**全部由它派生**，因此三者不可能互相矛盾",
         "PathwayVersion", errors=((404, "no_pathway_version"),),
@@ -318,10 +330,20 @@ _STUDENT: tuple[Endpoint, ...] = (
     ),
     Endpoint(
         "POST", "/v1/students/{student_id}/resume",
-        "上传 Resume（md/txt/pdf）→ A1 提炼候选变更 → 恒为 pending 的提案，"
-        "冲突项带 old_value 由学生逐项确认（B3）",
-        "ProfileUpdateProposal", "ResumeUpload",
+        "上传官方模板简历（md/txt/pdf）→ 确定性解析 → **直接物化进档案**，"
+        "逐条回显且每条可撤销（2026-08-10 用户裁定 F；B3 豁免只给学生自述）",
+        "ResumeUploadResult", "ResumeUpload",
         errors=((422, "unreadable_resume"), (503, "model_backend_unavailable")),
+    ),
+    Endpoint(
+        "GET", "/v1/students/{student_id}/profile/changes",
+        "已物化的档案变更台账（含已撤销的——撤销不删记录）",
+        "AppliedChange", response_is_list=True,
+    ),
+    Endpoint(
+        "POST", "/v1/students/{student_id}/profile/changes/{change_id}/undo",
+        "撤销一条已物化的变更（逆物化 + 盖 undone_at；幂等）",
+        "AppliedChange", errors=((404, "unknown_change"),),
     ),
     Endpoint(
         "POST", "/v1/students/{student_id}/advisor/bookings",

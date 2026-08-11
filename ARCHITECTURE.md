@@ -1,6 +1,26 @@
 # CampusPath 架构文档
 
-> 版本对应：Spec **v4.1.23** · Plan V2 · 契约 **1.34.0** · Seed **1.9.0**（2026-08-03 main 同步）
+> 版本对应：Spec **v4.1.30** · Plan V2 · 契约 **1.39.0** · Seed **1.10.0**（2026-08-10 main 同步）
+>
+> 2026-08-10 第八轮 P3（Spec v4.1.30，契约 1.38.0→1.39.0）：两条数据流的**控制权**改了。
+> **① 档案上传 → 直写 + 可撤销**：`POST /students/{id}/resume` → `resume_template.py`
+> 确定性解析（零模型）→ `_materialise_changes(origin=student_upload)` **直接物化**进
+> experiences / interests / profile_extras，同时落一条 `confirmed` 提案 + 一条
+> `ProfileChangeEvent(actor=student)` + 一份 `AppliedChange` 台账 →
+> `POST /profile/changes/{id}/undo` 逐条逆物化（只盖 `undone_at`，不删行）。
+> B3 边界在类型层：`ResumeUploadResult` validator 拒收非 `student_upload` 来源，
+> **A1 抽取/推断走不进这条通道**，仍只能落 pending 提案由学生逐条裁决。
+> **② 规划 → 草案 → 批准 → 落盘**：`GET /pathway` 不再当场生成（此前读一下就写盘），
+> 改为只读已采纳版本；`POST /pathway/draft` 走 A5（matches + 记忆 advisory + carry-over）
+> 排一版存进 `deps.pathway_drafts`，`POST /pathway/draft/{id}/decision?decision=adopt`
+> 过 B8 闸门后才写 `deps.pathways`。无模型时的 `build_demo_pathway` 回落**同样**
+> 受这道闸门约束。前端 `usePathwayPlan` + `PathwayApprovalGate` 两页共用一条批准流。
+>
+> 2026-08-10 第八轮 P2（Spec v4.1.29，契约 1.36.0→1.38.0）：过期判定从"启动期算一次、
+> 只看 deadline"改为**读时单一出处** `_is_expired`（截止 or 办完，取并集，时钟 = `deps.today`），
+> 广场目录与 `_compute_matches` 共用——**过期条目不进任何推荐**；
+> 新增 `CurationBadge` 只出徽章不出分数（自动派生 ≥4.0 且已验证 ≥5；
+> 人工理由由契约 Literal 收窄）。Seed 1.9.0→1.10.0：反馈优先落在在架活动上。
 >
 > 2026-08-04 北极星指标 VGA 落地（Spec v4.1.23，契约 1.34.0）：新增数据流
 > **反思闭环 → VGA**——反思活动（OPP）→ 铸 EV-REFL 证据 + 同步铸
@@ -231,8 +251,9 @@ sequenceDiagram
 ## 5. 分层清单
 
 ### 契约层（`contracts/`，唯一真相来源）
-声明式 OpenAPI（`openapi.py`，不从 FastAPI 反推）。**129 个 Pydantic 模型 / 59 路径 66 操作 / 185 OpenAPI schema**，
-版本 1.13.0（1.3 同意自助授权 → 1.10 档案自助编辑 → 1.11 证据上传 → 1.12 重要联系人 → 1.13 ISI/PSS-10 评估 → 1.14 校方复合角色 → 1.15 档案补充分区）。改动三件套：`openapi.py` 声明 → `make contracts && make types` → API 实现。
+声明式 OpenAPI（`openapi.py`，不从 FastAPI 反推）。**177 个数据契约类型 / 92 路径 111 操作 / 238 OpenAPI schema**（2026-08-10 实测），
+版本 **1.39.0**。对外一律称「数据契约类型」——"模型"在 AI 产品语境里会被读成大语言模型。
+改动三件套：`openapi.py` 声明 → `make contracts && make types` → API 实现。
 前端 TS 类型同源生成，`make contracts-check` 守产物一致性。
 
 ### 确定性平面（`services/`，9 模块 + 2 装配）

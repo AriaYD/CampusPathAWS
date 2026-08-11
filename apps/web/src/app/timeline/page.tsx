@@ -12,6 +12,7 @@ import {
   withinWindow,
 } from "@/lib/plan-window";
 import { useResource } from "@/lib/useResource";
+import { PathwayApprovalGate, usePathwayPlan } from "@/components/pathway-approval";
 import { PlanHub } from "@/components/plan-hub";
 import {
   Bar,
@@ -139,8 +140,10 @@ export function ActivityPlanContent({ standalone = false }: { standalone?: boole
   // S1 三档强度（2026-08-03 用户问出缺口）：三变体一直在后台生成，
   // 现在学生可选——选择持久化，A5 按档重出课程计划
   const [intensity, setIntensity] = useState<string>(storedIntensity);
-  const pathway = useResource(
-    () => api.pathway(studentId, intensity), [studentId, intensity]);
+  // G（2026-08-10）：规划不再静默落盘——空态先给"开始规划"，
+  // 草案出来弹窗让学生看清依据再批准
+  const plan = usePathwayPlan(studentId, intensity);
+  const pathway = plan.pathway;
   const trajectory = useResource(() => api.growthTrajectory(studentId), [studentId]);
   // J：卡片要挂活动详情与官方链接——从目录取；推荐理由——从 A5 的匹配结果取
   const catalog = useResource(() => api.catalog(500, true), []);
@@ -177,6 +180,8 @@ export function ActivityPlanContent({ standalone = false }: { standalone?: boole
           }))}
         />
       </PageHeader>
+
+      <PathwayApprovalGate plan={plan} />
 
       {/* S1 三档强度选择（2026-08-03，用户复裁定样式）：**不是导航**，
           不用 Segmented——mist 色系标签药丸与分页控件明确区隔；

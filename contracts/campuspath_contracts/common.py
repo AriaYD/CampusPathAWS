@@ -19,7 +19,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, StringConstraints
 
 # 契约版本。任何破坏性字段变更都必须同步 bump，并在 CHANGELOG 记录。
-CONTRACTS_VERSION = "1.38.0"
+CONTRACTS_VERSION = "1.39.0"
 
 # --------------------------------------------------------------------------
 # 标识符

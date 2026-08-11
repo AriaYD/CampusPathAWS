@@ -3,11 +3,17 @@
 import { useState } from "react";
 import { usePersona } from "@/app/providers";
 import { pickLang, useI18n, type MessageKey } from "@/i18n";
-import { api, type ExperienceRecord, type ProfileExtras as ProfileExtrasType } from "@/lib/api";
+import {
+  api,
+  type ExperienceRecord,
+  type ProfileExtras as ProfileExtrasType,
+  type Schemas,
+} from "@/lib/api";
 import { ProfileExtrasSections } from "@/components/profile-extras";
 import { useResource } from "@/lib/useResource";
 import {
   Card,
+  Drawer,
   Empty,
   Failure,
   Grid,
@@ -359,6 +365,35 @@ export default function ProfilePage() {
   const [tab, setTab] = useState<"overview" | "evidence" | "proposals">("overview");
   const [resumeState, setResumeState] =
     useState<"idle" | "parsing" | "done" | "error">("idle");
+  // F（2026-08-10 用户裁定）：上传即直写，弹窗只是"请你自查"，不是"请你批准"。
+  // 所以每条给的是**撤销**而不是确认——默认已经在档案里了。
+  const [uploadResult, setUploadResult] =
+    useState<Schemas["ResumeUploadResult"] | null>(null);
+  const [undone, setUndone] = useState<Record<string, boolean>>({});
+
+  async function applyUpload(result: Schemas["ResumeUploadResult"]) {
+    setUploadResult(result);
+    setUndone({});
+    setResumeState("done");
+    // 总览是同页切分页、不重挂载——不主动 reload 就会停在上传前的快照
+    // （2026-08-04 用户报障的同一族问题，这里一次补齐四处）
+    experiences.reload();
+    extras.reload();
+    profile.reload();
+    proposals.reload();
+  }
+
+  async function undoOne(changeId: string) {
+    try {
+      await api.undoProfileChange(studentId, changeId);
+      setUndone((prev) => ({ ...prev, [changeId]: true }));
+      experiences.reload();
+      extras.reload();
+      profile.reload();
+    } catch {
+      /* 撤销失败保持原状：弹窗里那条仍显示为"已写入" */
+    }
+  }
   // R4-G：LinkedIn 式编辑——学生本人直接改标签与经历，保存即落库
   const [editing, setEditing] = useState(false);
   const [tagDraft, setTagDraft] = useState<string[]>([]);
@@ -574,13 +609,11 @@ export default function ProfilePage() {
                     try {
                       const res = await fetch(`/demo-resume-${slug}.md`);
                       if (!res.ok) throw new Error(String(res.status));
-                      await api.uploadResume(studentId, {
+                      await applyUpload(await api.uploadResume(studentId, {
                         filename: `demo-resume-${slug}.md`,
                         content_text: await res.text(),
                         content_base64: null,
-                      });
-                      setResumeState("done");
-                      proposals.reload();
+                      }));
                     } catch {
                       setResumeState("error");
                     }
@@ -629,9 +662,7 @@ export default function ProfilePage() {
                                 content_text: await file.text(),
                                 content_base64: null };
                   }
-                  await api.uploadResume(studentId, payload);
-                  setResumeState("done");
-                  proposals.reload();
+                  await applyUpload(await api.uploadResume(studentId, payload));
                 } catch {
                   setResumeState("error");
                 } finally {
@@ -655,6 +686,81 @@ export default function ProfilePage() {
               </p>
             )}
           </Card>
+
+          {/* F（2026-08-10 用户裁定）：上传后的自查弹窗。
+              措辞刻意不是"是否确认"——东西**已经在**档案里了，这里给的是
+              一份清单和每条的后悔药。把它写成确认框就又变回那多余的一步。 */}
+          <Drawer
+            open={uploadResult !== null}
+            onClose={() => setUploadResult(null)}
+            title={t("profile.resume.review.title")}
+          >
+            <div data-resume-review>
+              <SectionTitle>{t("profile.resume.review.title")}</SectionTitle>
+              <p className="t-meta mb-4 text-fg-muted">
+                {t("profile.resume.review.lead")}
+              </p>
+              {uploadResult?.applied.length ? (
+                <ul className="mb-4 flex flex-col gap-2">
+                  {uploadResult.applied.map((change) => {
+                    const gone = undone[change.change_id];
+                    return (
+                      <li
+                        key={change.change_id}
+                        data-applied-change={change.change_id}
+                        data-undone={gone ? "true" : "false"}
+                        className="flex items-center justify-between gap-3 rounded-md border border-line bg-bg-sunk p-3"
+                      >
+                        <span
+                          className={`t-meta ${gone ? "text-fg-faint line-through" : "text-fg"}`}
+                        >
+                          {change.summary}
+                        </span>
+                        {gone ? (
+                          <span className="t-micro shrink-0 text-fg-faint">
+                            {t("profile.resume.review.undone")}
+                          </span>
+                        ) : (
+                          <button
+                            type="button"
+                            data-undo-change={change.change_id}
+                            onClick={() => undoOne(change.change_id)}
+                            className="pressable btn btn-secondary t-micro shrink-0"
+                          >
+                            {t("profile.resume.review.undo")}
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <p className="t-meta mb-4 text-fg-muted" data-applied-empty>
+                  {t("profile.resume.review.nothingNew")}
+                </p>
+              )}
+              {uploadResult?.skipped.length ? (
+                <div className="mb-4" data-resume-skipped>
+                  <p className="t-micro mb-1.5 text-fg-faint">
+                    {t("profile.resume.review.skipped")}
+                  </p>
+                  <ul className="t-micro flex flex-col gap-1 text-fg-muted">
+                    {uploadResult.skipped.map((line) => (
+                      <li key={line}>· {line}</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                data-resume-review-close
+                onClick={() => setUploadResult(null)}
+                className="pressable btn btn-primary t-body w-full"
+              >
+                {t("profile.resume.review.done")}
+              </button>
+            </div>
+          </Drawer>
 
           {/* D（2026-07-31）：LinkedIn 式完整档案分区——项目与经历 / 实习与工作 /
               课外课程与证书。数据来自 experiences 与 evidence，两处都带核验状态，

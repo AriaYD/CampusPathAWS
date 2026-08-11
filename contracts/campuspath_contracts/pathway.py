@@ -129,6 +129,66 @@ class PathwayVersion(CampusPathModel):
         return self
 
 
+class PathwayDraftDiff(CampusPathModel):
+    """草案相对**当前已采纳版本**的差异。审批弹窗要回答的是"会变什么"。
+
+    只报数不报清单：条目本身就在 ``PathwayDraft.pathway`` 里，
+    再复制一份就有两个出处，一旦漂移谁都说不清哪个是真的。
+    """
+
+    is_first_plan: bool = Field(
+        description="没有已采纳版本——这就是用户说的「第一次规划」那一刻")
+    added_count: int = Field(ge=0)
+    removed_count: int = Field(ge=0)
+    rescheduled_count: int = Field(ge=0)
+    carried_over_count: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _first_plan_removes_nothing(self) -> "PathwayDraftDiff":
+        """第一次规划不可能"移除"或"改期"任何东西——之前什么都没有。
+
+        这条不是洁癖：diff 算错方向时（拿草案当基线反着减）第一次规划会
+        报出一堆"移除"，弹窗就会劝学生批准一份看起来在删他东西的计划。
+        """
+        if self.is_first_plan and (self.removed_count or self.rescheduled_count):
+            raise ValueError(
+                "第一次规划报出了移除/改期条目——diff 的基线取反了")
+        return self
+
+
+class PathwayDraft(CampusPathModel):
+    """一份**尚未落盘**的规划草案（2026-08-10 用户裁定 G）。
+
+    用户原话：「第一次规划直接落盘 很不对劲」。所以生成与采纳被拆成两件事：
+    草案存在 ``deps.pathway_drafts``，只有学生点了"采纳"才写进
+    ``deps.pathways``。``GET /pathway`` 从此**只读已采纳版本**。
+
+    三条 ``rationale_*`` 是弹窗里的"依据"行——数据一直都在
+    （``PlanItem.assumptions`` 与记忆 advisory），只是从没上过屏。
+    要学生批准一件事，就得先让他看见这件事是凭什么来的。
+    """
+
+    draft_id: Identifier
+    student_id: StudentId
+    intensity: str = Field(min_length=1, max_length=32)
+    created_at: datetime
+    pathway: PathwayVersion
+    diff: PathwayDraftDiff
+    rationale_goals: tuple[str, ...] = ()
+    rationale_profile: tuple[str, ...] = ()
+    rationale_memory: tuple[str, ...] = ()
+    adopted_at: datetime | None = None
+    discarded_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _one_decision_at_most(self) -> "PathwayDraft":
+        if self.adopted_at is not None and self.discarded_at is not None:
+            raise ValueError("一份草案不能既被采纳又被丢弃")
+        if self.pathway.student_id != self.student_id:
+            raise ValueError("草案与它承载的路径属于不同学生")
+        return self
+
+
 def _explain(registry: ValidationRegistry, validation_id: str, subject: SourceRef) -> str:
     """说清楚是"没签发"、"过期了"、"张冠李戴"还是"判定本身不合规"。
 

@@ -37,9 +37,9 @@ HKUST_CampusPath/
 ├── CLAUDE.md                                             # 工作硬约束（会话自动加载）
 ├── Makefile                                              # check/eval/api/web/contracts/seed…
 │
-├── contracts/                    # 契约层：唯一真相来源（1.36.0）
-│   ├── campuspath_contracts/     #   172 个数据契约类型（Pydantic）+ 声明式 openapi.py + 边界守卫
-│   ├── openapi/campuspath.json   #   生成的 OpenAPI 3.1（88 路径 / 107 操作）
+├── contracts/                    # 契约层：唯一真相来源（1.39.0）
+│   ├── campuspath_contracts/     #   177 个数据契约类型（Pydantic）+ 声明式 openapi.py + 边界守卫
+│   ├── openapi/campuspath.json   #   生成的 OpenAPI 3.1（92 路径 / 111 操作）
 │   ├── schema/                   #   逐模型 JSON Schema 冻结产物
 │   └── tests/                    #   B1–B13 红线逐条测试 + 变异自检
 │

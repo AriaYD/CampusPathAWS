@@ -124,12 +124,15 @@ from campuspath_contracts.pathway import (
     ActionEvent,
     ActionType,
     AffectedScope,
+    PathwayDraft,
+    PathwayDraftDiff,
     PlanItem,
     PlanItemKind,
     PlanItemStatus,
     ReplanRequest,
 )
 from campuspath_contracts.profile import (
+    AppliedChange,
     ConsentRecord,
     EducationEntry,
     LanguageSkill,
@@ -146,7 +149,9 @@ from campuspath_contracts.profile import (
     Note,
     ProfileChangeEvent,
     ProfileUpdateProposal,
+    ProfileWriteOrigin,
     ProposalStatus,
+    ResumeUploadResult,
     StudentProfile,
 )
 from campuspath_contracts.publishing import (
@@ -334,6 +339,12 @@ class Deps:
             self.publishing.register(PublisherRoleGrant(**row))
         #: 学生反思（Private Vault 的进程内形态）。原文永不出域（B4）。
         self.reflections: dict[str, list] = {}
+        #: F（2026-08-10）：已物化进档案的变更台账，change_id → 记录。
+        #: 撤销只盖 undone_at，不删——"这条后来被撤了"要答得上。
+        self.applied_changes: dict[str, AppliedChange] = {}
+        #: 每条变更的逆操作把手：change_id → (entity_type, 撤销键)。
+        #: 与台账分开是因为台账是出域契约，撤销键是内部实现细节。
+        self.applied_undo: dict[str, tuple[str, str]] = {}
         #: A4 提交的机会草稿。进不了 Catalog，等待人工审核（§8.9.1）。
         self.opportunity_drafts: list = []
         #: 官方信息源注册表（C，2026-08-02）——console 源列表、变更检测、
@@ -493,6 +504,9 @@ class Deps:
         #: A5 提交的路径版本与排程预览。目前只在进程内存活——
         #: 换 Firestore 后端时替换这两个容器，端点不变。
         self.pathways: dict[str, PathwayVersion] = {}
+        #: G（2026-08-10）：**未采纳**的规划草案，draft_id → 草案。
+        #: 与 `pathways` 分开存是这条需求的全部要点——排一版和定下来是两件事。
+        self.pathway_drafts: dict[str, PathwayDraft] = {}
         self.schedule_proposals: dict[str, list[ScheduleProposal]] = {}
         #: /matches 的当日缓存与手动刷新计数（F：一天真正跑一次 AI，手动限 3 次）
         self.match_cache: dict[str, tuple[date, list[MatchResult]]] = {}
@@ -1540,6 +1554,267 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             raise HTTPException(404, f"未知学生 {student_id}")
         return store
 
+    def _materialise_changes(
+        student_id: str,
+        proposal: ProfileUpdateProposal,
+        origin: ProfileWriteOrigin,
+    ) -> tuple[list[AppliedChange], list[str]]:
+        """把一条提案里的变更真正写进档案，并留下逐条可撤销的把手。
+
+        两个调用方共用它：``decide_proposal``（学生逐条裁决之后）与
+        ``upload_resume``（2026-08-10 用户裁定 F：学生本人上传官方模板即直写）。
+        抽成一处是因为这段物化逻辑一旦有两份实现，就会立刻开始漂移——
+        修了一边忘了另一边，档案里会长出两种形状的同类条目。
+
+        返回 ``(已写入, 已跳过)``。跳过的必须如实报出来：档案里已有的条目
+        不重复写，但学生要能分清"没解析到"与"解析到了但你已经有了"。
+
+        2026-08-02 用户报障修复三处仍在此处生效：① Resume 经历不带 period
+        （A1 不猜时间段）——此前 DateRange(start=None) 直接 500，回落到确认日
+        并在 outcomes 注明"时间段待补充"；② 同一提案多条经历共用一个 EXP-id
+        只落第一条——id 加序号；③ 技能类 add 此前根本没有写回路径——并入
+        interests 自述标签池（大小写不敏感去重、保序）。
+        """
+        applied: list[AppliedChange] = []
+        skipped: list[str] = []
+        now = datetime.now(timezone.utc)
+        decided_on = now.date()
+        proposal_id = proposal.proposal_id
+        exp_index = 0
+        skill_adds: list[str] = []
+        # D 裁定（1.32.0）：模板解析新增四类的物化缓冲
+        edu_adds: list[dict] = []
+        lang_adds: list[dict] = []
+        honor_adds: list[dict] = []
+        cert_adds: list[dict] = []
+
+        def _record(entity_type: str, summary: str, undo_key: str) -> None:
+            change_id = f"AC-{proposal_id}-{len(applied) + 1}"
+            record = AppliedChange(
+                change_id=change_id, student_id=student_id, origin=origin,
+                entity_type=entity_type, summary=summary[:300],
+                applied_at=now, proposal_id=proposal_id,
+            )
+            applied.append(record)
+            deps.applied_changes[change_id] = record
+            deps.applied_undo[change_id] = (entity_type, undo_key)
+
+        for change in proposal.proposed_changes:
+            if (change.entity_type == "skill"
+                    and change.operation == "add"
+                    and isinstance(change.new_value, str)
+                    and change.new_value.strip()):
+                skill_adds.append(change.new_value.strip())
+                continue
+            if (change.entity_type == "skill"
+                    and change.operation == "update"
+                    and isinstance(change.new_value, str)):
+                # 上传时已判定"档案里有同名技能"——不重复写，但要说出来
+                skipped.append(f"技能「{change.new_value}」已在档案中")
+                continue
+            if change.operation == "add" and isinstance(change.new_value, dict):
+                if change.entity_type == "education":
+                    edu_adds.append(change.new_value)
+                    continue
+                if change.entity_type == "language":
+                    lang_adds.append(change.new_value)
+                    continue
+                if change.entity_type == "honor":
+                    honor_adds.append(change.new_value)
+                    continue
+                if change.entity_type == "certificate":
+                    # 审查 M6：自述证书 → extras（无伪造 Vault 引用；
+                    # 证书编号进 note 不再冒充颁发方）
+                    value = change.new_value
+                    cert_adds.append({
+                        "title": value.get("title", ""),
+                        "date": (value.get("obtained") or "")[:10] or None,
+                        "note": (f"编号：{value['credential_id']}"
+                                 if value.get("credential_id") else None),
+                    })
+                    continue
+            if change.entity_type != "experience" or change.operation != "add":
+                continue
+            exp_index += 1
+            value = change.new_value or {}
+            exp_id = f"EXP-{proposal_id}-{exp_index}"
+            if any(e.experience_id == exp_id for e in deps.experiences):
+                continue        # 幂等
+            # 直写之后重复上传同一份简历会立刻长出两套经历（此前学生还要
+            # 再按一次确认，撞上的概率低）。按「机构 + 角色」语义去重，
+            # 与技能/教育那几类同一口径，并如实报进 skipped。
+            org = str(value.get("organization", ""))
+            role = str(value.get("role", ""))
+            if any(e.student_id == student_id
+                   and e.organization == org and e.role == role
+                   for e in deps.experiences):
+                skipped.append(
+                    f"经历「{' · '.join(x for x in (org, role) if x)}」已在档案中")
+                continue
+            period_start = value.get("period_start") or decided_on
+            outcomes = tuple(value.get("outcomes", ()))
+            if not value.get("period_start"):
+                outcomes = outcomes + ("时间段未从 Resume 解析，待补充",)
+            deps.experiences.append(ExperienceRecord(
+                experience_id=exp_id,
+                student_id=student_id,
+                type=value.get("type", "other"),
+                organization=value.get("organization", ""),
+                role=value.get("role", ""),
+                period={"start": period_start, "end": value.get("period_end")},
+                outcomes=outcomes,
+                skills=tuple(value.get("skills", ())),
+            ))
+            _record("experience",
+                    " · ".join(x for x in (value.get("organization"),
+                                           value.get("role")) if x) or exp_id,
+                    exp_id)
+
+        if skill_adds:
+            current = deps.students[student_id]
+            seen = {t.lower() for t in current.interests}
+            merged = list(current.interests)
+            for tag in skill_adds:
+                if tag.lower() in seen:
+                    skipped.append(f"技能「{tag}」已在档案中")
+                    continue
+                merged.append(tag)
+                seen.add(tag.lower())
+                _record("skill", f"技能 · {tag}", tag)
+            if len(merged) != len(current.interests):
+                deps.students[student_id] = StudentProfile.model_validate({
+                    **current.model_dump(),
+                    "interests": tuple(merged),
+                    "version": current.version + 1,
+                    "updated_at": now,
+                })
+        if edu_adds or lang_adds or honor_adds or cert_adds:
+            # 教育/语言/荣誉/证书并入 extras（自述分区；语义键去重）
+            found = deps.profile_extras.get(student_id)
+            base = found or ProfileExtras(
+                student_id=student_id, updated_at=now)
+            edu = list(base.education)
+            edu_keys = {(e.school.lower(), (e.program or "").lower()) for e in edu}
+            for v in edu_adds:
+                key = (str(v.get("school", "")).lower(),
+                       str(v.get("program") or "").lower())
+                if not v.get("school"):
+                    continue
+                if key in edu_keys:
+                    skipped.append(f"教育经历「{v['school']}」已在档案中")
+                    continue
+                edu.append(EducationEntry.model_validate(v))
+                edu_keys.add(key)
+                _record("education",
+                        f"教育 · {v['school']}"
+                        + (f" {v['program']}" if v.get("program") else ""),
+                        f"{key[0]}|{key[1]}")
+            langs = list(base.languages)
+            lang_keys = {l.language.lower() for l in langs}
+            for v in lang_adds:
+                name = str(v.get("language") or "")
+                if not name:
+                    continue
+                if name.lower() in lang_keys:
+                    skipped.append(f"语言「{name}」已在档案中")
+                    continue
+                langs.append(LanguageSkill.model_validate(v))
+                lang_keys.add(name.lower())
+                _record("language", f"语言 · {name}", name.lower())
+            honors = list(base.honors)
+            honor_keys = {h.title.lower() for h in honors}
+            for v in honor_adds:
+                title = str(v.get("title") or "")
+                if not title:
+                    continue
+                if title.lower() in honor_keys:
+                    skipped.append(f"荣誉「{title}」已在档案中")
+                    continue
+                honors.append(ProfileEntry.model_validate(v))
+                honor_keys.add(title.lower())
+                _record("honor", f"荣誉 · {title}", title.lower())
+            certs = list(base.certificates)
+            cert_keys = {c.title.lower() for c in certs}
+            for v in cert_adds:
+                title = str(v.get("title") or "")
+                if not title:
+                    continue
+                if title.lower() in cert_keys:
+                    skipped.append(f"证书「{title}」已在档案中")
+                    continue
+                certs.append(ProfileEntry.model_validate(v))
+                cert_keys.add(title.lower())
+                _record("certificate", f"证书 · {title}", title.lower())
+            deps.profile_extras[student_id] = base.model_copy(
+                update={"education": tuple(edu[:10]),
+                        "languages": tuple(langs[:10]),
+                        "honors": tuple(honors[:20]),
+                        "certificates": tuple(certs[:20]),
+                        "updated_at": now})
+        return applied, skipped
+
+    def _undo_change(student_id: str, change_id: str) -> AppliedChange:
+        """逆物化一条已写入的变更。撤销**不删记录**——只盖 undone_at。
+
+        幂等：已撤销的再撤一次返回同一条记录，不再动档案。
+        """
+        record = deps.applied_changes.get(change_id)
+        if record is None or record.student_id != student_id:
+            raise HTTPException(404, {"error": "unknown_change",
+                                      "detail": change_id})
+        if record.undone_at is not None:
+            return record
+        entity_type, key = deps.applied_undo.get(change_id, (None, None))
+        now = datetime.now(timezone.utc)
+        if entity_type == "experience":
+            deps.experiences[:] = [e for e in deps.experiences
+                                   if e.experience_id != key]
+        elif entity_type == "skill":
+            current = deps.students[student_id]
+            kept = tuple(t for t in current.interests if t.lower() != key.lower())
+            if len(kept) != len(current.interests):
+                deps.students[student_id] = StudentProfile.model_validate({
+                    **current.model_dump(), "interests": kept,
+                    "version": current.version + 1, "updated_at": now,
+                })
+        elif entity_type in {"education", "language", "honor", "certificate"}:
+            extras = deps.profile_extras.get(student_id)
+            if extras is not None:
+                if entity_type == "education":
+                    kept = tuple(
+                        e for e in extras.education
+                        if f"{e.school.lower()}|{(e.program or '').lower()}" != key)
+                    extras = extras.model_copy(update={"education": kept})
+                elif entity_type == "language":
+                    extras = extras.model_copy(update={"languages": tuple(
+                        l for l in extras.languages if l.language.lower() != key)})
+                elif entity_type == "honor":
+                    extras = extras.model_copy(update={"honors": tuple(
+                        h for h in extras.honors if h.title.lower() != key)})
+                else:
+                    extras = extras.model_copy(update={"certificates": tuple(
+                        c for c in extras.certificates if c.title.lower() != key)})
+                deps.profile_extras[student_id] = extras.model_copy(
+                    update={"updated_at": now})
+        undone = AppliedChange.model_validate(
+            {**record.model_dump(), "undone_at": now})
+        deps.applied_changes[change_id] = undone
+        return undone
+
+    @implements("GET", "/students/{student_id}/profile/changes",
+                response_model=list[AppliedChange])
+    def profile_changes(student_id: str) -> list[AppliedChange]:
+        """已物化变更的台账（含已撤销的）。撤销不是删除，审计要答得上。"""
+        _known_student(student_id)
+        return [c for c in deps.applied_changes.values()
+                if c.student_id == student_id]
+
+    @implements("POST", "/students/{student_id}/profile/changes/{change_id}/undo",
+                response_model=AppliedChange)
+    def undo_profile_change(student_id: str, change_id: str) -> AppliedChange:
+        _known_student(student_id)
+        return _undo_change(student_id, change_id)
+
     @implements("POST", "/students/{student_id}/profile/proposals",
                 response_model=ProfileUpdateProposal)
     def submit_proposal(student_id: str, proposal: ProfileUpdateProposal
@@ -1588,143 +1863,24 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 changed_fields=fields,
             )
             # R5-G2：确认的变更物化进档案（总览的经历分区与标签池读它）。
-            # 2026-08-02 用户报障修复三处：① Resume 经历不带 period（A1 不猜
-            # 时间段）——此前 DateRange(start=None) 直接 500，回落到确认日并在
-            # outcomes 注明"时间段待补充"；② 同一提案多条经历共用一个 EXP-id
-            # 只落第一条——id 加序号；③ 技能类 add 此前根本没有写回路径——
-            # 并入 interests 自述标签池（大小写不敏感去重、保序）。
+            # 物化本身抽进 `_materialise_changes`——上传直写走的是同一段代码。
             if status is ProposalStatus.CONFIRMED:
                 proposal = next(
                     (p for p in _store(student_id).proposals()
                      if p.proposal_id == proposal_id), None)
                 if proposal is not None:
-                    decided_on = datetime.now(timezone.utc).date()
-                    exp_index = 0
-                    skill_adds: list[str] = []
-                    # D 裁定（1.32.0）：模板解析新增四类的物化缓冲
-                    edu_adds: list[dict] = []
-                    lang_adds: list[dict] = []
-                    honor_adds: list[dict] = []
-                    cert_adds: list[dict] = []
-                    for change in proposal.proposed_changes:
-                        if (change.entity_type == "skill"
-                                and change.operation == "add"
-                                and isinstance(change.new_value, str)
-                                and change.new_value.strip()):
-                            skill_adds.append(change.new_value.strip())
-                            continue
-                        if change.operation == "add" and isinstance(
-                                change.new_value, dict):
-                            if change.entity_type == "education":
-                                edu_adds.append(change.new_value)
-                                continue
-                            if change.entity_type == "language":
-                                lang_adds.append(change.new_value)
-                                continue
-                            if change.entity_type == "honor":
-                                honor_adds.append(change.new_value)
-                                continue
-                            if change.entity_type == "certificate":
-                                # 审查 M6：自述证书 → extras（无伪造 Vault
-                                # 引用；证书编号进 note 不再冒充颁发方）
-                                value = change.new_value
-                                cert_adds.append({
-                                    "title": value.get("title", ""),
-                                    "date": (value.get("obtained") or "")[:10]
-                                    or None,
-                                    "note": (f"编号：{value['credential_id']}"
-                                             if value.get("credential_id")
-                                             else None),
-                                })
-                                continue
-                        if change.entity_type != "experience" or                                 change.operation != "add":
-                            continue
-                        exp_index += 1
-                        value = change.new_value or {}
-                        exp_id = f"EXP-{proposal_id}-{exp_index}"
-                        if any(e.experience_id == exp_id
-                               for e in deps.experiences):
-                            continue        # 幂等
-                        period_start = value.get("period_start") or decided_on
-                        outcomes = tuple(value.get("outcomes", ()))
-                        if not value.get("period_start"):
-                            outcomes = outcomes + ("时间段未从 Resume 解析，待补充",)
-                        deps.experiences.append(ExperienceRecord(
-                            experience_id=exp_id,
-                            student_id=student_id,
-                            type=value.get("type", "other"),
-                            organization=value.get("organization", ""),
-                            role=value.get("role", ""),
-                            period={"start": period_start,
-                                    "end": value.get("period_end")},
-                            outcomes=outcomes,
-                            skills=tuple(value.get("skills", ())),
-                        ))
-                    if skill_adds:
-                        current = deps.students[student_id]
-                        seen = {t.lower() for t in current.interests}
-                        merged = list(current.interests)
-                        for tag in skill_adds:
-                            if tag.lower() not in seen:
-                                merged.append(tag)
-                                seen.add(tag.lower())
-                        if len(merged) != len(current.interests):
-                            deps.students[student_id] = StudentProfile.model_validate({
-                                **current.model_dump(),
-                                "interests": tuple(merged),
-                                "version": current.version + 1,
-                                "updated_at": datetime.now(timezone.utc),
-                            })
-                    if edu_adds or lang_adds or honor_adds or cert_adds:
-                        # 教育/语言/荣誉/证书并入 extras（自述分区；语义键去重）
-                        found = deps.profile_extras.get(student_id)
-                        base = found or ProfileExtras(
-                            student_id=student_id,
-                            updated_at=datetime.now(timezone.utc))
-                        edu = list(base.education)
-                        edu_keys = {(e.school.lower(),
-                                     (e.program or "").lower()) for e in edu}
-                        for v in edu_adds:
-                            key = (str(v.get("school", "")).lower(),
-                                   str(v.get("program") or "").lower())
-                            if v.get("school") and key not in edu_keys:
-                                edu.append(EducationEntry.model_validate(v))
-                                edu_keys.add(key)
-                        langs = list(base.languages)
-                        lang_keys = {l.language.lower() for l in langs}
-                        for v in lang_adds:
-                            if (v.get("language")
-                                    and str(v["language"]).lower()
-                                    not in lang_keys):
-                                langs.append(LanguageSkill.model_validate(v))
-                                lang_keys.add(str(v["language"]).lower())
-                        honors = list(base.honors)
-                        honor_keys = {h.title.lower() for h in honors}
-                        for v in honor_adds:
-                            if (v.get("title")
-                                    and str(v["title"]).lower()
-                                    not in honor_keys):
-                                honors.append(ProfileEntry.model_validate(v))
-                                honor_keys.add(str(v["title"]).lower())
-                        certs = list(base.certificates)
-                        cert_keys = {c.title.lower() for c in certs}
-                        for v in cert_adds:
-                            if (v.get("title")
-                                    and str(v["title"]).lower()
-                                    not in cert_keys):
-                                certs.append(ProfileEntry.model_validate(v))
-                                cert_keys.add(str(v["title"]).lower())
-                        deps.profile_extras[student_id] = base.model_copy(
-                            update={"education": tuple(edu[:10]),
-                                    "languages": tuple(langs[:10]),
-                                    "honors": tuple(honors[:20]),
-                                    "certificates": tuple(certs[:20]),
-                                    "updated_at": datetime.now(timezone.utc)})
+                    _materialise_changes(
+                        student_id, proposal,
+                        # 走到这里学生已经逐条裁决过了；origin 记的是这批
+                        # 变更**当初从哪来**，用于台账回溯，不是豁免凭据。
+                        ProfileWriteOrigin.AGENT_PROPOSAL,
+                    )
             return event
         except ProposalNotFound as exc:
             raise HTTPException(404, f"未知提案 {proposal_id}") from exc
         except UnconfirmedWrite as exc:
             raise HTTPException(422, str(exc)) from exc
+
 
     @implements("POST", "/students/{student_id}/memory/recall",
                 response_model=MemoryRecallResult)
@@ -2746,23 +2902,23 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         deps.pathways[student_id] = pathway
         return pathway
 
-    @implements("GET", "/students/{student_id}/pathway", response_model=PathwayVersion)
-    def current_pathway(student_id: str,
-                        intensity: str = Query("balanced"),
-                        ) -> PathwayVersion:
-        """D1 的三个时间视图都读这一个对象，所以它们不可能互相矛盾。
+    def _build_pathway_candidate(
+        student_id: str, intensity: str,
+    ) -> tuple[PathwayVersion | None, tuple[str, ...]]:
+        """排一版路径出来，**不写任何东西**。返回 (路径, 记忆依据)。
 
-        没有版本时返回 **404 而不是空路径**：空路径会被前端渲染成
-        "你没什么要做的"，而真相是"A5 还没跑过"。
+        这段以前长在 `GET /pathway` 里，读一下就落盘——2026-08-10 用户裁定 G
+        点名的"第一次规划直接落盘 很不对劲"就是它。现在它只负责"排"，
+        "定"由 `decide_pathway_draft` 负责，两件事分开。
+
+        审计 E（2026-08-02）：A5 类本体接进线上路径——模型可用时优先真实
+        生成（PathwayAgent.build_pathway 修复循环 + generate_course_plans
+        三变体；取舍输入=matches 确定性分 + 记忆 advisory 摘要）；模型理由
+        调用失败即回落夹具并如实标注——**拿不到模型就不冒充 A5**。
         """
-        _known_student(student_id)
         found = deps.pathways.get(student_id)
-        # 审计 E（2026-08-02）：A5 类本体接进线上路径——模型可用时优先真实
-        # 生成（PathwayAgent.build_pathway 修复循环 + generate_course_plans
-        # 三变体；取舍输入=matches 确定性分 + 记忆 advisory 摘要）；模型理由
-        # 调用失败即回落夹具并如实标注——**拿不到模型就不冒充 A5**。
-        # trigger 携带目标指纹：换目标 → 指纹变 → 下次读取自动重生成；
-        # 已批准吸收的条目跨版本携带，不因重规划消失。
+        memory_notes: tuple[str, ...] = ()
+        built = None
         if deps.model is not None:
             from campuspath_contracts.academic import CoursePlanVariant
             from .a5_pathway import build_a5_pathway, goal_fingerprint
@@ -2775,14 +2931,11 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             goals = deps.goals.get(student_id, ())
             fp = goal_fingerprint(goals) if goals else None
             expected_trigger = f"a5:{fp}:{variant.value}"
-            stale = (found is None or found.trigger == "demo_fixture"
-                     or (found.trigger.startswith("a5:")
-                         and found.trigger != expected_trigger))
             # 审查 H3：失败负缓存——A5 生成失败（模型不可用等）后，同一
-            # 目标指纹当日不再重试，否则每次 GET 都白烧 matches 理由 +
-            # A5 两轮模型调用（GET 是最高频读端点）。
+            # 目标指纹当日不再重试，否则每次生成都白烧 matches 理由 +
+            # A5 两轮模型调用。
             failed_key = (student_id, expected_trigger)
-            if (fp is not None and stale
+            if (fp is not None
                     and deps.a5_failed.get(failed_key) != date.today()):
                 today = deps.today
                 cached = deps.match_cache.get(student_id)
@@ -2796,7 +2949,6 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                         deps.match_cache[student_id] = (today, matches)
                 except Exception:
                     matches = []
-                memory_notes: tuple[str, ...] = ()
                 try:
                     recall = deps.memory.recall(
                         MemoryRecallQuery(student_id=student_id,
@@ -2819,11 +2971,9 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 carry = tuple(
                     i for i in (found.plan_items if found else ())
                     if i.subject_id in approved_opps)
-                built = None
                 if matches:
-                    # 读端点不许 500（与审查 M10 同一条纪律）：生成器内部
-                    # 虽有防护，这里再兜一层——任何异常都回落夹具并计入
-                    # 失败负缓存，否则每次 GET 重烧模型再炸一遍
+                    # 生成不许 500（与审查 M10 同一条纪律）：任何异常都回落
+                    # 夹具并计入失败负缓存，否则每次重烧模型再炸一遍
                     # （2026-08-03 用户报障：y1s2 撞名炸出的正是这条路）
                     try:
                         built = build_a5_pathway(
@@ -2838,19 +2988,16 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                         built = None
                 if built is not None:
                     # 审查 M10：B8 闸门是这条路上唯一可能抛出的调用——
-                    # 凭据绑定对不上时回落夹具并留日志，读端点不许 500
+                    # 凭据绑定对不上时回落夹具并留日志
                     try:
                         enforce_validation_binding(built, deps.validations)
                     except Exception:
                         logging.getLogger("campuspath").exception(
                             "A5 路径未过 B8 闸门，回落夹具")
                         built = None
-                if built is not None:
-                    deps.pathways[student_id] = built
-                    found = built
-                else:
+                if built is None:
                     deps.a5_failed[failed_key] = date.today()
-        if found is None:
+        if built is None:
             # 演示夹具：确定性生成，凭据由 Rules 真实签发，trigger 标明来历。
             # 它同样要过 B8 闸门——自己都过不了闸门的演示数据没有演示价值。
             from .demo_pathway import build_demo_pathway
@@ -2858,8 +3005,116 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             fixture = build_demo_pathway(deps, student_id)
             if fixture is not None:
                 enforce_validation_binding(fixture, deps.validations)
-                deps.pathways[student_id] = fixture
-                found = fixture
+                built = fixture
+        return built, memory_notes
+
+    @implements("POST", "/students/{student_id}/pathway/draft",
+                response_model=PathwayDraft)
+    def draft_pathway(student_id: str,
+                      intensity: str = Query("balanced"),
+                      ) -> PathwayDraft:
+        """排一版**草案**给学生看，等他批准（2026-08-10 用户裁定 G）。
+
+        草案存在 `deps.pathway_drafts`，**进不了** `deps.pathways`——
+        只有 `decide_pathway_draft(adopt)` 那一步才写已采纳版本。
+        """
+        _known_student(student_id)
+        built, memory_notes = _build_pathway_candidate(student_id, intensity)
+        if built is None:
+            raise HTTPException(404, {"error": "no_pathway_version",
+                                      "detail": "没有可用的规划输入"})
+        current = deps.pathways.get(student_id)
+        # diff 的基线永远是**已采纳版本**。反过来减会让第一次规划报出一堆
+        # "移除"，弹窗就成了劝学生批准一份在删他东西的计划——契约层的
+        # PathwayDraftDiff validator 会当场拒收那种取反。
+        old_ids = {i.subject_id for i in (current.plan_items if current else ())}
+        new_ids = {i.subject_id for i in built.plan_items}
+        old_dates = {i.subject_id: i.date_range
+                     for i in (current.plan_items if current else ())}
+        diff = PathwayDraftDiff(
+            is_first_plan=current is None,
+            added_count=len(new_ids - old_ids),
+            removed_count=len(old_ids - new_ids),
+            rescheduled_count=sum(
+                1 for i in built.plan_items
+                if i.subject_id in old_dates
+                and old_dates[i.subject_id] != i.date_range),
+            carried_over_count=len(old_ids & new_ids),
+        )
+        goals = deps.goals.get(student_id, ())
+        profile = deps.students.get(student_id)
+        draft = PathwayDraft(
+            draft_id=f"PD-{student_id}-{len(deps.pathway_drafts) + 1:04d}",
+            student_id=student_id,
+            intensity=intensity,
+            created_at=datetime.now(timezone.utc),
+            pathway=built,
+            diff=diff,
+            # 分隔符用中性的「 · 」：这串会同时出现在中/英/繁三个界面上，
+            # 服务端塞一个全角冒号进去，英文界面就穿帮了
+            rationale_goals=tuple(
+                f"{g.role.value} · {g.target_name}" for g in goals)[:4],
+            rationale_profile=tuple(profile.interests)[:6] if profile else (),
+            rationale_memory=memory_notes[:3],
+        )
+        deps.pathway_drafts[draft.draft_id] = draft
+        return draft
+
+    @implements("POST",
+                "/students/{student_id}/pathway/draft/{draft_id}/decision",
+                response_model=PathwayDraft)
+    def decide_pathway_draft(student_id: str, draft_id: str,
+                             decision: str = Query(...),
+                             ) -> PathwayDraft:
+        """学生的批准是**唯一**能让规划落盘的动作。
+
+        与 B3 的 `decide_proposal` 同一形状：拒绝也留记录，
+        "为什么这版没生效"要能回答。
+        """
+        _known_student(student_id)
+        draft = deps.pathway_drafts.get(draft_id)
+        if draft is None or draft.student_id != student_id:
+            raise HTTPException(404, {"error": "unknown_draft",
+                                      "detail": draft_id})
+        if draft.adopted_at is not None or draft.discarded_at is not None:
+            raise HTTPException(409, {"error": "draft_already_decided",
+                                      "detail": draft_id})
+        if decision not in {"adopt", "discard"}:
+            raise HTTPException(422, {"error": "unknown_decision",
+                                      "detail": decision})
+        now = datetime.now(timezone.utc)
+        if decision == "adopt":
+            # 已采纳版本才过 B8 闸门的最终确认——草案阶段已经查过一遍，
+            # 这里是落盘前的最后一道，宁可重复也不给未背书的条目开口子。
+            try:
+                enforce_validation_binding(draft.pathway, deps.validations)
+            except UnbackedOutputError as exc:
+                raise HTTPException(
+                    422, {"error": "unbacked_validation_id", "detail": str(exc)}
+                ) from exc
+            deps.pathways[student_id] = draft.pathway
+            decided = draft.model_copy(update={"adopted_at": now})
+        else:
+            decided = draft.model_copy(update={"discarded_at": now})
+        deps.pathway_drafts[draft_id] = decided
+        return decided
+
+    @implements("GET", "/students/{student_id}/pathway", response_model=PathwayVersion)
+    def current_pathway(student_id: str,
+                        intensity: str = Query("balanced"),
+                        ) -> PathwayVersion:
+        """D1 的三个时间视图都读这一个对象，所以它们不可能互相矛盾。
+
+        **只读，零写入**（2026-08-10 用户裁定 G）。此前这里会在目标指纹或
+        强度变化时当场生成并写盘，学生一进页面就看到一份从没被问过的计划。
+        现在没有已采纳版本就是 404——前端据此显示"开始规划"空态，
+        由学生点击才发起 `POST /pathway/draft`。
+
+        `intensity` 保留是为了不破坏既有调用方的签名，但它**不再触发重排**：
+        换档要看新的一版，走草案 + 批准那条路。
+        """
+        _known_student(student_id)
+        found = deps.pathways.get(student_id)
         if found is None:
             raise HTTPException(404, {"error": "no_pathway_version"})
         return _augment_pathway_with_intl(found, student_id)
@@ -4968,13 +5223,22 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         })
 
     @implements("POST", "/students/{student_id}/resume",
-                response_model=ProfileUpdateProposal)
-    def upload_resume(student_id: str, upload: "ResumeUpload") -> ProfileUpdateProposal:
-        """Resume → A1 提炼 → **恒为 pending** 的提案（B3）。
+                response_model=ResumeUploadResult)
+    def upload_resume(student_id: str, upload: "ResumeUpload") -> ResumeUploadResult:
+        """Resume → 确定性解析 → **直接写进档案总览**，逐条可撤销。
 
-        与现有档案冲突的条目 operation=update 并带 old_value——
-        「是否更新为新上传的版本」由学生在档案页逐项决定，系统不代答。
-        原文不落库：解析完就丢，档案里只进学生确认过的结构化条目。
+        2026-08-10 用户裁定 F：上传完还要切到「档案更新建议」分页逐条按
+        确认，是多余的一步——学生上传自己的简历，本身就是"我说这些是我的
+        经历"。B3 挡的是 **AI 抽取或高影响推断**被静默写入，不是学生自述
+        （自助编辑 ``selfEditProfile`` 从来就是直写的，这条与它同类）。
+        豁免边界钉在契约层：:class:`ResumeUploadResult` 的 validator 拒收
+        任何非 ``student_upload`` 来源的已应用变更。
+
+        审计不断：仍然落一条提案 + 一条 ProfileChangeEvent（``confirmed``，
+        actor=student），加上逐条 :class:`AppliedChange` 台账。
+        与现有档案重复的条目不重复写入，但会出现在 ``skipped`` 里——
+        "没解析到"和"解析到了但你已经有了"，学生要分得清。
+        原文不落库：解析完就丢。
         """
         import base64
         import io
@@ -5033,13 +5297,45 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         )
         proposal = a1.propose_profile_update(
             student_id, tuple(changes),
-            reason=f"来自 Resume「{upload.filename}」的候选变更"
-                   f"（模板规则解析·零 AI，待确认）",
+            reason=f"来自 Resume「{upload.filename}」的自述条目"
+                   f"（模板规则解析·零 AI，学生本人上传即直写）",
             proposal_id=f"PROP-RESUME-{deps.memory.next_sequence()}",
             now=datetime.now(timezone.utc),
         )
-        _store(student_id).submit_proposal(proposal)
-        return proposal
+        store = _store(student_id)
+        store.submit_proposal(proposal)
+        # 学生的上传动作**就是**那个决定——立刻裁决并物化，不再让他多按一遍。
+        # 走的仍是 store 的唯一写入路径，所以版本号与事件流照常。
+        _field_of = {
+            "skill": "skills", "experience": "experiences",
+            "education": "extras.education", "language": "extras.languages",
+            "honor": "extras.honors", "certificate": "evidence",
+        }
+        fields = tuple(dict.fromkeys(
+            _field_of.get(c.entity_type, c.entity_type)
+            for c in proposal.proposed_changes))
+        store.apply_decision(
+            proposal.proposal_id, ProposalStatus.CONFIRMED,
+            decided_at=datetime.now(timezone.utc),
+            actor="student", changed_fields=fields,
+        )
+        applied, skipped = _materialise_changes(
+            student_id, proposal, ProfileWriteOrigin.STUDENT_UPLOAD)
+        if not applied and not skipped:
+            # 契约层会拒收"既没写入也没跳过"的结果——那说明解析器空转了。
+            # 与其让 500 冒充成功，不如如实告诉学生这份文件没解析出条目。
+            raise HTTPException(422, {
+                "error": "resume_not_in_template",
+                "detail": "模板解析没有产出任何条目",
+                "expected_sections": TemplateError.EXPECTED,
+            })
+        return ResumeUploadResult(
+            proposal_id=proposal.proposal_id,
+            student_id=student_id,
+            profile_version=deps.students[student_id].version,
+            applied=tuple(applied),
+            skipped=tuple(skipped),
+        )
 
     # ── Advisor（I/Q）：学生端预约，Advisor 端确认与会后建议，两端不混 ──
     def _slot_taken(slot_id: str) -> bool:

@@ -98,11 +98,11 @@ def test_upload_template_resume_needs_no_model(client: TestClient):
               "content_text": TEMPLATE_RESUME},
     )
     assert resp.status_code == 200, resp.text
-    proposal = resp.json()
-    kinds = {c["entity_type"] for c in proposal["proposed_changes"]}
+    result = resp.json()
+    kinds = {c["entity_type"] for c in result["applied"]}
     assert {"skill", "experience", "education",
             "certificate", "honor", "language"} <= kinds
-    assert "零 AI" in proposal["reason"] or "规则" in proposal["reason"]
+    assert all(c["origin"] == "student_upload" for c in result["applied"])
 
 
 def test_upload_free_text_resume_rejected_with_hint(client: TestClient):
@@ -117,18 +117,15 @@ def test_upload_free_text_resume_rejected_with_hint(client: TestClient):
     assert "Skills" in str(detail) or "模板" in str(detail)
 
 
-def test_confirm_materializes_all_entity_kinds(client: TestClient):
+def test_upload_materializes_all_entity_kinds(client: TestClient):
+    """2026-08-10 用户裁定 F：上传即写入，不再需要切分页逐条按确认。"""
     up = client.post(
         "/v1/students/STU-A/resume", headers=_headers(),
         json={"filename": "template.md",
               "content_text": TEMPLATE_RESUME},
     )
+    assert up.status_code == 200, up.text
     pid = up.json()["proposal_id"]
-    dec = client.post(
-        f"/v1/students/STU-A/profile/proposals/{pid}/decision?decision=confirmed",
-        headers=_headers(),
-    )
-    assert dec.status_code == 200, dec.text
 
     exps = client.get("/v1/students/STU-A/experiences",
                       headers=_headers()).json()

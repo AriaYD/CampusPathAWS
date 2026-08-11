@@ -392,11 +392,32 @@ export const api = {
       method: "POST",
       body: JSON.stringify(req),
     }),
+  /** 上传官方模板简历。2026-08-10 起**直接写进档案**，返回逐条可撤销的清单。 */
   uploadResume: (id: string, upload: Schemas["ResumeUpload"]) =>
-    request<ProfileUpdateProposal>(`${s(id)}/resume`, {
+    request<Schemas["ResumeUploadResult"]>(`${s(id)}/resume`, {
       method: "POST",
       body: JSON.stringify(upload),
     }),
+  /** G（2026-08-10）：排一版草案，**不落盘**——等学生批准。 */
+  pathwayDraft: (id: string, intensity?: string) =>
+    request<Schemas["PathwayDraft"]>(
+      `${s(id)}/pathway/draft${intensity ? `?intensity=${intensity}` : ""}`,
+      { method: "POST" },
+    ),
+  decidePathwayDraft: (id: string, draftId: string,
+                       decision: "adopt" | "discard") =>
+    request<Schemas["PathwayDraft"]>(
+      `${s(id)}/pathway/draft/${encodeURIComponent(draftId)}`
+      + `/decision?decision=${decision}`,
+      { method: "POST" },
+    ),
+  profileChanges: (id: string) =>
+    request<Schemas["AppliedChange"][]>(`${s(id)}/profile/changes`),
+  undoProfileChange: (id: string, changeId: string) =>
+    request<Schemas["AppliedChange"]>(
+      `${s(id)}/profile/changes/${encodeURIComponent(changeId)}/undo`,
+      { method: "POST" },
+    ),
   bookAdvisor: (id: string, booking: Schemas["AdvisorBooking"]) =>
     request<Schemas["AdvisorBooking"]>(`${s(id)}/advisor/bookings`, {
       method: "POST",

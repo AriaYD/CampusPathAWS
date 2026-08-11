@@ -1140,6 +1140,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/students/{student_id}/pathway/draft": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 生成规划草案（**不落盘**）：按目标 + 档案 + 记忆偏好排一版，连同与现行版本的差异一并返回，等学生批准（2026-08-10 用户裁定 G） */
+        post: operations["post_v1_students_student_id_pathway_draft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/pathway/draft/{draft_id}/decision": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 学生对草案的裁决：adopt 才写入已采纳版本，discard 丢弃；两者都只能做一次 */
+        post: operations["post_v1_students_student_id_pathway_draft_draft_id_decision"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/students/{student_id}/pathway/items/{plan_item_id}": {
         parameters: {
             query?: never;
@@ -1168,6 +1202,40 @@ export interface paths {
         get: operations["get_v1_students_student_id_profile"];
         put?: never;
         post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/profile/changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 已物化的档案变更台账（含已撤销的——撤销不删记录） */
+        get: operations["get_v1_students_student_id_profile_changes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/profile/changes/{change_id}/undo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 撤销一条已物化的变更（逆物化 + 盖 undone_at；幂等） */
+        post: operations["post_v1_students_student_id_profile_changes_change_id_undo"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1288,7 +1356,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** 上传 Resume（md/txt/pdf）→ A1 提炼候选变更 → 恒为 pending 的提案，冲突项带 old_value 由学生逐项确认（B3） */
+        /** 上传官方模板简历（md/txt/pdf）→ 确定性解析 → **直接物化进档案**，逐条回显且每条可撤销（2026-08-10 用户裁定 F；B3 豁免只给学生自述） */
         post: operations["post_v1_students_student_id_resume"];
         delete?: never;
         options?: never;
@@ -1938,6 +2006,47 @@ export interface components {
              * @default null
              */
             workload_estimate_hours_per_week: number | null;
+        };
+        /**
+         * AppliedChange
+         * @description 已经物化进档案的一条变更，**带撤销把手**。
+         *
+         *     与 :class:`ProfileChangeEvent` 分工不同：那个是 append-only 的**事件**
+         *     （所以是 FrozenModel，一个 id 永远只指一件事）；这个是**台账行**，
+         *     有生命周期——已应用 → 已撤销。撤销不删行，只盖 ``undone_at``，
+         *     因为"这条后来被撤了"本身就是审计要回答的问题。
+         *
+         *     刻意不做成 FrozenModel：把有状态的台账伪装成不可变事件，只会逼出
+         *     ``model_copy(update=...)`` 那种绕过守卫的写法。
+         */
+        AppliedChange: {
+            /**
+             * Applied At
+             * Format: date-time
+             */
+            applied_at: string;
+            /** Change Id */
+            change_id: string;
+            /**
+             * Entity Type
+             * @enum {string}
+             */
+            entity_type: "experience" | "skill" | "education" | "language" | "honor" | "certificate";
+            origin: components["schemas"]["ProfileWriteOrigin"];
+            /**
+             * Proposal Id
+             * @default null
+             */
+            proposal_id: string | null;
+            /** Student Id */
+            student_id: string;
+            /** Summary */
+            summary: string;
+            /**
+             * Undone At
+             * @default null
+             */
+            undone_at: string | null;
         };
         /**
          * AvailabilityBlock
@@ -4911,6 +5020,80 @@ export interface components {
             title: string;
         };
         /**
+         * PathwayDraft
+         * @description 一份**尚未落盘**的规划草案（2026-08-10 用户裁定 G）。
+         *
+         *     用户原话：「第一次规划直接落盘 很不对劲」。所以生成与采纳被拆成两件事：
+         *     草案存在 ``deps.pathway_drafts``，只有学生点了"采纳"才写进
+         *     ``deps.pathways``。``GET /pathway`` 从此**只读已采纳版本**。
+         *
+         *     三条 ``rationale_*`` 是弹窗里的"依据"行——数据一直都在
+         *     （``PlanItem.assumptions`` 与记忆 advisory），只是从没上过屏。
+         *     要学生批准一件事，就得先让他看见这件事是凭什么来的。
+         */
+        PathwayDraft: {
+            /**
+             * Adopted At
+             * @default null
+             */
+            adopted_at: string | null;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            diff: components["schemas"]["PathwayDraftDiff"];
+            /**
+             * Discarded At
+             * @default null
+             */
+            discarded_at: string | null;
+            /** Draft Id */
+            draft_id: string;
+            /** Intensity */
+            intensity: string;
+            pathway: components["schemas"]["PathwayVersion"];
+            /**
+             * Rationale Goals
+             * @default []
+             */
+            rationale_goals: string[];
+            /**
+             * Rationale Memory
+             * @default []
+             */
+            rationale_memory: string[];
+            /**
+             * Rationale Profile
+             * @default []
+             */
+            rationale_profile: string[];
+            /** Student Id */
+            student_id: string;
+        };
+        /**
+         * PathwayDraftDiff
+         * @description 草案相对**当前已采纳版本**的差异。审批弹窗要回答的是"会变什么"。
+         *
+         *     只报数不报清单：条目本身就在 ``PathwayDraft.pathway`` 里，
+         *     再复制一份就有两个出处，一旦漂移谁都说不清哪个是真的。
+         */
+        PathwayDraftDiff: {
+            /** Added Count */
+            added_count: number;
+            /** Carried Over Count */
+            carried_over_count: number;
+            /**
+             * Is First Plan
+             * @description 没有已采纳版本——这就是用户说的「第一次规划」那一刻
+             */
+            is_first_plan: boolean;
+            /** Removed Count */
+            removed_count: number;
+            /** Rescheduled Count */
+            rescheduled_count: number;
+        };
+        /**
          * PathwayVersion
          * @description 多时间尺度路径（D1 要求三个视图数据同源，因此三者都从这里派生）。
          */
@@ -5213,6 +5396,17 @@ export interface components {
             /** Student Id */
             student_id: string;
         };
+        /**
+         * ProfileWriteOrigin
+         * @description 一次 Profile 写入的来路。B3 约束的是最后一种。
+         *
+         *     Spec §5.6 / §17.5 的 ``Unconfirmed Profile Write`` 管的是"**AI 抽取或
+         *     高影响推断**被静默写进档案"。学生本人自助编辑（``selfEditProfile``）
+         *     从来就是直写的，学生本人上传官方模板经**确定性解析**得到的自述内容
+         *     与之同类——两者都是学生自己说的话，不是系统替他下的结论。
+         * @enum {string}
+         */
+        ProfileWriteOrigin: "student_upload" | "student_edit" | "agent_proposal";
         /**
          * ProgramCurriculum
          * @description 一个本科专业的四年课程要求全貌（必修组/选修组/毕业要求）。
@@ -6244,6 +6438,34 @@ export interface components {
             content_text: string | null;
             /** Filename */
             filename: string;
+        };
+        /**
+         * ResumeUploadResult
+         * @description 上传官方模板简历的结果：**已经写进档案了**，不是待办清单。
+         *
+         *     2026-08-10 用户裁定：上传后绕到"档案更新建议"分页逐条按确认很多余。
+         *     改为直写 + 弹窗逐条回显 + 每条可撤销。
+         *
+         *     ``skipped`` 是如实交代——档案里已有的条目不重复写入，但也不能装作
+         *     没解析到；否则学生会以为模板没写对。
+         */
+        ResumeUploadResult: {
+            /**
+             * Applied
+             * @default []
+             */
+            applied: components["schemas"]["AppliedChange"][];
+            /** Profile Version */
+            profile_version: number;
+            /** Proposal Id */
+            proposal_id: string;
+            /**
+             * Skipped
+             * @default []
+             */
+            skipped: string[];
+            /** Student Id */
+            student_id: string;
         };
         /**
          * ReviewSuggestion
@@ -9880,6 +10102,103 @@ export interface operations {
             };
         };
     };
+    post_v1_students_student_id_pathway_draft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathwayDraft"];
+                };
+            };
+            /** @description no_goal */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "no_goal";
+                    };
+                };
+            };
+            /** @description unknown_intensity */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "unknown_intensity";
+                    };
+                };
+            };
+        };
+    };
+    post_v1_students_student_id_pathway_draft_draft_id_decision: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathwayDraft"];
+                };
+            };
+            /** @description unknown_draft */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "unknown_draft";
+                    };
+                };
+            };
+            /** @description draft_already_decided */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "draft_already_decided";
+                    };
+                };
+            };
+        };
+    };
     delete_v1_students_student_id_pathway_items_plan_item_id: {
         parameters: {
             query?: never;
@@ -9934,6 +10253,64 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentProfile"];
+                };
+            };
+        };
+    };
+    get_v1_students_student_id_profile_changes: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppliedChange"][];
+                };
+            };
+        };
+    };
+    post_v1_students_student_id_profile_changes_change_id_undo: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                change_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppliedChange"];
+                };
+            };
+            /** @description unknown_change */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "unknown_change";
+                    };
                 };
             };
         };
@@ -10195,7 +10572,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ProfileUpdateProposal"];
+                    "application/json": components["schemas"]["ResumeUploadResult"];
                 };
             };
             /** @description unreadable_resume */

@@ -1,0 +1,41 @@
+{
+  "$id": "https://campuspath.invalid/schema/PathwayDraftDiff.json",
+  "additionalProperties": false,
+  "description": "草案相对**当前已采纳版本**的差异。审批弹窗要回答的是\"会变什么\"。\n\n只报数不报清单：条目本身就在 ``PathwayDraft.pathway`` 里，\n再复制一份就有两个出处，一旦漂移谁都说不清哪个是真的。",
+  "properties": {
+    "added_count": {
+      "minimum": 0,
+      "title": "Added Count",
+      "type": "integer"
+    },
+    "carried_over_count": {
+      "minimum": 0,
+      "title": "Carried Over Count",
+      "type": "integer"
+    },
+    "is_first_plan": {
+      "description": "没有已采纳版本——这就是用户说的「第一次规划」那一刻",
+      "title": "Is First Plan",
+      "type": "boolean"
+    },
+    "removed_count": {
+      "minimum": 0,
+      "title": "Removed Count",
+      "type": "integer"
+    },
+    "rescheduled_count": {
+      "minimum": 0,
+      "title": "Rescheduled Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "is_first_plan",
+    "added_count",
+    "removed_count",
+    "rescheduled_count",
+    "carried_over_count"
+  ],
+  "title": "PathwayDraftDiff",
+  "type": "object"
+}

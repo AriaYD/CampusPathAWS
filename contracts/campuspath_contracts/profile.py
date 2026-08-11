@@ -434,6 +434,86 @@ class ResumeUpload(CampusPathModel):
         return self
 
 
+class ProfileWriteOrigin(StrEnum):
+    """一次 Profile 写入的来路。B3 约束的是最后一种。
+
+    Spec §5.6 / §17.5 的 ``Unconfirmed Profile Write`` 管的是"**AI 抽取或
+    高影响推断**被静默写进档案"。学生本人自助编辑（``selfEditProfile``）
+    从来就是直写的，学生本人上传官方模板经**确定性解析**得到的自述内容
+    与之同类——两者都是学生自己说的话，不是系统替他下的结论。
+    """
+
+    STUDENT_UPLOAD = "student_upload"
+    STUDENT_EDIT = "student_edit"
+    AGENT_PROPOSAL = "agent_proposal"
+
+
+class AppliedChange(CampusPathModel):
+    """已经物化进档案的一条变更，**带撤销把手**。
+
+    与 :class:`ProfileChangeEvent` 分工不同：那个是 append-only 的**事件**
+    （所以是 FrozenModel，一个 id 永远只指一件事）；这个是**台账行**，
+    有生命周期——已应用 → 已撤销。撤销不删行，只盖 ``undone_at``，
+    因为"这条后来被撤了"本身就是审计要回答的问题。
+
+    刻意不做成 FrozenModel：把有状态的台账伪装成不可变事件，只会逼出
+    ``model_copy(update=...)`` 那种绕过守卫的写法。
+    """
+
+    change_id: Identifier
+    student_id: StudentId
+    origin: ProfileWriteOrigin
+    entity_type: Literal[
+        "experience", "skill", "education", "language", "honor", "certificate"
+    ]
+    summary: str = Field(min_length=1, max_length=300)
+    applied_at: datetime
+    undone_at: datetime | None = None
+    proposal_id: Identifier | None = None
+
+
+class ResumeUploadResult(CampusPathModel):
+    """上传官方模板简历的结果：**已经写进档案了**，不是待办清单。
+
+    2026-08-10 用户裁定：上传后绕到"档案更新建议"分页逐条按确认很多余。
+    改为直写 + 弹窗逐条回显 + 每条可撤销。
+
+    ``skipped`` 是如实交代——档案里已有的条目不重复写入，但也不能装作
+    没解析到；否则学生会以为模板没写对。
+    """
+
+    proposal_id: Identifier
+    student_id: StudentId
+    profile_version: int = Field(ge=1)
+    applied: tuple[AppliedChange, ...] = ()
+    skipped: tuple[str, ...] = ()
+
+    @model_validator(mode="after")
+    def _direct_write_is_student_only(self) -> "ResumeUploadResult":
+        """B3 的边界就钉在这里：直写通道**类型上**装不下 AI 的推断。
+
+        豁免只给"学生本人上传 + 确定性解析"这一条路。A1 从反思里抽出来的
+        候选变更仍然只能落 pending 提案，由学生逐条决定。
+        """
+        offenders = [
+            c.change_id for c in self.applied
+            if c.origin is not ProfileWriteOrigin.STUDENT_UPLOAD
+        ]
+        if offenders:
+            raise ValueError(
+                "直写通道只接受学生本人上传模板的解析结果；AI 抽取或推断"
+                f"必须先落 pending 提案再由学生确认（B3）：{offenders}"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def _must_report_something(self) -> "ResumeUploadResult":
+        """解析成功却既没写入也没跳过 = 解析器空转，不是"空结果"。"""
+        if not self.applied and not self.skipped:
+            raise ValueError("解析成功却既无写入也无跳过条目——这是解析器的缺陷")
+        return self
+
+
 class ContactPerson(CampusPathModel):
     """R5-E2（2026-08-01）：学生自填的重要联系人。
 

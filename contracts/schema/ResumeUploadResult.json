@@ -1,0 +1,140 @@
+{
+  "$defs": {
+    "AppliedChange": {
+      "additionalProperties": false,
+      "description": "已经物化进档案的一条变更，**带撤销把手**。\n\n与 :class:`ProfileChangeEvent` 分工不同：那个是 append-only 的**事件**\n（所以是 FrozenModel，一个 id 永远只指一件事）；这个是**台账行**，\n有生命周期——已应用 → 已撤销。撤销不删行，只盖 ``undone_at``，\n因为\"这条后来被撤了\"本身就是审计要回答的问题。\n\n刻意不做成 FrozenModel：把有状态的台账伪装成不可变事件，只会逼出\n``model_copy(update=...)`` 那种绕过守卫的写法。",
+      "properties": {
+        "applied_at": {
+          "format": "date-time",
+          "title": "Applied At",
+          "type": "string"
+        },
+        "change_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Change Id",
+          "type": "string"
+        },
+        "entity_type": {
+          "enum": [
+            "experience",
+            "skill",
+            "education",
+            "language",
+            "honor",
+            "certificate"
+          ],
+          "title": "Entity Type",
+          "type": "string"
+        },
+        "origin": {
+          "$ref": "#/components/schemas/ProfileWriteOrigin"
+        },
+        "proposal_id": {
+          "anyOf": [
+            {
+              "maxLength": 128,
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Proposal Id"
+        },
+        "student_id": {
+          "maxLength": 128,
+          "minLength": 1,
+          "title": "Student Id",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 300,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "undone_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Undone At"
+        }
+      },
+      "required": [
+        "change_id",
+        "student_id",
+        "origin",
+        "entity_type",
+        "summary",
+        "applied_at"
+      ],
+      "title": "AppliedChange",
+      "type": "object"
+    },
+    "ProfileWriteOrigin": {
+      "description": "一次 Profile 写入的来路。B3 约束的是最后一种。\n\nSpec §5.6 / §17.5 的 ``Unconfirmed Profile Write`` 管的是\"**AI 抽取或\n高影响推断**被静默写进档案\"。学生本人自助编辑（``selfEditProfile``）\n从来就是直写的，学生本人上传官方模板经**确定性解析**得到的自述内容\n与之同类——两者都是学生自己说的话，不是系统替他下的结论。",
+      "enum": [
+        "student_upload",
+        "student_edit",
+        "agent_proposal"
+      ],
+      "title": "ProfileWriteOrigin",
+      "type": "string"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/ResumeUploadResult.json",
+  "additionalProperties": false,
+  "description": "上传官方模板简历的结果：**已经写进档案了**，不是待办清单。\n\n2026-08-10 用户裁定：上传后绕到\"档案更新建议\"分页逐条按确认很多余。\n改为直写 + 弹窗逐条回显 + 每条可撤销。\n\n``skipped`` 是如实交代——档案里已有的条目不重复写入，但也不能装作\n没解析到；否则学生会以为模板没写对。",
+  "properties": {
+    "applied": {
+      "default": [],
+      "items": {
+        "$ref": "#/components/schemas/AppliedChange"
+      },
+      "title": "Applied",
+      "type": "array"
+    },
+    "profile_version": {
+      "minimum": 1,
+      "title": "Profile Version",
+      "type": "integer"
+    },
+    "proposal_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Proposal Id",
+      "type": "string"
+    },
+    "skipped": {
+      "default": [],
+      "items": {
+        "type": "string"
+      },
+      "title": "Skipped",
+      "type": "array"
+    },
+    "student_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Student Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "proposal_id",
+    "student_id",
+    "profile_version"
+  ],
+  "title": "ResumeUploadResult",
+  "type": "object"
+}
