@@ -69,6 +69,16 @@ export const zhHans: Record<keyof Dict, string> = {
   "nav.tab.forYou": "推荐",
   "nav.tab.actions": "规划",
   "nav.tab.calendar": "日历",
+  // 校方端短名（2026-08-11 P6）：不给短名的话标签栏会把「资讯广场总览」
+  // 截成「资讯广场…」——截断不是解法，换一个短名才是
+  "nav.tab.publisher": "投稿",
+  "nav.tab.console": "控制台",
+  "nav.tab.review": "审核",
+  "nav.tab.plaza": "广场",
+  "nav.tab.insights": "洞察",
+  "nav.tab.reports": "报告",
+  "nav.tab.outreach": "转介",
+  "nav.tab.desk": "工作台",
 
   // —— 导航分组 ——
   "nav.group.start": "开始",
@@ -532,6 +542,12 @@ export const zhHans: Record<keyof Dict, string> = {
   "calendar.week": "周",
   "calendar.viewSwitch": "日历视图",
   "calendar.view.week": "周",
+  "calendar.view.day": "日",
+  "sw.unregister.title": "清理离线缓存",
+  "sw.unregister.lead": "注销 Service Worker 并清空离线缓存。页面被旧版本卡住时打开这里。",
+  "calendar.dayView": "当日议程",
+  "calendar.day.empty": "这一天还没有安排。",
+  "calendar.day.add": "在这一天加一段",
   "calendar.view.month": "月",
   "calendar.monthView": "月历",
   "calendar.fixedLoad": "固定负担",
@@ -1177,6 +1193,7 @@ export const zhHans: Record<keyof Dict, string> = {
   "wellbeingDesk.hours.lead":
     "这里开放的时间，就是学生端能看到并预约的全部时段——没开放的时间在学生端不存在。",
   "wellbeingDesk.hours.add": "加一段",
+  "wellbeingDesk.hours.remove": "移除这一段",
   "wellbeingDesk.hours.slotMinutes": "每段时长（分钟）",
   "wellbeingDesk.hours.save": "保存时段",
   "wellbeingDesk.hours.saved": "已保存",

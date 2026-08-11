@@ -3,6 +3,7 @@ import { Nunito } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Shell } from "@/components/shell";
+import { ServiceWorkerRegistrar } from "@/components/sw-register";
 
 /**
  * 标题字体：Nunito（圆润，配 clay 质感）。next/font 构建期下载并自托管，
@@ -18,6 +19,23 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "CampusPath",
   description: "Growth pathways, with receipts — synthetic demo build",
+  // PWA（P6-D）。`manifest` 指向 `app/manifest.ts` 生成的那条路由。
+  // `appleWebApp` 是**必须单列**的：iOS 至今不读 manifest，
+  // 主屏图标、standalone、状态栏样式全靠这几个 meta。
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "CampusPath",
+    // 奶油底配深字，用 default 会得到一条白条压在内容上
+    statusBarStyle: "black-translucent",
+  },
+  icons: {
+    icon: [
+      { url: "/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 /**
@@ -70,6 +88,7 @@ export default function RootLayout({
     <html lang="zh-Hans" suppressHydrationWarning className={nunito.variable}>
       <body>
         <script dangerouslySetInnerHTML={{ __html: NO_FLASH }} />
+        <ServiceWorkerRegistrar />
         <Providers>
           <Shell>{children}</Shell>
         </Providers>

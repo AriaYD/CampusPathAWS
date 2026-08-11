@@ -469,6 +469,11 @@ function usePortalGuard(): "checking" | "login" | "app" {
   const router = useRouter();
 
   const onLogin = pathname === "/login";
+  // `/sw-unregister` **不带壳、不问会话、登录与否都照常显示**：它是
+  // Service Worker 的紧急卸载通道。被旧 SW 锁住的人很可能连登录页都打不开，
+  // 这条路要是也要先登录、或者登录了就被弹回主页，它就在最需要它的
+  // 那一刻失效了。
+  const bare = pathname === "/sw-unregister";
   const guarded = NAV_ITEMS.find(
     (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
   );
@@ -478,13 +483,14 @@ function usePortalGuard(): "checking" | "login" | "app" {
     !itemsFor(session).some((item) => item.href === guarded.href);
 
   useEffect(() => {
-    if (!ready) return;
+    if (!ready || bare) return;
     if (session === null && !onLogin) router.replace("/login");
     else if (session !== null && (onLogin || wrongDesk)) {
       router.replace(homeFor(session));
     }
-  }, [ready, session, onLogin, wrongDesk, router]);
+  }, [ready, session, onLogin, wrongDesk, bare, router]);
 
+  if (bare) return "login";
   if (!ready) return "checking";
   if (onLogin) return session === null ? "login" : "checking";
   if (session === null || wrongDesk) return "checking";
@@ -518,6 +524,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
         <div className="mx-auto flex max-w-[1240px] items-center gap-3 px-4 py-2.5 sm:px-5 sm:py-3">
           <Link
             href={session ? homeFor(session) : "/login"}
+            data-brand-home
             className="flex min-w-0 items-baseline gap-2"
           >
             <span

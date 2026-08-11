@@ -19,8 +19,18 @@ const noStore = (res: NextResponse): NextResponse => {
   return res;
 };
 
-/** 门前公开路径。加进来之前先想清楚：这一条会被任何人看到。 */
-const PUBLIC_PATHS = new Set(["/login", "/landing", "/landing.html"]);
+/** 门前公开路径。加进来之前先想清楚：这一条会被任何人看到。
+ *
+ * PWA 那几件（2026-08-11 P6）必须在门外：manifest / sw.js / 图标一旦被
+ * 302 到登录页，浏览器拿到的是一份 HTML——**安装提示直接消失**，
+ * 而现象是「线上装不上，本地能装」，极难查。这几个文件本身不含任何内容，
+ * 门挡不挡它们对保密没有区别。 */
+const PUBLIC_PATHS = new Set([
+  "/login", "/landing", "/landing.html",
+  "/manifest.webmanifest", "/sw.js", "/sw-unregister",
+  "/icon-192.png", "/icon-512.png", "/icon-512-maskable.png",
+  "/apple-touch-icon.png",
+]);
 
 export async function middleware(request: NextRequest) {
   const passcode = process.env.CAMPUSPATH_DEMO_PASSCODE;

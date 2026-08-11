@@ -172,7 +172,10 @@ function HoursCard() {
                 ...draft,
                 windows: draft.windows.filter((_, i) => i !== index),
               })}
-              className="pressable t-meta text-fg-faint">×</button>
+              // 「×」本身只有 8px 宽——全局的 44px 只补高度，补不了宽度。
+              // 命中区靠 `min-w`（视觉仍是一个字符，居中）
+              aria-label={t("wellbeingDesk.hours.remove")}
+              className="pressable t-meta min-w-[44px] justify-center text-fg-faint">×</button>
           </li>
         ))}
       </ul>

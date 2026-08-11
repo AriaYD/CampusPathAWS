@@ -80,22 +80,22 @@ export const NAV_ITEMS: readonly NavItem[] = [
   // 归并到 Career Center 控制台；wellbeing_coordinator 是心理咨询室部门，
   // 有自己的工作台（outreach 队列），不与 Career Center 混排。
   { href: "/publisher", labelKey: "publisher.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["publisher"] },
+    roles: ["publisher"], mobileLabelKey: "nav.tab.publisher" },
   { href: "/console", labelKey: "console.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["career_center_admin", "reviewer", "curator", "connector_admin"] },
+    roles: ["career_center_admin", "reviewer", "curator", "connector_admin"], mobileLabelKey: "nav.tab.console" },
   // 用户裁定（2026-08-01）：审核队列独立成页；广场总览给管理端只读监看
   { href: "/review", labelKey: "console.reviewQueue", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["career_center_admin", "reviewer"] },
+    roles: ["career_center_admin", "reviewer"], mobileLabelKey: "nav.tab.review" },
   { href: "/plaza-admin", labelKey: "console.plaza.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["career_center_admin", "curator"] },
+    roles: ["career_center_admin", "curator"], mobileLabelKey: "nav.tab.plaza" },
   { href: "/insights", labelKey: "insights.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["career_center_admin", "curator"] },
+    roles: ["career_center_admin", "curator"], mobileLabelKey: "nav.tab.insights" },
   { href: "/quality-reports", labelKey: "reports.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["career_center_admin"] },
+    roles: ["career_center_admin"], mobileLabelKey: "nav.tab.reports" },
   { href: "/wellbeing-desk", labelKey: "wellbeingDesk.title", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["wellbeing_coordinator"] },
+    roles: ["wellbeing_coordinator"], mobileLabelKey: "nav.tab.outreach" },
   { href: "/advisor-desk", labelKey: "advisor.deskTitle", groupKey: "nav.group.institution", portal: "institution",
-    roles: ["advisor"] },
+    roles: ["advisor"], mobileLabelKey: "nav.tab.desk" },
 ] as const;
 
 export type NavSession =

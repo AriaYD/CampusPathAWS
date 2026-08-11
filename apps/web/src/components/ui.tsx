@@ -332,6 +332,10 @@ export function Toggle({
       aria-checked={checked}
       aria-labelledby={labelledBy}
       onClick={() => onChange(!checked)}
+      // 26px 的药丸是设计尺寸，撑到 44 就不是这个开关了；命中区改由
+      // `[data-toggle-switch]::after` 向外扩（globals.css 的 coarse 段）。
+      data-tap-exempt
+      data-toggle-switch
       className="pressable relative h-[26px] w-[46px] shrink-0 rounded-full border"
       style={{
         background: checked ? "var(--accent)" : "var(--bg-sunk)",
@@ -395,8 +399,31 @@ export function Segmented<T extends string>({
 /* ------------------------------------------------------------------ */
 
 /**
+ * 窄屏判定。**必须是状态而不是一次性读取**：视口会转向、会被开发者工具改，
+ * 读一次就永远停在那一档。SSR 首帧当作宽屏（桌面是既有形态，
+ * 手机上多一次 effect 后的切换比服务端猜错要安全）。
+ */
+export function useIsNarrow(query = "(max-width: 1023px)") {
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    const sync = () => setNarrow(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, [query]);
+  return narrow;
+}
+
+/**
  * 侧滑面板。进出**走同一条路径**（ui-ux-pro-max continuity/modal-motion），
  * 材质是 blur + scale 一起动，读起来像一层真的玻璃到位，而不是简单淡入。
+ *
+ * **窄屏改底部工作表**（2026-08-11 P6）。理由不是"手机流行这样"：
+ * 440px 的右侧抽屉在 390px 视口里等于整屏覆盖，而它从右侧滑入、
+ * 顶到 `inset-y-0`——顶栏的人设徽标会压住抽屉标题的一角（实测），
+ * 且拇指够不到顶部的关闭区。底部工作表从拇指所在的一侧升起，
+ * 留出顶部 15% 让人看得见"下面还有原来的页面"（§7 modal-motion 的空间连续性）。
  */
 export function Drawer({
   open,
@@ -410,6 +437,7 @@ export function Drawer({
   children: ReactNode;
 }) {
   const reduce = useReducedMotion();
+  const narrow = useIsNarrow();
   const panelRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -439,13 +467,31 @@ export function Drawer({
         aria-modal="true"
         aria-label={title}
         tabIndex={-1}
-        className="material-modal absolute inset-y-0 right-0 w-full max-w-[440px] overflow-y-auto rounded-l-lg border-l border-line p-6"
-        initial={reduce ? { opacity: 0 } : { x: 32, opacity: 0, scale: 0.99 }}
-        animate={reduce ? { opacity: 1 } : { x: 0, opacity: 1, scale: 1 }}
+        data-drawer-form={narrow ? "sheet" : "side"}
+        className={
+          narrow
+            ? "material-modal absolute inset-x-0 bottom-0 max-h-[85dvh] overflow-y-auto rounded-t-lg border-t border-line px-5 pt-3"
+            : "material-modal absolute inset-y-0 right-0 w-full max-w-[440px] overflow-y-auto rounded-l-lg border-l border-line p-6"
+        }
+        // 底部工作表要给home indicator留位，否则最后一个按钮压在手势条下面
+        style={narrow
+          ? { paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }
+          : undefined}
+        initial={reduce ? { opacity: 0 }
+          : narrow ? { y: 40, opacity: 0 } : { x: 32, opacity: 0, scale: 0.99 }}
+        animate={reduce ? { opacity: 1 }
+          : narrow ? { y: 0, opacity: 1 } : { x: 0, opacity: 1, scale: 1 }}
         transition={
           reduce ? { duration: 0.12 } : { type: "spring", bounce: 0, duration: 0.34 }
         }
       >
+        {/* 抓手：告诉人这层是可以被推下去的（也顺带把标题从屏幕最上沿挪开）。
+            纯视觉，交互仍靠背景点击与 Esc——手势关闭在 iOS Safari 上会与
+            页面回弹打架，不值当为它引一套拖拽状态机。 */}
+        {narrow && (
+          <div aria-hidden className="mx-auto mb-3 h-1 w-10 rounded-full"
+               style={{ background: "var(--line-strong)" }} />
+        )}
         {children}
       </motion.div>
     </div>

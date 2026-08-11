@@ -393,6 +393,64 @@ label.btn:focus-within {
     display: inline-flex;
     align-items: center;
   }
+
+  /* ── 2026-08-11（P6）手写交互元素的命中区 ────────────────────────
+     上面那几条只补到了 `.btn`、输入框、导航链接与语言切换。全站手机档
+     体检（23 页逐页量）显示真正的大头在**手写按钮**上：分段控件 31px、
+     目标候选 35px、写反思入口 31px、顾问时段 24px、值班时段的「×」8×19。
+     它们的共同点是都带 `.pressable`，所以按元素类型一次补齐。
+
+     `:not([class*="min-h-"])` 是**故意的**，不是投机取巧：这条规则不在
+     `@layer` 里，而未分层的声明赢过 Tailwind 工具类——一写死 `min-height`
+     就会把已经自己声明过高度的元素**压矮**（底部标签栏 56px → 44px、
+     月视图格 72px → 44px，都是实测会发生的倒退）。判据就是「这个元素
+     有没有自己声明 min-height」，而 class 串里那段文本正是唯一的事实来源。
+
+     `data-tap-exempt` 留给**高度由数据算出**的元素（开关的 26px 药丸、
+     周视图按时长定高的色块）——那些撑到 44px 会互相压叠，得靠伪元素
+     单独扩命中区（见下）。 */
+  button.pressable:not([class*="min-h-"]):not([data-tap-exempt]),
+  a.pressable:not([class*="min-h-"]):not([data-tap-exempt]),
+  a[data-tap-link] {
+    min-height: 44px;
+  }
+  /* 顶栏站标：它是 `items-baseline` 的 flex 容器（标题与副标对齐基线），
+     撑高会把文字顶到框上沿。改用伪元素扩命中区——视觉一动不动。 */
+  a[data-brand-home] { position: relative; }
+  a[data-brand-home]::after {
+    content: "";
+    position: absolute;
+    inset-block: -11px;
+    inset-inline: -4px;
+  }
+  /* 光有 min-height 会让文字贴在顶上。**只**给还没自己排过版的元素补
+     居中——已经写了 `flex` / `grid` 的（尤其纵向排布的标签栏格）碰不得，
+     一改 display 就会把它们的排布掀翻。 */
+  button.pressable:not([class*="min-h-"]):not([data-tap-exempt]):not([class*="flex"]):not([class*="grid"]),
+  a.pressable:not([class*="min-h-"]):not([data-tap-exempt]):not([class*="flex"]):not([class*="grid"]),
+  a[data-tap-link] {
+    display: inline-flex;
+    align-items: center;
+  }
+
+  /* 勾选框实测只有 13×13，而它的真正命中区是包着它的 `<label>`（≈19px 高）。
+     两头都补：方框放到 18px（还是方框，不是按钮），标签行补到 44px。 */
+  input[type="checkbox"], input[type="radio"] {
+    width: 18px;
+    height: 18px;
+  }
+  label:has(> input[type="checkbox"]),
+  label:has(> input[type="radio"]) { min-height: 44px; }
+
+  /* 开关：视觉尺寸是设计的一部分（26px 药丸 + 20px 圆钮），不能撑高。
+     用伪元素把命中区扩到 44——**视觉不变、手指够得着**（HIG 允许
+     命中区超出视觉边界）。 */
+  [data-toggle-switch]::after {
+    content: "";
+    position: absolute;
+    inset-block: -9px;
+    inset-inline: 0;
+  }
 }
 
 /* ---------------------------------------------------------------

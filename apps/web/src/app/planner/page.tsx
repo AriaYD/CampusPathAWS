@@ -508,6 +508,7 @@ export function PlannerContent() {
                   {rec.official_url && (
                     <a href={rec.official_url} target="_blank" rel="noreferrer"
                        data-course-official={rec.course_id}
+                       data-tap-link
                        className="t-micro underline underline-offset-2"
                        style={{ color: "var(--accent-deep)" }}>
                       {t("planner.officialPage")} ↗

@@ -90,6 +90,53 @@ export const PAGES = [
     path: "/settings",
     must: ["[data-consent-scope]", "[data-delete-data]", "[data-synthetic-badge]"],
   },
+  // 签到页：四种状态互斥，任一在场即算渲染成功（无票根时是 invalid 态）。
+  {
+    path: "/checkin",
+    must: ["[data-checkin-invalid],[data-checkin-go],[data-checkin-done],[data-checkin-dup]"],
+  },
+
+  /* ── 校方端七页（2026-08-11 P6 补入）──────────────────────────────
+     此前门禁只覆盖 15 页，校方端除 `/insights` 外**零覆盖**——手机档全站
+     体检当场量到 `/plaza-admin` 横向溢出 51px，而门禁一次都没报过。
+     缺的不是断言的力度，是**断言的覆盖面**：没被跑过的页面，绿是没有意义的。
+     每页各自声明身份，MUST 一律取结构性选择器（不取"要先有数据才出现"的）。 */
+  {
+    path: "/publisher",
+    session: { portal: "institution", role: "publisher" },
+    must: ["[data-active-role]", "textarea"],
+  },
+  {
+    path: "/console",
+    session: { portal: "institution", role: "career_center_admin" },
+    must: ["[data-active-role]", "[data-registered-source]", "[data-source-health]", "[data-probe]"],
+  },
+  {
+    path: "/review",
+    session: { portal: "institution", role: "career_center_admin" },
+    // 队列可能为空（诚实空态），所以判**队列容器**在场而非「有条目」。
+    must: ["[data-active-role]", "[data-review-queue]"],
+  },
+  {
+    path: "/plaza-admin",
+    session: { portal: "institution", role: "career_center_admin" },
+    must: ["[data-active-role]", "[data-plaza-item]", "[data-plaza-quality]"],
+  },
+  {
+    path: "/quality-reports",
+    session: { portal: "institution", role: "career_center_admin" },
+    must: ["[data-active-role]", "[data-report]", "[data-report-toggle]"],
+  },
+  {
+    path: "/wellbeing-desk",
+    session: { portal: "institution", role: "wellbeing_coordinator" },
+    must: ["[data-active-role]", "[data-hours-row]"],
+  },
+  {
+    path: "/advisor-desk",
+    session: { portal: "institution", role: "advisor" },
+    must: ["[data-desk-tab]", "[data-occupancy]"],
+  },
 ];
 
 /** 每一页都要成立的全站不变量。 */

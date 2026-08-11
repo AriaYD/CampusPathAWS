@@ -145,7 +145,8 @@
 flowchart TB
     subgraph Clients["前端（Next.js 16，双语 i18n，两门户互不可见）"]
         SP["学生门户<br/>14 页（profile/goals/gaps/planner/for-you/square/<br/>timeline+actions/calendar+wellbeing/reflections/memory…）"]
-        IP["校方门户（一岗一台，R7-A）<br/>publisher · console(含审核队列) ·<br/>wellbeing-desk · advisor-desk"]
+        IP["校方门户（一岗一台，R7-A）<br/>publisher · console · review · plaza-admin ·<br/>insights · quality-reports · wellbeing-desk · advisor-desk"]
+        PWA["可安装 PWA<br/>manifest + appleWebApp + sw.js<br/>（HTML 永不入缓存）"]
         LG["/login 合成登录<br/>campuspath.session + 三规则守卫"]
     end
 
@@ -312,6 +313,18 @@ A2（候选构建 `_course_candidates_for`）、A0（/matches 与选修推荐的
 文案全部走 `src/i18n/`（en.ts 为类型源），简/繁/英三语可切换持久化——
 繁体词典由 OpenCC 自简体生成入库（`i18n:hant` + `i18n:hant:check` 守一致性），
 契约 `LocalizedText` 不加字段：繁体态下服务端动态文案运行时确定性转换。
+
+**移动端与 PWA（2026-08-11 P6）**：学生端 14 页移动优先，校方端 8 页保证可用；
+壳层在 <1024px 换成底部标签栏（6 格，短名走 `mobileLabelKey`），
+`Drawer` 换底部工作表、`/calendar` 换日视图/议程——**换的是形态不是尺寸**。
+可安装 PWA 由三件构成：`app/manifest.ts`（standalone + maskable 图标）、
+`layout.tsx` 的 `appleWebApp`（iOS 不读 manifest）、`public/sw.js`。
+SW 的边界写死在它自己的第一条规矩上：**HTML 一律 network-only、绝不入缓存**
+（缓存 HTML 会把一次白屏事故变成用户清不掉的永久版本），只缓存内容哈希过的
+`/_next/static/*`；不做 API 离线缓存（后端是内存态+演示时钟，旧数据比没数据更糟）。
+`/sw-unregister` 与 `?sw=off` 是卸载后门——SW 是全前端唯一能把用户永久锁在旧版本上的东西。
+manifest / sw.js / 图标必须在口令门**外**（`middleware.ts` 的 `PUBLIC_PATHS`），
+否则被 302 成 HTML，安装提示直接消失。
 
 ### 评测（`eval/`，`make eval`）
 13 BLOCKER（红线，违反即失败）· 12 TARGET（量化指标，当前 11/12，T11 75% 如实红）·

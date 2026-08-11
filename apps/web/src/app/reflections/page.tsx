@@ -242,7 +242,10 @@ function ComposeTab({
                 }}
               >
                 <span className="min-w-0">
-                  <span className="t-body block truncate text-fg">{s.label}</span>
+                  {/* 换行而不是截断（§6 truncation-strategy）：390px 下
+                      「HKUST Computer Society …」被切掉 24px，而这一行正是
+                      用来认出"我要反思哪场活动"的——切掉就选不准了 */}
+                  <span className="t-body block break-words text-fg">{s.label}</span>
                   {s.detail && (
                     <span className="t-mono text-fg-faint">{s.detail}</span>
                   )}

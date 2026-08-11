@@ -29,6 +29,23 @@ const nextConfig: NextConfig = {
    */
   devIndicators: { position: "top-left" },
 
+  /**
+   * `sw.js` 与 manifest 一律 `no-store`（P6-D）。
+   *
+   * 它们是 `public/` 下的静态文件，默认会拿到长缓存——而 Service Worker
+   * 恰恰是**唯一能把用户永久锁在旧版本上**的东西：新版 sw.js 推不下去，
+   * 就再也没有机会修好。这与 §10.2 那条「HTML 被缓存导致白屏」是同族问题，
+   * 只是后果更长久。（注册时的 `updateViaCache: "none"` 是同一件事的另一半。）
+   */
+  async headers() {
+    return [
+      {
+        source: "/:file(sw.js|manifest.webmanifest)",
+        headers: [{ key: "Cache-Control", value: "no-store, must-revalidate" }],
+      },
+    ];
+  },
+
   async rewrites() {
     return [
       { source: "/api/:path*", destination: `${API_ORIGIN}/:path*` },

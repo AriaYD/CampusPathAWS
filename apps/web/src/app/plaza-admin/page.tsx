@@ -221,7 +221,12 @@ export default function PlazaAdminPage() {
                         {localized(opp.organizer_localized, locale) || opp.organizer}
                       </span>
                     </span>
-                    <span className="t-micro flex items-center gap-2 text-fg-faint">
+                    {/* 2026-08-11 P6：这一行原是**不换行**的 flex——外层有
+                        `flex-wrap` 但它自己是单个 flex 项，装着标签 + 状态 +
+                        二维码 + 编辑推荐下拉 + 编辑 + 撤下六件东西，390px 视口
+                        下量到右缘 441px（溢出 51px）。加 `flex-wrap` 让它自己
+                        折行，`min-w-0` 让它肯收缩——两者缺一不可。 */}
+                    <span className="t-micro flex min-w-0 flex-wrap items-center gap-2 text-fg-faint">
                       {opp.category_tags.slice(0, 2).join(" · ")}
                       {opp.deadline ? ` · ${opp.deadline.slice(0, 10)}` : ""}
                       <span

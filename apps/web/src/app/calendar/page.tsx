@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { usePersona } from "@/app/providers";
 import WellbeingPage from "../wellbeing/page";
 import { useI18n, localized, type MessageKey } from "@/i18n";
@@ -16,6 +16,7 @@ import {
   Metric,
   PageHeader,
   SectionTitle,
+  useIsNarrow,
 } from "@/components/ui";
 
 /**
@@ -230,8 +231,20 @@ function CalendarInner() {
   const { studentId } = usePersona();
   const [weekOffset, setWeekOffset] = useState(0);
   // R7-C：周 / 月两种模式，像 Google Calendar。月视图看分布，周视图做编辑。
-  const [view, setView] = useState<"week" | "month">("week");
+  // 2026-08-11 P6 增第三档「日」：周网格钉死 680px 宽 + 24h×26px=624px 高，
+  // 390px 手机上要横竖双滚，且块高不足 20px 时连标题都不画——满屏无字色块。
+  // 这不是打断点能救的，得换一种形态：日视图 = 议程列表。
+  const [view, setView] = useState<"day" | "week" | "month">("week");
   const [monthIndex, setMonthIndex] = useState(0);
+  const narrow = useIsNarrow();
+  // 手机上默认落在日视图；**只在用户没自己选过的时候**代他选——
+  // 他在手机上主动点了「周」，就不该被下一次渲染改回去。
+  const [viewPicked, setViewPicked] = useState(false);
+  useEffect(() => {
+    if (!viewPicked) setView(narrow ? "day" : "week");
+  }, [narrow, viewPicked]);
+  /** 日视图当前显示哪一天。null = 跟着当前周的第一天走。 */
+  const [dayKey, setDayKey] = useState<string | null>(null);
 
   const blocks = useResource(() => api.availability(studentId), [studentId]);
   // 用户裁定 B（2026-08-02）：课外活动规划的机会类条目要在日历上可见——
@@ -529,15 +542,18 @@ function CalendarInner() {
 
   function jumpToDay(dayKey: string) {
     const index = allDays.indexOf(dayKey);
+    // 手机上「点月历里的某一天」该落到那一天的议程，落到周网格等于又要横滚
+    const dayTarget = narrow ? "day" : "week";
     if (index >= 0) {
       setWeekOffset(Math.floor(index / 7));
-      setView("week");
+      setDayKey(dayKey);
+      setView(dayTarget);
     } else {
       // 空日子：仍切到周视图（最近的一周）并直接开新建面板
       const before = allDays.filter((d) => d < dayKey).length;
       setWeekOffset(Math.max(0, Math.min(Math.floor((before - 1) / 7),
         Math.ceil(allDays.length / 7) - 1)));
-      setView("week");
+      setView(dayTarget);
       openCreate(dayKey, 9);
     }
   }
@@ -545,6 +561,8 @@ function CalendarInner() {
   // 审查修复：翻页上限与 days 用同一份 allDays（含拆分出的凌晨段日），
   // 否则最后一天可能永远翻不到
   const totalWeeks = Math.ceil(allDays.length / 7);
+  /** 日视图当前这一天。翻周之后旧的 dayKey 不在本周里，退回本周第一天。 */
+  const activeDay = days.find((d) => d.key === dayKey) ?? days[0] ?? null;
   const overloaded = snapshot.data?.overload_signal ?? false;
 
   // 「睡眠-负荷平衡」周合计（2026-08-02 用户裁定）：按当前显示周的原始块
@@ -660,7 +678,8 @@ function CalendarInner() {
             控件贴着它作用的对象（ui-ux-pro-max grouping & mapping） */}
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <h2 className="t-section text-fg">
-            {t(view === "week" ? "calendar.week" : "calendar.monthView")}
+            {t(view === "week" ? "calendar.week"
+              : view === "month" ? "calendar.monthView" : "calendar.dayView")}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             <span
@@ -691,13 +710,13 @@ function CalendarInner() {
               role="group"
               aria-label={t("calendar.viewSwitch")}
             >
-              {(["week", "month"] as const).map((mode) => (
+              {(["day", "week", "month"] as const).map((mode) => (
                 <button
                   key={mode}
                   type="button"
                   data-view-option={mode}
                   aria-pressed={view === mode}
-                  onClick={() => setView(mode)}
+                  onClick={() => { setViewPicked(true); setView(mode); }}
                   className="pressable t-meta rounded-sm px-2.5 py-1"
                   style={{
                     background: view === mode ? "var(--accent-deep)" : "transparent",
@@ -705,11 +724,12 @@ function CalendarInner() {
                     fontWeight: view === mode ? 600 : 500,
                   }}
                 >
-                  {t(mode === "week" ? "calendar.view.week" : "calendar.view.month")}
+                  {t(mode === "week" ? "calendar.view.week"
+                    : mode === "month" ? "calendar.view.month" : "calendar.view.day")}
                 </button>
               ))}
             </div>
-            {view === "week" ? (
+            {view !== "month" ? (
               <div className="flex items-center gap-1">
                 <button
                   type="button"
@@ -822,6 +842,113 @@ function CalendarInner() {
           </div>
         )}
 
+        {/* ── 日视图 / 议程：手机上的主形态 ──────────────────────────────
+            周网格在 390px 里横竖双滚、块高不足 20px 连标题都不画；这一档
+            换成**一列纵向的议程**：一行一件事，时间在左、内容在右，
+            全宽可点。上面一条七天选择器代替横滚——切一天只要一次点击。
+            桌面上它同样可用（`day` 档在三选一里），所以不是"手机专供的次品"。 */}
+        {view === "day" && activeDay && (
+          <div data-day-view={activeDay.key}>
+            <div className="mb-3 grid grid-cols-7 gap-1" data-day-picker>
+              {days.map((d) => {
+                const active = d.key === activeDay.key;
+                const count = d.blocks.filter((b) => b.type !== "free").length;
+                return (
+                  <button
+                    key={d.key}
+                    type="button"
+                    data-day-option={d.key}
+                    aria-pressed={active}
+                    onClick={() => setDayKey(d.key)}
+                    className="pressable flex min-h-[54px] flex-col items-center justify-center gap-0.5 rounded-sm border px-0.5 py-1"
+                    style={{
+                      borderColor: active ? "var(--accent)" : "var(--line)",
+                      background: active ? "var(--accent-soft)" : "var(--bg-sunk)",
+                      color: active ? "var(--accent-deep)" : "var(--fg-muted)",
+                    }}
+                  >
+                    <span className="t-micro" style={{ letterSpacing: 0 }}>
+                      {new Date(`${d.key}T00:00:00Z`).toLocaleDateString(locale, {
+                        weekday: "narrow", timeZone: "UTC",
+                      })}
+                    </span>
+                    <span className="t-meta tabular-nums font-semibold">
+                      {Number(d.key.slice(8, 10))}
+                    </span>
+                    {/* 密度用圆点，不用数字——一眼看忙闲，数字要读 */}
+                    <span aria-hidden className="flex h-1 items-center gap-[2px]">
+                      {Array.from({ length: Math.min(count, 3) }, (_, i) => (
+                        <span key={i} className="block h-1 w-1 rounded-full"
+                              style={{ background: active ? "var(--accent-deep)" : "var(--line-strong)" }} />
+                      ))}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            {(() => {
+              const items = activeDay.blocks
+                .filter((b) => b.type !== "free")
+                .sort((a, b) => a.span.start.localeCompare(b.span.start));
+              if (items.length === 0) {
+                return (
+                  <p className="t-meta py-6 text-center text-fg-faint" data-agenda-empty>
+                    {t("calendar.day.empty")}
+                  </p>
+                );
+              }
+              return (
+                <ul className="flex flex-col gap-1.5" data-agenda>
+                  {items.map((block) => (
+                    <li key={block.block_id}>
+                      <button
+                        type="button"
+                        data-block={block.block_id}
+                        data-block-type={block.type}
+                        data-block-has-title={block.title ? "true" : "false"}
+                        data-agenda-item={block.block_id}
+                        onClick={() => {
+                          setDetail(displayToOriginal.get(block.block_id) ?? block);
+                          setEditor(null);
+                        }}
+                        className="pressable flex w-full items-start gap-3 rounded-md border border-line bg-bg-sunk p-3 text-start"
+                      >
+                        <span className="t-mono w-[86px] shrink-0 tabular-nums text-fg-faint"
+                              style={{ fontSize: "0.75rem" }}>
+                          {block.span.start.slice(11, 16)}
+                          <br />
+                          {block.span.end.slice(11, 16)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          {/* 标题只在二级授权或学生自己命名时存在；没有就只写类型，
+                              **不填「忙」充数**——两种授权层级不能看起来一样 */}
+                          <span className="t-body block break-words text-fg">
+                            {block.title ?? t(TYPE_KEY[block.type] ?? "calendar.block.busy")}
+                          </span>
+                          <span className="t-micro mt-0.5 inline-block rounded-xs px-1.5"
+                                style={blockStyle(block)}>
+                            {t(TYPE_KEY[block.type] ?? "calendar.block.busy")}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              );
+            })()}
+
+            <button
+              type="button"
+              data-agenda-add
+              onClick={() => openCreate(activeDay.key, 9)}
+              className="pressable btn btn-secondary t-meta mt-3 w-full"
+            >
+              {t("calendar.day.add")}
+            </button>
+          </div>
+        )}
+
         {view === "week" && days.length > 0 && (
           <div className="overflow-x-auto">
             <div className="flex min-w-[680px] gap-1" data-week-grid>
@@ -886,6 +1013,10 @@ function CalendarInner() {
                             setDetail(displayToOriginal.get(block.block_id) ?? block);
                             setEditor(null);
                           }}
+                          // 高度 = 时长 × 每小时像素。撑到 44px 命中区会让
+                          // 相邻时段互相压叠，所以这块豁免全局的 44px 规则；
+                          // 手机上真正的解法是下面的日视图/议程（周网格 lg 起）。
+                          data-tap-exempt
                           className="pressable absolute inset-x-[2px] overflow-hidden rounded-xs px-1 text-start"
                           style={{ top, height, ...blockStyle(block) }}
                         >

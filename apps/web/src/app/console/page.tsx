@@ -337,6 +337,7 @@ export default function ConsolePage() {
                         target="_blank"
                         rel="noopener noreferrer"
                         data-src-url
+                        data-tap-link
                         className="t-micro mt-1 inline-block break-all underline underline-offset-2 text-fg-muted"
                       >
                         {source.url}

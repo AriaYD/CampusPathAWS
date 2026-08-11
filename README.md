@@ -68,14 +68,18 @@ HKUST_CampusPath/
 ├── agents/cloud/                 # ADK 部署镜像（A0/A4 → Vertex AI Agent Engine，两运行时；镜像一致性 CI 断言）
 │
 ├── apps/web/                     # Next.js 16 前端（bun），学生/校方双门户
-│   ├── src/app/                  #   login + 学生 14 页 + 校方 6 页（publisher/console/review/plaza-admin/advisor-desk/wellbeing-desk）
+│   ├── src/app/                  #   login + 学生 14 页 + 校方 8 页（publisher/console/review/plaza-admin/insights/quality-reports/advisor-desk/wellbeing-desk）
+│   ├── src/app/manifest.ts       #   PWA manifest（standalone + 三档图标含 maskable）
+│   ├── src/app/sw-unregister/    #   Service Worker 紧急卸载页（不带壳、不要会话；另有 `?sw=off`）
 │   ├── src/components/           #   shell（含手机底部标签栏 + 「更多」面板）/ nav（门户过滤+守卫+标签栏槽位）/ nav-icons / ui / add-to-plan / review-queue
-│   ├── scripts/                  #   三道 UI 门禁：check-contrast / check-alignment / run-pages-must（各带 H5 自检）
+│   ├── scripts/                  #   三道 UI 门禁：check-contrast / check-alignment / run-pages-must（各带 H5 自检；覆盖 23 页 × 两档视口）
+│   ├── scripts/gen-icons.mjs     #   PWA 图标生成（复用 puppeteer-core 渲染 SVG 字标，不引 sharp/canvas）
 │   ├── scripts/lib/browser.mjs   #   门禁共用的 puppeteer 样板 + 视口两档（desktop 1280×900 / mobile 390×844）+ 无横向溢出断言
 │   ├── src/i18n/                 #   en.ts（类型源）+ zh-Hans + zh-Hant（生成物），三语切换持久化
 │   ├── src/lib/api.ts            #   契约类型化 API 客户端
 │   ├── src/lib/gate.ts           #   口令门 HMAC（middleware 与校验路由共用）
 │   ├── src/lib/plan-window.ts    #   规划时间窗口口径（行动中心/课外规划共用）
+│   ├── public/sw.js              #   最小 Service Worker：HTML 一律 network-only 绝不入缓存，只缓存 /_next/static/*
 │   └── public/resume-template.md #   官方 Resume 模板（上传只认它，零 AI 解析）；同目录 demo-resume-*.md 一键注入用
 │
 ├── seed/                         # 数据层
@@ -137,6 +141,10 @@ make check                      # preflight + 契约/Seed 一致性 + 全量测�
   改 `content.mjs` 后 `bun run landing` 重新生成三份产物即可。
   改宣传页内容 → 改 `docs/landing/content.mjs` → `bun run landing` →
   **必须重新部署 web 才会生效**（它是构建期打进镜像的静态文件）
+- **PWA**：学生端可「添加到主屏」——manifest / `sw.js` / 图标都在**口令门外**
+  （middleware 的 `PUBLIC_PATHS`），否则它们会被 302 成 HTML，安装提示直接消失。
+  Service Worker **只在生产注册**（本地要验证：`localStorage.setItem("campuspath.sw","on")`）；
+  出事时的卸载后门是 `/sw-unregister` 或任意页面加 `?sw=off`
 - **API**：https://campuspath-api-786160486093.asia-east2.run.app （rev 00014-kv6；公网实例不含测试邮箱，联系人回落哑地址；
   `CHECKIN_SECRET` 挂 Secret Manager `campuspath-checkin-secret`；**max-instances=1**——巡检/签到/后台任务全是实例内存态，多实例会互相看不见）
 - **每日源巡检**：Cloud Run Job `campuspath-sources-refresh` + Cloud Scheduler `campuspath-sources-daily`（09:00 HKT；赠金 2026-09-27 到期前 `bash infra/sources_job.sh delete --apply` 清理）
