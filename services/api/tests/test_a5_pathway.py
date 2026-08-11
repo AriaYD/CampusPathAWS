@@ -14,6 +14,7 @@ from campuspath_agents.model import ScriptedModel
 from campuspath_contracts.common import ActorRole
 from campuspath_api.app import Deps, create_app
 from campuspath_api.rbac import ROLE_HEADER
+from pathway_flow import adopt_pathway
 
 A5_SCRIPT = "\n".join([
     "OPP-EVT-001\t贴合主目标的沟通训练\tCommunication training for the goal",
@@ -36,7 +37,7 @@ def call(client, method, path, **kw):
 
 def test_pathway_is_a5_generated_when_model_available(deps):
     client = TestClient(create_app(deps))
-    r = call(client, "GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200, r.text
     body = r.json()
     assert body["trigger"].startswith("a5:"), body["trigger"]
@@ -52,7 +53,7 @@ def test_pathway_is_a5_generated_when_model_available(deps):
 
 def test_goal_change_regenerates_pathway(deps):
     client = TestClient(create_app(deps))
-    first = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    first = adopt_pathway(client, "STU-A").json()
     r = call(client, "POST", "/v1/students/STU-A/goals", json={
         "goal_id": "GOAL-STU-A-primary", "student_id": "STU-A",
         "role": "primary", "development_mode": "employment",
@@ -60,7 +61,7 @@ def test_goal_change_regenerates_pathway(deps):
         "horizon": "long_term", "created_at": "2026-09-15T09:00:00Z",
     })
     assert r.status_code == 200, r.text
-    second = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    second = adopt_pathway(client, "STU-A").json()
     assert second["pathway_id"] != first["pathway_id"], "换目标必须重生成"
     assert second["version"] > first["version"]
 
@@ -69,7 +70,7 @@ def test_model_rationale_failure_falls_back_to_fixture():
     d = Deps("full")
     d.model = ScriptedModel({})      # a5 purpose 未预设 → 调用抛错
     client = TestClient(create_app(d))
-    r = call(client, "GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200, r.text
     assert r.json()["trigger"] == "demo_fixture", "拿不到模型就不冒充 A5"
 
@@ -78,14 +79,14 @@ def test_no_model_keeps_fixture_semantics():
     d = Deps("full")
     d.model = None
     client = TestClient(create_app(d))
-    r = call(client, "GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200
     assert r.json()["trigger"] == "demo_fixture"
 
 
 def test_approved_items_survive_regeneration(deps):
     client = TestClient(create_app(deps))
-    first = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    first = adopt_pathway(client, "STU-A").json()
     # 报名 + 批准一个机会（吸收进 pathway）
     opp = "OPP-EVT-039"
     call(client, "POST", "/v1/students/STU-A/actions", json={
@@ -116,7 +117,7 @@ def test_approved_items_survive_regeneration(deps):
         "target_type": "role", "target_name": "游戏开发工程师",
         "horizon": "long_term", "created_at": "2026-09-15T09:00:00Z",
     })
-    regenerated = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    regenerated = adopt_pathway(client, "STU-A").json()
     assert regenerated["pathway_id"] != first["pathway_id"]
     assert any(i["subject_id"] == opp for i in regenerated["plan_items"]), \
         "已批准吸收的条目不许因重规划消失"
@@ -144,7 +145,7 @@ def test_near_term_overload_prefits_instead_of_failing(deps):
             doctored.append(o)
     deps.opportunities = doctored + list(deps.opportunities[40:])
     client = TestClient(create_app(deps))
-    body = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    body = adopt_pathway(client, "STU-A").json()
     assert body["trigger"].startswith("a5:"), \
         f"超载不该让 A5 整体失败回夹具，得到 {body['trigger']}"
     near_hours = sum(
@@ -162,8 +163,7 @@ def test_intensity_variant_is_user_selectable(deps):
     client = TestClient(create_app(deps))
     counts = {}
     for variant, expect in (("low_load", 2), ("balanced", 3), ("ambitious", 4)):
-        body = call(client, "GET",
-                    f"/v1/students/STU-A/pathway?intensity={variant}").json()
+        body = adopt_pathway(client, "STU-A", variant).json()
         assert body["trigger"].startswith("a5:"), body["trigger"]
         cp = body["course_plan"]
         assert cp is not None and cp["variant"] == variant
@@ -180,7 +180,7 @@ def test_course_plan_term_uses_academic_termcode(deps):
     CoursePlanItem → 整页 500；用户随后裁定自述学期通道全部撤除，
     这里保留格式断言防止任何回归。"""
     client = TestClient(create_app(deps))
-    body = call(client, "GET", "/v1/students/STU-A/pathway")
+    body = adopt_pathway(client, "STU-A")
     assert body.status_code == 200, body.text
     parsed = body.json()
     assert parsed["trigger"].startswith("a5:"), parsed["trigger"]
@@ -204,7 +204,7 @@ def test_unexpected_a5_exception_falls_back_and_negative_caches(deps, monkeypatc
 
     monkeypatch.setattr(a5mod, "build_a5_pathway", boom)
     client = TestClient(create_app(deps))
-    r = call(client, "GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200, r.text
     assert r.json()["trigger"] == "demo_fixture"
     call(client, "GET", "/v1/students/STU-A/pathway")
@@ -213,7 +213,7 @@ def test_unexpected_a5_exception_falls_back_and_negative_caches(deps, monkeypatc
 
 def test_intensity_default_stays_balanced(deps):
     client = TestClient(create_app(deps))
-    body = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    body = adopt_pathway(client, "STU-A").json()
     assert body["course_plan"]["variant"] == "balanced"
 
 
@@ -244,8 +244,7 @@ def test_intensity_scales_activity_plan_not_just_courses(deps):
     near_counts, total_counts = {}, {}
     caps = {"low_load": 3, "balanced": 5, "ambitious": 7}
     for variant in ("low_load", "balanced", "ambitious"):
-        body = call(client, "GET",
-                    f"/v1/students/STU-A/pathway?intensity={variant}").json()
+        body = adopt_pathway(client, "STU-A", variant).json()
         assert body["trigger"].startswith("a5:")
         opp = [i for i in body["plan_items"] if i["kind"] == "opportunity"]
         near_cut = (deps.today + timedelta(days=14)).isoformat()

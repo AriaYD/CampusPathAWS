@@ -14,6 +14,7 @@ from campuspath_agents.model import ScriptedModel
 from campuspath_contracts.common import ActorRole
 from campuspath_api.app import Deps, create_app
 from campuspath_api.rbac import ROLE_HEADER
+from pathway_flow import adopt_pathway
 
 
 def call(client, method, path, **kw):
@@ -36,7 +37,7 @@ def client(deps: Deps) -> TestClient:
 
 
 def _first_opportunity_item(client) -> dict:
-    body = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    body = adopt_pathway(client, "STU-A").json()
     item = next(i for i in body["plan_items"] if i["kind"] == "opportunity")
     return item
 
@@ -80,7 +81,7 @@ def test_declined_subject_does_not_resurrect_on_regeneration(client):
         "target_type": "role", "target_name": "数据可视化工程师",
         "horizon": "long_term", "created_at": "2026-09-15T09:00:00Z",
     })
-    regen = call(client, "GET", "/v1/students/STU-A/pathway").json()
+    regen = adopt_pathway(client, "STU-A").json()
     assert regen["trigger"].startswith("a5:")
     assert subject not in [i["subject_id"] for i in regen["plan_items"]], \
         "A5 重新生成把被拒活动复活了"

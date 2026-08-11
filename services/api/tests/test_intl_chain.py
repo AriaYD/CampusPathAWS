@@ -18,6 +18,7 @@ from campuspath_contracts.common import ActorRole, SourceRef
 from campuspath_connector.fetcher import ProbeResult
 from campuspath_api.app import Deps, create_app
 from campuspath_api.rbac import ROLE_HEADER
+from pathway_flow import adopt_pathway
 
 from test_intl_pack_api import INTL_CONTEXT, _enable
 
@@ -124,7 +125,7 @@ def test_matches_non_visa_types_stay_quiet_without_fields(client, deps):
 
 
 def test_pathway_without_intl_has_no_intl_items(client):
-    r = student(client)("GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200
     assert not [i for i in r.json()["plan_items"]
                 if i["plan_item_id"].startswith("PI-INTL-")]
@@ -132,7 +133,7 @@ def test_pathway_without_intl_has_no_intl_items(client):
 
 def test_pathway_injects_backed_intl_prep_items(client, deps):
     _enable(student(client))
-    r = student(client)("GET", "/v1/students/STU-A/pathway")
+    r = adopt_pathway(client, "STU-A")
     assert r.status_code == 200
     items = [i for i in r.json()["plan_items"]
              if i["plan_item_id"].startswith("PI-INTL-")]
@@ -176,7 +177,7 @@ def test_pathway_survives_pack_digest_change(client, deps):
     """codex #6 回归：档案输入变了 → Pack digest 变了 → 不许撞旧凭据 500。"""
     call = student(client)
     _enable(call)
-    assert call("GET", "/v1/students/STU-A/pathway").status_code == 200
+    assert adopt_pathway(client, "STU-A").status_code == 200
     changed = {**INTL_CONTEXT, "language_evidence": ["TOEFL 100"],
                "target_cities": ["Shenzhen"]}
     r = call("POST", "/v1/students/STU-A/profile/self-edit",
@@ -198,7 +199,7 @@ def test_pathway_overdue_anchor_is_flagged_not_rewritten(client, deps):
     r = call("POST", "/v1/students/STU-A/profile/self-edit",
              json={"intl_context": overdue})
     assert r.status_code == 200, r.text
-    items = [i for i in call("GET", "/v1/students/STU-A/pathway")
+    items = [i for i in adopt_pathway(client, "STU-A")
              .json()["plan_items"] if i["plan_item_id"] == "PI-INTL-PREP-1"]
     assert items
     joined = " ".join(a["zh_Hans"] for a in items[0]["assumptions"])

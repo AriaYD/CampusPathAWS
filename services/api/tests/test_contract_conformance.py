@@ -24,6 +24,7 @@ from campuspath_contracts.validation import (
 
 from campuspath_api.app import SYNTHETIC_NOTICE, Deps, create_app
 from campuspath_api.rbac import ROLE_HEADER, ROLE_TABLE
+from pathway_flow import adopt_pathway
 
 NOW = datetime(2026, 9, 15, 9, tzinfo=timezone.utc)
 TODAY = date(2026, 9, 15)
@@ -695,7 +696,7 @@ def test_demo_pathway_contains_extracurricular_items(client: TestClient, deps: D
     deps.pathways.clear()  # 前面的测试可能 POST 过 pathway，把夹具挡住
     call = as_role(client, ActorRole.STUDENT)
     for sid in ("STU-A", "STU-B", "STU-C"):
-        pathway = call("GET", f"/v1/students/{sid}/pathway").json()
+        pathway = adopt_pathway(client, sid).json()
         kinds = {i["kind"] for i in pathway["plan_items"]}
         assert "opportunity" in kinds, f"{sid} 的演示路径没有任何课外条目"
         for item in pathway["plan_items"]:

@@ -15,6 +15,7 @@ from campuspath_contracts.common import ActorRole
 from campuspath_connector.fetcher import ProbeResult
 from campuspath_api.app import Deps, create_app
 from campuspath_api.rbac import ROLE_HEADER
+from pathway_flow import adopt_pathway
 
 from test_intl_pack_api import _enable
 
@@ -138,7 +139,7 @@ def test_growth_trajectory_counts_real_evidence(client, deps):
 def test_intl_plan_items_carry_official_guidance(client, deps):
     call = as_role(client, ActorRole.STUDENT.value)
     _enable(call)
-    items = call("GET", "/v1/students/STU-A/pathway").json()["plan_items"]
+    items = adopt_pathway(client, "STU-A").json()["plan_items"]
     intl = {i["plan_item_id"]: i for i in items
             if i["plan_item_id"].startswith("PI-INTL-")}
     assert intl
@@ -212,7 +213,7 @@ def test_fixture_opportunity_items_use_real_event_dates(client, deps):
     """机会类计划项日期 = 活动真实起止——「未来两周」标签与日历必须同一口径
     （用户报障：标签里列 11 月活动，日历这两周当然找不到）。"""
     call = as_role(client, ActorRole.STUDENT.value)
-    items = call("GET", "/v1/students/STU-A/pathway").json()["plan_items"]
+    items = adopt_pathway(client, "STU-A").json()["plan_items"]
     checked = 0
     for item in items:
         if item["kind"] != "opportunity":
