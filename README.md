@@ -38,7 +38,7 @@ HKUST_CampusPath/
 ├── Makefile                                              # check/eval/api/web/contracts/seed…
 │
 ├── contracts/                    # 契约层：唯一真相来源（1.36.0）
-│   ├── campuspath_contracts/     #   172 个 Pydantic 模型 + 声明式 openapi.py + 边界守卫
+│   ├── campuspath_contracts/     #   172 个数据契约类型（Pydantic）+ 声明式 openapi.py + 边界守卫
 │   ├── openapi/campuspath.json   #   生成的 OpenAPI 3.1（88 路径 / 107 操作）
 │   ├── schema/                   #   逐模型 JSON Schema 冻结产物
 │   └── tests/                    #   B1–B13 红线逐条测试 + 变异自检
@@ -52,7 +52,7 @@ HKUST_CampusPath/
 │   ├── aggregation/              #   k-匿名抑制、时间衰减（无 student_id）
 │   ├── monitor/                  #   事件去抖 + 受影响范围（长期项不波及）
 │   ├── publishing/               #   投稿状态机、越权拦截留痕
-│   ├── connector/                #   统一适配器接口 + Source Health + 源注册表（92 源）+ 共享抓取器/变更检测
+│   ├── connector/                #   统一适配器接口 + Source Health + 源注册表（93 源，85 真实/8 mock）+ 共享抓取器/变更检测
 │   ├── packs/                    #   国际生 Context Pack（vendored，确定性求值，待政策复核）
 │   ├── api/                      #   FastAPI 装配 + RBAC + B8 闸门（app.py + a5_pathway.py A5 线上生成 + resume_template.py 模板解析）
 │   └── mock-campus/              #   SIS / Degree Audit 等 7 个 mock 端点

@@ -74,5 +74,5 @@ make types            # 从 OpenAPI 生成前端 TypeScript 类型
 
 - 本包**不得依赖任何模型 SDK**。确定性服务平面会 import 它，
   一旦混进 SDK，Rules / Capacity / Wellbeing 的零 LLM 断言一起失效。
-- 契约模型不做排序。分数只允许出现在 A5 的输出模型上（`MatchResult`、`CoursePlan`）。
+- 数据契约类型不做排序。分数只允许出现在 A5 的输出类型上（`MatchResult`、`CoursePlan`）。
 - 新增或修改字段要同步 `CONTRACTS_VERSION` 与 `make contracts`。
