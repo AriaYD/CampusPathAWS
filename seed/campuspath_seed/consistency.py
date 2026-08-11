@@ -211,6 +211,63 @@ def check_metric_tuples_deidentified(bundle: dict[str, Any]) -> CheckResult:
     return _result("MetricTuple 已去标识", offenders, "出域元组携带可指向个人的字段")
 
 
+def check_metric_tuples_are_synthetic(bundle: dict[str, Any]) -> CheckResult:
+    """seed **永远不得**产出 `derived`。
+
+    那两个字是留给「真实曝光 × 资格 × 行动」推导出来的元组的。seed 里出现一条，
+    校方界面上的「N 真实 / M 合成」拆分就开始撒谎，而且再也分不开。
+    """
+    offenders = [
+        f"metric_tuples[{i}].provenance={row.get('provenance')!r}"
+        for i, row in enumerate(bundle["metric_tuples"])
+        if row.get("provenance") != "synthetic"
+    ]
+    return _result("MetricTuple 全部标为合成", offenders, "seed 产出了 derived 元组")
+
+
+def check_metric_tuple_periods_meet_min_cell_n(bundle: dict[str, Any]) -> CheckResult:
+    """每一期的 institution 行都必须够阈值。
+
+    这条不是洁癖：B9 评测器**无参**调 `/insights/resource-coverage`，把返回里
+    任何 `cell_n < MIN_CELL_N` 的行判为泄漏——哪怕那行已经被正确抑制。
+    所以无参响应只能是 institution 行，且每期样本量都得过阈值。
+    """
+    from collections import Counter
+
+    from campuspath_contracts.aggregation import MIN_CELL_N
+
+    counts = Counter(row["period"] for row in bundle["metric_tuples"])
+    offenders = [f"{period}: {n} < {MIN_CELL_N}"
+                 for period, n in sorted(counts.items()) if n < MIN_CELL_N]
+    return _result("每期样本量过阈值", offenders, "某一期的 institution 行会被判泄漏")
+
+
+def check_metric_tuple_cells_demonstrate_suppression(
+        bundle: dict[str, Any]) -> CheckResult:
+    """既要有出得了数的格，也要有出不了数的格。
+
+    `Insufficient evidence` 必须在演示里真的出现一次——那是隐私红线在工作，
+    不是缺陷。一个薄格子都没有，评委就只会看到一片漂亮数字，看不到边界。
+    """
+    from collections import Counter
+
+    from campuspath_contracts.aggregation import MIN_CELL_N
+
+    cells = Counter(
+        (row["period"], row["cohort_dims"]["school"],
+         row["cohort_dims"]["year_level"], row["cohort_dims"]["development_mode"])
+        for row in bundle["metric_tuples"]
+    )
+    thick = [c for c, n in cells.items() if n >= MIN_CELL_N]
+    thin = [c for c, n in cells.items() if 0 < n < MIN_CELL_N]
+    offenders = []
+    if not thick:
+        offenders.append("没有任何达阈值的分组格——分组对比会整片抑制")
+    if not thin:
+        offenders.append("没有任何薄格子——Insufficient evidence 演示不到")
+    return _result("抑制与出数两种格都在", offenders, "分组对比演示形状不完整")
+
+
 def check_no_real_pii(bundle: dict[str, Any]) -> CheckResult:
     """合成数据不得出现真实邮箱或电话形状的串（Plan §9）。"""
     offenders: list[str] = []
@@ -257,6 +314,7 @@ def check_scale_floors(bundle: dict[str, Any]) -> CheckResult:
         "submissions": len(bundle["publication_submissions"]),
         "profile_events": len(bundle["profile_update_proposals"]),
         "moodle_courses": len({r["course_id"] for r in bundle["student_course_records"]}),
+        "metric_tuples": len(bundle["metric_tuples"]),
     }
     offenders = [
         f"{key} {counts[key]} < {floor}"
@@ -317,6 +375,9 @@ CHECKS: tuple[Check, ...] = (
     check_four_states_covered,
     check_publisher_references,
     check_metric_tuples_deidentified,
+    check_metric_tuples_are_synthetic,
+    check_metric_tuple_periods_meet_min_cell_n,
+    check_metric_tuple_cells_demonstrate_suppression,
     check_no_real_pii,
     check_synthetic_notice,
     check_scale_floors,
@@ -393,6 +454,22 @@ MUTATIONS: tuple[Mutation, ...] = (
     ("MetricTuple 混入 student_id",
      lambda b: b["metric_tuples"][0].__setitem__("student_id", "STU-A"),
      "check_metric_tuples_deidentified"),
+    ("seed 产出了 derived 元组",
+     lambda b: b["metric_tuples"][0].__setitem__("provenance", "derived"),
+     "check_metric_tuples_are_synthetic"),
+    ("某一期样本量掉到阈值以下",
+     lambda b: b.__setitem__(
+         "metric_tuples",
+         [r for r in b["metric_tuples"] if r["period"] != "2025-26_FALL"]
+         + [r for r in b["metric_tuples"] if r["period"] == "2025-26_FALL"][:4]),
+     "check_metric_tuple_periods_meet_min_cell_n"),
+    ("薄格子被删光，抑制演示不到",
+     lambda b: b.__setitem__(
+         "metric_tuples",
+         [r for r in b["metric_tuples"]
+          if not (r["cohort_dims"]["school"] == "SCI"
+                  and r["cohort_dims"]["year_level"] == 4)]),
+     "check_metric_tuple_cells_demonstrate_suppression"),
     ("出现真实邮箱形状",
      lambda b: b["notes"][0].__setitem__("text", "联系我 someone@realmail.com"),
      "check_no_real_pii"),

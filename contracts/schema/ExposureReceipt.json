@@ -1,0 +1,42 @@
+{
+  "$id": "https://campuspath.invalid/schema/ExposureReceipt.json",
+  "additionalProperties": false,
+  "description": "服务端如实回报收了几条、去重掉几条——静默丢弃会让前端以为都记上了。",
+  "properties": {
+    "accepted": {
+      "minimum": 0,
+      "title": "Accepted",
+      "type": "integer"
+    },
+    "deduplicated": {
+      "minimum": 0,
+      "title": "Deduplicated",
+      "type": "integer"
+    },
+    "received_at": {
+      "format": "date-time",
+      "title": "Received At",
+      "type": "string"
+    },
+    "student_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Student Id",
+      "type": "string"
+    },
+    "total_for_period": {
+      "minimum": 0,
+      "title": "Total For Period",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "student_id",
+    "accepted",
+    "deduplicated",
+    "total_for_period",
+    "received_at"
+  ],
+  "title": "ExposureReceipt",
+  "type": "object"
+}

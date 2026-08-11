@@ -152,6 +152,12 @@
       "title": "Computed At",
       "type": "string"
     },
+    "derived_cell_n": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Derived Cell N",
+      "type": "integer"
+    },
     "discovery_rate": {
       "anyOf": [
         {
@@ -210,6 +216,12 @@
       },
       "title": "Suppressed Cells",
       "type": "array"
+    },
+    "synthetic_cell_n": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Synthetic Cell N",
+      "type": "integer"
     },
     "unmet_requirement_ranking": {
       "default": [],

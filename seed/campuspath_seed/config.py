@@ -43,7 +43,7 @@ from datetime import date
 #:   ② 课程约束 Gold 的先修判定改为三值成绩感知评估，
 #:   含成绩条件的表达式不再一律 unknown。
 #: * ``seed/1.0.0``：初版。
-SEED_VERSION = "seed/1.10.0"
+SEED_VERSION = "seed/1.11.0"
 
 #: 全局随机种子。不要按环境变量覆盖——那等于放弃可复现。
 MASTER_SEED = 20260729
@@ -154,6 +154,8 @@ FULL_SCALE_FLOORS: dict[str, int] = {
     "submissions": 20,
     "profile_events": 20,
     "moodle_courses": 8,
+    # P4（2026-08-10）：三期 × 各 cohort 的合成元组，够画趋势与分组对比
+    "metric_tuples": 100,
 }
 
 #: D6.5 的 Gold Set 下限。

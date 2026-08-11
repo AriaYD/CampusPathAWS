@@ -113,43 +113,14 @@ def build_feedback(
         if index >= count:
             break
 
-    # 去标识指标元组：每个学生在私有域内算出一条，出域时已无 student_id
-    tuples: list[MetricTuple] = []
-    for persona in personas:
-        profile = persona.profile
-        prng = stream(f"metrics.{profile.student_id}")
-        eligible = prng.randrange(18, 46)
-        seen = prng.randrange(int(eligible * 0.3), eligible + 1)
-        acted = prng.randrange(0, max(1, int(seen * 0.4)) + 1)
-        gap_total = prng.randrange(6, 16)
-        gap_covered = prng.randrange(int(gap_total * 0.4), gap_total + 1)
-        uncovered = tuple(
-            sorted(
-                set(sample(prng, list(RequirementCategory), gap_total - gap_covered)),
-                key=lambda c: c.value,
-            )
-        )
-        tuples.append(
-            MetricTuple(
-                period=CURRENT_TERM,
-                cohort_dims=CohortDims(
-                    school={"BSC-COMP": "ENGG", "BENG-IEDA": "ENGG", "BBA-ISOM": "BUS"}[
-                        profile.program_id
-                    ],
-                    year_level=profile.year,
-                    development_mode=(
-                        profile.development_modes[0].mode.value
-                        if profile.development_modes else "exploration"
-                    ),
-                ),
-                eligible_count=eligible,
-                seen_count=seen,
-                acted_count=acted,
-                gap_total=gap_total,
-                gap_covered=gap_covered,
-                uncovered_requirement_categories=uncovered,
-            )
-        )
+    # 2026-08-10（P4）：**去标识指标元组不再在这里造**。
+    # 旧写法按 persona 各造一条 `prng.randrange` 随机数，period 全是当前学期
+    # （趋势画不出来），而且造的就是运行时要真实派生的同一批学生——留着即重复
+    # 计数，且与派生数据无法区分。合成扩样整体搬去 `metrics.py`：由手写 cell
+    # plan 驱动、跨三期、全部标 provenance=synthetic。
+    from .metrics import build_metric_tuples
+
+    tuples = build_metric_tuples()
 
     return FeedbackBundle(
         feedback=feedback,

@@ -355,7 +355,50 @@ def test_metric_tuple_field_set_is_pinned():
     assert set(MetricTuple.model_fields) == {
         "period", "cohort_dims", "eligible_count", "seen_count", "acted_count",
         "gap_total", "gap_covered", "uncovered_requirement_categories",
+        # 2026-08-10（P4）：这两个是**有意识加进白名单**的，不是顺手放行——
+        # provenance 只是 derived/synthetic 二选一（不含任何学生信息）；
+        # surface_conversions 只有 surface 与两个计数。加字段就得回来改这里，
+        # 这条断言的价值就在于逼人回来想一遍"它会不会带出个人"。
+        "provenance", "surface_conversions",
     }
+
+
+def test_surface_conversion_field_set_is_pinned():
+    """嵌套模型也要钉——外层白名单挡不住子模型里塞进来的字段（B10）。"""
+    from campuspath_contracts.aggregation import SurfaceConversion
+
+    assert set(SurfaceConversion.model_fields) == {
+        "surface", "exposed_count", "acted_count",
+    }
+
+
+def test_exposure_event_never_reaches_the_aggregation_domain():
+    """曝光事件带 student_id，所以它**只能**活在学生私有域。
+
+    这条断言钉的是"出域类型里没有任何一处能装下曝光事件"：
+    聚合侧的模型字段名与注解里都不许出现它。
+    """
+    import campuspath_contracts.aggregation as agg
+    from campuspath_contracts.pathway import ExposureEvent
+
+    for name in dir(agg):
+        model = getattr(agg, name)
+        if not (isinstance(model, type) and issubclass(model, pydantic.BaseModel)):
+            continue
+        for field_name, field in model.model_fields.items():
+            assert ExposureEvent not in _annotation_types(field.annotation), (
+                f"{name}.{field_name} 携带了 ExposureEvent——它带 student_id，"
+                "不得出现在任何出域类型里（B10）")
+
+
+def _annotation_types(annotation) -> set:
+    """把 tuple[X, ...] / X | None 这类嵌套注解摊平成里面用到的类型集合。"""
+    import typing
+
+    found = {annotation}
+    for arg in typing.get_args(annotation) or ():
+        found |= _annotation_types(arg)
+    return found
 
 
 def test_event_quality_feedback_field_set_is_pinned():

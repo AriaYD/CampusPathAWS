@@ -40,6 +40,15 @@
       "title": "DevelopmentModeType",
       "type": "string"
     },
+    "MetricProvenance": {
+      "description": "这条元组是**真的算出来的**，还是**造出来演示的**。\n\n两者绝不静默合并（2026-08-10 用户裁定 B）。冷启动的进程里派生侧本来就没有\n数据，如果把合成数据混进去充数，校方看到的每个百分比都失去意义。",
+      "enum": [
+        "derived",
+        "synthetic"
+      ],
+      "title": "MetricProvenance",
+      "type": "string"
+    },
     "RequirementCategory": {
       "description": "出域时 ``MetricTuple.uncovered_requirement_categories`` 只携带这一层。\n\n它必须足够粗，粗到无法反推是哪位学生——所以是枚举而不是自由文本。",
       "enum": [
@@ -57,6 +66,37 @@
       ],
       "title": "RequirementCategory",
       "type": "string"
+    },
+    "SurfaceConversion": {
+      "additionalProperties": false,
+      "description": "某一个入口（广场 / 为你推荐）上的「看见 → 行动」转化（Spec §17.6）。\n\n嵌在 :class:`MetricTuple` 里而不是另开一条流：广场转化的分母是**全部**\n广场曝光，不满足 ``seen ≤ eligible`` 那条嵌套约束（学生在广场上看到的\n包括他并不合格的机会——而那恰恰是校方最想知道的信号）。放进带自己\n局部不变量的子模型，既保住「每人每期一条元组」，也不动现有 validator。",
+      "properties": {
+        "acted_count": {
+          "minimum": 0,
+          "title": "Acted Count",
+          "type": "integer"
+        },
+        "exposed_count": {
+          "minimum": 0,
+          "title": "Exposed Count",
+          "type": "integer"
+        },
+        "surface": {
+          "enum": [
+            "plaza",
+            "for_you"
+          ],
+          "title": "Surface",
+          "type": "string"
+        }
+      },
+      "required": [
+        "surface",
+        "exposed_count",
+        "acted_count"
+      ],
+      "title": "SurfaceConversion",
+      "type": "object"
     }
   },
   "$id": "https://campuspath.invalid/schema/MetricTuple.json",
@@ -91,10 +131,21 @@
       "title": "Period",
       "type": "string"
     },
+    "provenance": {
+      "$ref": "#/components/schemas/MetricProvenance"
+    },
     "seen_count": {
       "minimum": 0,
       "title": "Seen Count",
       "type": "integer"
+    },
+    "surface_conversions": {
+      "default": [],
+      "items": {
+        "$ref": "#/components/schemas/SurfaceConversion"
+      },
+      "title": "Surface Conversions",
+      "type": "array"
     },
     "uncovered_requirement_categories": {
       "default": [],
@@ -108,6 +159,7 @@
   "required": [
     "period",
     "cohort_dims",
+    "provenance",
     "eligible_count",
     "seen_count",
     "acted_count",

@@ -3755,6 +3755,52 @@ export interface components {
          */
         ExperienceType: "internship" | "part_time" | "research" | "project" | "competition" | "club" | "volunteer" | "entrepreneurship" | "exchange" | "other";
         /**
+         * ExposureBatch
+         * @description 前端攒一批再发。逐条发会把最高频的浏览动作变成最高频的网络请求。
+         */
+        ExposureBatch: {
+            /** Events */
+            events: components["schemas"]["ExposureEvent"][];
+            /** Student Id */
+            student_id: string;
+        };
+        /**
+         * ExposureDepth
+         * @description 看到了，还是点开了。两者的转化意义完全不同。
+         * @enum {string}
+         */
+        ExposureDepth: "impression" | "detail";
+        /**
+         * ExposureEvent
+         * @description 「这个学生真的看见过这条机会」（Spec §17.6 的唯一真实来源）。
+         *
+         *     **刻意不并进** :class:`ActionType`。``ActionEvent`` 是 VGA 与 B8 的载体
+         *     （``verified_growth`` / ``evidence_ids`` / ``approval_receipt_id``），曝光一样
+         *     都没有；混进去会污染 ``GET /actions``、广场的「已收藏/已报名」派生与
+         *     ``vga-summary``——而 §17.1 明写 **VGA 不奖励点击、收藏、报名或忙碌本身**。
+         *
+         *     它**带 student_id**：按设计只活在学生私有域，只经 ``roles=(STUDENT,)``
+         *     的端点写入，绝不出现在任何 ``/v1/insights/*`` 响应里（由测试钉死）。
+         */
+        ExposureEvent: {
+            /** @default impression */
+            depth: components["schemas"]["ExposureDepth"];
+            /** Event Id */
+            event_id: string;
+            /**
+             * Occurred At
+             * Format: date-time
+             */
+            occurred_at: string;
+            /** Period */
+            period: string;
+            /** Student Id */
+            student_id: string;
+            /** Subject Id */
+            subject_id: string;
+            surface: components["schemas"]["ExposureSurface"];
+        };
+        /**
          * ExposureGapEntry
          * @description 曝光断层榜的一行：合格的人多，实际看到的人少。
          */
@@ -3768,6 +3814,31 @@ export interface components {
             /** Seen N */
             seen_n: number;
         };
+        /**
+         * ExposureReceipt
+         * @description 服务端如实回报收了几条、去重掉几条——静默丢弃会让前端以为都记上了。
+         */
+        ExposureReceipt: {
+            /** Accepted */
+            accepted: number;
+            /** Deduplicated */
+            deduplicated: number;
+            /**
+             * Received At
+             * Format: date-time
+             */
+            received_at: string;
+            /** Student Id */
+            student_id: string;
+            /** Total For Period */
+            total_for_period: number;
+        };
+        /**
+         * ExposureSurface
+         * @description 曝光发生在哪个入口。Plaza-to-Action 只数广场那一半。
+         * @enum {string}
+         */
+        ExposureSurface: "plaza" | "for_you";
         /**
          * FitShare
          * @description 契合标签在已验证反馈中的占比（2026-08-04 用户裁定上呈现层）。
@@ -3821,6 +3892,54 @@ export interface components {
             /** @default none */
             uncertainty: components["schemas"]["Uncertainty"];
         };
+        /**
+         * GapChangeEvent
+         * @description 缺口等级变化的 append-only 事件——`GrowthTrajectory.gaps_closed` 的唯一来源。
+         *
+         *     在此之前 `gaps_closed` 在 API 里硬编码为 0，注释写着「判定链未接入」。
+         *     接上它要绕开一个陷阱：`gap_map()` 对已满足的要求是**跳过**的，所以缺口列表里
+         *     永远不会出现 `satisfied`——「关闭」在数据上表现为**该 requirement_id 从列表里
+         *     消失**。差分必须把「上一快照有、这一快照没有」判为 satisfied，否则
+         *     `gaps_closed` 会永远是 0，只是换了个位置重犯同一个错。
+         *
+         *     validator 要求 `to_level=satisfied` 必须挂证据（与 `Gap._satisfied_needs_evidence`
+         *     同源）：`gaps_closed` 只能被**说得出是什么关闭了它**的事件加一。
+         */
+        GapChangeEvent: {
+            category: components["schemas"]["RequirementCategory"];
+            /** Change Id */
+            change_id: string;
+            /**
+             * Detected At
+             * Format: date-time
+             */
+            detected_at: string;
+            /**
+             * Evidence Ids
+             * @default []
+             */
+            evidence_ids: string[];
+            from_level: components["schemas"]["GapLevel"];
+            /**
+             * Goal Id
+             * @default null
+             */
+            goal_id: string | null;
+            origin: components["schemas"]["GapChangeOrigin"];
+            /** Requirement Id */
+            requirement_id: string;
+            /** Student Id */
+            student_id: string;
+            /** Term */
+            term: string;
+            to_level: components["schemas"]["GapLevel"];
+        };
+        /**
+         * GapChangeOrigin
+         * @description 这条「缺口关闭」是怎么被发现的。两者都是真实派生，且必须可分。
+         * @enum {string}
+         */
+        GapChangeOrigin: "replay" | "observed";
         /**
          * GapLevel
          * @enum {string}
@@ -4462,6 +4581,15 @@ export interface components {
          */
         MemoryType: "decision" | "preference" | "experience" | "rejection" | "energy_pattern" | "contact" | "domain_fact";
         /**
+         * MetricProvenance
+         * @description 这条元组是**真的算出来的**，还是**造出来演示的**。
+         *
+         *     两者绝不静默合并（2026-08-10 用户裁定 B）。冷启动的进程里派生侧本来就没有
+         *     数据，如果把合成数据混进去充数，校方看到的每个百分比都失去意义。
+         * @enum {string}
+         */
+        MetricProvenance: "derived" | "synthetic";
+        /**
          * MetricTuple
          * @description 离开学生数据域时携带的全部内容（Spec §17.1.2）。
          *
@@ -4480,8 +4608,14 @@ export interface components {
             gap_total: number;
             /** Period */
             period: string;
+            provenance: components["schemas"]["MetricProvenance"];
             /** Seen Count */
             seen_count: number;
+            /**
+             * Surface Conversions
+             * @default []
+             */
+            surface_conversions: components["schemas"]["SurfaceConversion"][];
             /**
              * Uncovered Requirement Categories
              * @default []
@@ -4807,6 +4941,25 @@ export interface components {
             provenance: components["schemas"]["Provenance"];
             /** Source Id */
             source_id: string;
+        };
+        /**
+         * OpportunityExposureCount
+         * @description 逐机会的曝光计数，用于曝光断层榜。
+         *
+         *     刻意是**计数**而不是「每个学生看过哪些机会的 id 集合」——后者本身就是指纹，
+         *     足以把聚合反推回个人。累加在学生域内完成，只让计数出域。
+         */
+        OpportunityExposureCount: {
+            /** Acted N */
+            acted_n: number;
+            /** Eligible N */
+            eligible_n: number;
+            /** Opportunity Id */
+            opportunity_id: string;
+            /** Period */
+            period: string;
+            /** Seen N */
+            seen_n: number;
         };
         /**
          * OpportunityType
@@ -5204,6 +5357,50 @@ export interface components {
          * @enum {string}
          */
         PlanItemStatus: "proposed" | "accepted" | "in_progress" | "completed" | "skipped" | "blocked";
+        /**
+         * PlazaConversionAggregate
+         * @description Plaza-to-Action Conversion（Spec §17.6）：广场上看到的，有多少变成了行动。
+         *
+         *     与 :class:`ResourceCoverageAggregate` 共用同一条抑制规则——样本不足就没有比率。
+         *     分开成一个模型是因为它的分母不同（全部曝光，而不是「合格的机会」）。
+         */
+        PlazaConversionAggregate: {
+            /** Acted Total */
+            acted_total: number;
+            /** Aggregate Id */
+            aggregate_id: string;
+            /** Cell N */
+            cell_n: number;
+            /**
+             * Computed At
+             * Format: date-time
+             */
+            computed_at: string;
+            /**
+             * Conversion Rate
+             * @default null
+             */
+            conversion_rate: number | null;
+            /**
+             * Derived Cell N
+             * @default 0
+             */
+            derived_cell_n: number;
+            /** Exposed Total */
+            exposed_total: number;
+            /** Period */
+            period: string;
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "plaza" | "for_you";
+            /**
+             * Synthetic Cell N
+             * @default 0
+             */
+            synthetic_cell_n: number;
+        };
         /**
          * PrerequisiteStatus
          * @description A2 的标注结果之一。``UNKNOWN`` 必须能传导到 UI，不许悄悄当成 MET。
@@ -6335,6 +6532,11 @@ export interface components {
              */
             computed_at: string;
             /**
+             * Derived Cell N
+             * @default 0
+             */
+            derived_cell_n: number;
+            /**
              * Discovery Rate
              * @default null
              */
@@ -6361,6 +6563,11 @@ export interface components {
              * @default []
              */
             suppressed_cells: components["schemas"]["SuppressedCell"][];
+            /**
+             * Synthetic Cell N
+             * @default 0
+             */
+            synthetic_cell_n: number;
             /**
              * Unmet Requirement Ranking
              * @default []
@@ -7097,6 +7304,26 @@ export interface components {
              * @enum {string}
              */
             reason: "below_min_cell_n" | "too_many_dimensions";
+        };
+        /**
+         * SurfaceConversion
+         * @description 某一个入口（广场 / 为你推荐）上的「看见 → 行动」转化（Spec §17.6）。
+         *
+         *     嵌在 :class:`MetricTuple` 里而不是另开一条流：广场转化的分母是**全部**
+         *     广场曝光，不满足 ``seen ≤ eligible`` 那条嵌套约束（学生在广场上看到的
+         *     包括他并不合格的机会——而那恰恰是校方最想知道的信号）。放进带自己
+         *     局部不变量的子模型，既保住「每人每期一条元组」，也不动现有 validator。
+         */
+        SurfaceConversion: {
+            /** Acted Count */
+            acted_count: number;
+            /** Exposed Count */
+            exposed_count: number;
+            /**
+             * Surface
+             * @enum {string}
+             */
+            surface: "plaza" | "for_you";
         };
         /**
          * TakeawayType

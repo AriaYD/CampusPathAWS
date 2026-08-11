@@ -1,0 +1,42 @@
+{
+  "$id": "https://campuspath.invalid/schema/OpportunityExposureCount.json",
+  "additionalProperties": false,
+  "description": "逐机会的曝光计数，用于曝光断层榜。\n\n刻意是**计数**而不是「每个学生看过哪些机会的 id 集合」——后者本身就是指纹，\n足以把聚合反推回个人。累加在学生域内完成，只让计数出域。",
+  "properties": {
+    "acted_n": {
+      "minimum": 0,
+      "title": "Acted N",
+      "type": "integer"
+    },
+    "eligible_n": {
+      "minimum": 0,
+      "title": "Eligible N",
+      "type": "integer"
+    },
+    "opportunity_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Opportunity Id",
+      "type": "string"
+    },
+    "period": {
+      "pattern": "^\\d{4}-\\d{2}_(FALL|WINTER|SPRING|SUMMER)$",
+      "title": "Period",
+      "type": "string"
+    },
+    "seen_n": {
+      "minimum": 0,
+      "title": "Seen N",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "period",
+    "opportunity_id",
+    "eligible_n",
+    "seen_n",
+    "acted_n"
+  ],
+  "title": "OpportunityExposureCount",
+  "type": "object"
+}

@@ -299,6 +299,65 @@ class ActionEvent(FrozenModel):
         return self
 
 
+class ExposureSurface(StrEnum):
+    """曝光发生在哪个入口。Plaza-to-Action 只数广场那一半。"""
+
+    PLAZA = "plaza"
+    FOR_YOU = "for_you"
+
+
+class ExposureDepth(StrEnum):
+    """看到了，还是点开了。两者的转化意义完全不同。"""
+
+    IMPRESSION = "impression"
+    DETAIL = "detail"
+
+
+class ExposureEvent(FrozenModel):
+    """「这个学生真的看见过这条机会」（Spec §17.6 的唯一真实来源）。
+
+    **刻意不并进** :class:`ActionType`。``ActionEvent`` 是 VGA 与 B8 的载体
+    （``verified_growth`` / ``evidence_ids`` / ``approval_receipt_id``），曝光一样
+    都没有；混进去会污染 ``GET /actions``、广场的「已收藏/已报名」派生与
+    ``vga-summary``——而 §17.1 明写 **VGA 不奖励点击、收藏、报名或忙碌本身**。
+
+    它**带 student_id**：按设计只活在学生私有域，只经 ``roles=(STUDENT,)``
+    的端点写入，绝不出现在任何 ``/v1/insights/*`` 响应里（由测试钉死）。
+    """
+
+    event_id: Identifier
+    student_id: StudentId
+    subject_id: Identifier
+    surface: ExposureSurface
+    depth: ExposureDepth = ExposureDepth.IMPRESSION
+    occurred_at: datetime
+    period: TermCode
+
+
+class ExposureBatch(CampusPathModel):
+    """前端攒一批再发。逐条发会把最高频的浏览动作变成最高频的网络请求。"""
+
+    student_id: StudentId
+    events: tuple[ExposureEvent, ...] = Field(min_length=1, max_length=200)
+
+    @model_validator(mode="after")
+    def _all_events_belong_to_the_batch_owner(self) -> "ExposureBatch":
+        alien = sorted({e.student_id for e in self.events} - {self.student_id})
+        if alien:
+            raise ValueError(f"批次里混入了别人的曝光事件：{alien}")
+        return self
+
+
+class ExposureReceipt(CampusPathModel):
+    """服务端如实回报收了几条、去重掉几条——静默丢弃会让前端以为都记上了。"""
+
+    student_id: StudentId
+    accepted: int = Field(ge=0)
+    deduplicated: int = Field(ge=0)
+    total_for_period: int = Field(ge=0)
+    received_at: datetime
+
+
 class ReplanTriggerType(StrEnum):
     """Spec §16.9 的触发器清单。T5 要求注入 ≥ 10 类。"""
 

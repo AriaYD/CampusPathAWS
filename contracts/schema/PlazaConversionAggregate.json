@@ -1,0 +1,83 @@
+{
+  "$id": "https://campuspath.invalid/schema/PlazaConversionAggregate.json",
+  "additionalProperties": false,
+  "description": "Plaza-to-Action Conversion（Spec §17.6）：广场上看到的，有多少变成了行动。\n\n与 :class:`ResourceCoverageAggregate` 共用同一条抑制规则——样本不足就没有比率。\n分开成一个模型是因为它的分母不同（全部曝光，而不是「合格的机会」）。",
+  "properties": {
+    "acted_total": {
+      "minimum": 0,
+      "title": "Acted Total",
+      "type": "integer"
+    },
+    "aggregate_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Aggregate Id",
+      "type": "string"
+    },
+    "cell_n": {
+      "minimum": 0,
+      "title": "Cell N",
+      "type": "integer"
+    },
+    "computed_at": {
+      "format": "date-time",
+      "title": "Computed At",
+      "type": "string"
+    },
+    "conversion_rate": {
+      "anyOf": [
+        {
+          "maximum": 1,
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Conversion Rate"
+    },
+    "derived_cell_n": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Derived Cell N",
+      "type": "integer"
+    },
+    "exposed_total": {
+      "minimum": 0,
+      "title": "Exposed Total",
+      "type": "integer"
+    },
+    "period": {
+      "pattern": "^\\d{4}-\\d{2}_(FALL|WINTER|SPRING|SUMMER)$",
+      "title": "Period",
+      "type": "string"
+    },
+    "surface": {
+      "enum": [
+        "plaza",
+        "for_you"
+      ],
+      "title": "Surface",
+      "type": "string"
+    },
+    "synthetic_cell_n": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Synthetic Cell N",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "aggregate_id",
+    "period",
+    "surface",
+    "cell_n",
+    "exposed_total",
+    "acted_total",
+    "computed_at"
+  ],
+  "title": "PlazaConversionAggregate",
+  "type": "object"
+}

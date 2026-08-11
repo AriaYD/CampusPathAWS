@@ -18,6 +18,7 @@ from pydantic import Field, model_validator
 from .common import (
     CampusPathModel,
     Confidence,
+    FrozenModel,
     DevelopmentModeType,
     EvidenceId,
     GoalId,
@@ -174,6 +175,52 @@ class Gap(CampusPathModel):
     def _satisfied_needs_evidence(self) -> "Gap":
         if self.gap_level is GapLevel.SATISFIED and not self.evidence_ids:
             raise ValueError("判定为 satisfied 的缺口必须引用至少一条 Evidence")
+        return self
+
+
+class GapChangeOrigin(StrEnum):
+    """这条「缺口关闭」是怎么被发现的。两者都是真实派生，且必须可分。"""
+
+    #: 进程启动时从成绩单 / 证据历史重放——冷启动也有真实历史可数
+    REPLAY = "replay"
+    #: 会话内 gap map 的前后差分
+    OBSERVED = "observed"
+
+
+class GapChangeEvent(FrozenModel):
+    """缺口等级变化的 append-only 事件——`GrowthTrajectory.gaps_closed` 的唯一来源。
+
+    在此之前 `gaps_closed` 在 API 里硬编码为 0，注释写着「判定链未接入」。
+    接上它要绕开一个陷阱：`gap_map()` 对已满足的要求是**跳过**的，所以缺口列表里
+    永远不会出现 `satisfied`——「关闭」在数据上表现为**该 requirement_id 从列表里
+    消失**。差分必须把「上一快照有、这一快照没有」判为 satisfied，否则
+    `gaps_closed` 会永远是 0，只是换了个位置重犯同一个错。
+
+    validator 要求 `to_level=satisfied` 必须挂证据（与 `Gap._satisfied_needs_evidence`
+    同源）：`gaps_closed` 只能被**说得出是什么关闭了它**的事件加一。
+    """
+
+    change_id: Identifier
+    student_id: StudentId
+    requirement_id: RequirementId
+    goal_id: GoalId | None = None
+    category: RequirementCategory
+    term: TermCode
+    from_level: GapLevel
+    to_level: GapLevel
+    evidence_ids: tuple[EvidenceId, ...] = ()
+    origin: GapChangeOrigin
+    detected_at: datetime
+
+    @model_validator(mode="after")
+    def _is_actually_a_change(self) -> "GapChangeEvent":
+        if self.from_level is self.to_level:
+            raise ValueError(
+                f"from_level 与 to_level 都是 {self.to_level.value}——这不是一次变化")
+        if self.to_level is GapLevel.SATISFIED and not self.evidence_ids:
+            raise ValueError(
+                "判定为 satisfied 的变更必须引用至少一条 Evidence——"
+                "gaps_closed 只数说得出理由的关闭")
         return self
 
 

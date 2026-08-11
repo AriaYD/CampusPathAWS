@@ -18,7 +18,7 @@ Aggregation Service 是确定性零 LLM 服务，只接受两类输入：
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import ClassVar, Literal
 
 from pydantic import Field, model_validator
 
@@ -40,6 +40,61 @@ class InsufficientEvidence(StrEnum):
     INSUFFICIENT_EVIDENCE = "insufficient_evidence"
 
 
+class MetricProvenance(StrEnum):
+    """这条元组是**真的算出来的**，还是**造出来演示的**。
+
+    两者绝不静默合并（2026-08-10 用户裁定 B）。冷启动的进程里派生侧本来就没有
+    数据，如果把合成数据混进去充数，校方看到的每个百分比都失去意义。
+    """
+
+    #: 从真实曝光 × 资格 × 行动 × gap map 推导
+    DERIVED = "derived"
+    #: seed 造的演示样本。``seed/`` **永远不得**产出 ``derived``
+    SYNTHETIC = "synthetic"
+
+
+class SurfaceConversion(CampusPathModel):
+    """某一个入口（广场 / 为你推荐）上的「看见 → 行动」转化（Spec §17.6）。
+
+    嵌在 :class:`MetricTuple` 里而不是另开一条流：广场转化的分母是**全部**
+    广场曝光，不满足 ``seen ≤ eligible`` 那条嵌套约束（学生在广场上看到的
+    包括他并不合格的机会——而那恰恰是校方最想知道的信号）。放进带自己
+    局部不变量的子模型，既保住「每人每期一条元组」，也不动现有 validator。
+    """
+
+    surface: Literal["plaza", "for_you"]
+    exposed_count: int = Field(ge=0)
+    acted_count: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _acted_within_exposed(self) -> "SurfaceConversion":
+        if self.acted_count > self.exposed_count:
+            raise ValueError("acted_count 不能超过 exposed_count（行动必先经过曝光）")
+        return self
+
+
+class OpportunityExposureCount(CampusPathModel):
+    """逐机会的曝光计数，用于曝光断层榜。
+
+    刻意是**计数**而不是「每个学生看过哪些机会的 id 集合」——后者本身就是指纹，
+    足以把聚合反推回个人。累加在学生域内完成，只让计数出域。
+    """
+
+    period: TermCode
+    opportunity_id: Identifier
+    eligible_n: int = Field(ge=0)
+    seen_n: int = Field(ge=0)
+    acted_n: int = Field(ge=0)
+
+    @model_validator(mode="after")
+    def _counts_are_nested(self) -> "OpportunityExposureCount":
+        if self.seen_n > self.eligible_n:
+            raise ValueError("seen_n 不能超过 eligible_n")
+        if self.acted_n > self.seen_n:
+            raise ValueError("acted_n 不能超过 seen_n")
+        return self
+
+
 class MetricTuple(CampusPathModel):
     """离开学生数据域时携带的全部内容（Spec §17.1.2）。
 
@@ -49,12 +104,16 @@ class MetricTuple(CampusPathModel):
 
     period: TermCode
     cohort_dims: CohortDims
+    #: **必填无默认**（2026-08-10）：给它一个默认值，就等于允许未来的生产者
+    #: 忘了声明来源。必填会当场弄红 seed 与既有测试——那正是目的。
+    provenance: MetricProvenance
     eligible_count: int = Field(ge=0)
     seen_count: int = Field(ge=0)
     acted_count: int = Field(ge=0)
     gap_total: int = Field(ge=0)
     gap_covered: int = Field(ge=0)
     uncovered_requirement_categories: tuple[RequirementCategory, ...] = ()
+    surface_conversions: tuple[SurfaceConversion, ...] = ()
 
     @model_validator(mode="after")
     def _counts_are_nested(self) -> "MetricTuple":
@@ -64,6 +123,13 @@ class MetricTuple(CampusPathModel):
             raise ValueError("acted_count 不能超过 seen_count（行动必先经过曝光）")
         if self.gap_covered > self.gap_total:
             raise ValueError("gap_covered 不能超过 gap_total")
+        return self
+
+    @model_validator(mode="after")
+    def _one_row_per_surface(self) -> "MetricTuple":
+        surfaces = [s.surface for s in self.surface_conversions]
+        if len(surfaces) != len(set(surfaces)):
+            raise ValueError("同一个入口出现了两行转化——聚合时会被重复计数")
         return self
 
 
@@ -100,6 +166,9 @@ class ResourceCoverageAggregate(CampusPathModel):
     scope: Literal["institution", "school", "year_level", "development_mode"]
     cohort_dims_used: tuple[str, ...] = ()
     cell_n: int = Field(ge=0)
+    #: 拆开报，别让校方把「造的」当「测的」（2026-08-10 用户裁定 B）
+    derived_cell_n: int = Field(default=0, ge=0)
+    synthetic_cell_n: int = Field(default=0, ge=0)
     discovery_rate: float | None = Field(default=None, ge=0, le=1)
     action_rate: float | None = Field(default=None, ge=0, le=1)
     gap_coverage_rate: float | None = Field(default=None, ge=0, le=1)
@@ -107,6 +176,11 @@ class ResourceCoverageAggregate(CampusPathModel):
     unmet_requirement_ranking: tuple[UnmetRequirementEntry, ...] = ()
     suppressed_cells: tuple[SuppressedCell, ...] = ()
     computed_at: datetime
+
+    #: 抑制清单的**单一出处**。以前是写死在 validator 里的字面量列表，
+    #: 于是每加一个比率字段就要有人记得回来改它——记不住的那一次就是 B9 泄漏。
+    SUPPRESSED_FIELDS: ClassVar[tuple[str, ...]] = (
+        "discovery_rate", "action_rate", "gap_coverage_rate")
 
     @model_validator(mode="after")
     def _suppress_small_cells(self) -> "ResourceCoverageAggregate":
@@ -117,13 +191,60 @@ class ResourceCoverageAggregate(CampusPathModel):
         if self.cell_n < MIN_CELL_N:
             leaked = [
                 name
-                for name in ("discovery_rate", "action_rate", "gap_coverage_rate")
+                for name in type(self).SUPPRESSED_FIELDS
                 if getattr(self, name) is not None
             ]
             if leaked or self.exposure_gap_ranking or self.unmet_requirement_ranking:
                 raise ValueError(
                     f"样本量 {self.cell_n} < {MIN_CELL_N}，必须抑制数值并显示 "
                     f"Insufficient evidence（B9）；仍携带：{leaked or '排行榜'}"
+                )
+        return self
+
+    @model_validator(mode="after")
+    def _provenance_split_adds_up(self) -> "ResourceCoverageAggregate":
+        total = self.derived_cell_n + self.synthetic_cell_n
+        if total and total != self.cell_n:
+            raise ValueError(
+                f"来源拆分 {self.derived_cell_n}+{self.synthetic_cell_n}={total} "
+                f"与 cell_n={self.cell_n} 对不上——有一侧被漏计了"
+            )
+        return self
+
+
+class PlazaConversionAggregate(CampusPathModel):
+    """Plaza-to-Action Conversion（Spec §17.6）：广场上看到的，有多少变成了行动。
+
+    与 :class:`ResourceCoverageAggregate` 共用同一条抑制规则——样本不足就没有比率。
+    分开成一个模型是因为它的分母不同（全部曝光，而不是「合格的机会」）。
+    """
+
+    aggregate_id: Identifier
+    period: TermCode
+    surface: Literal["plaza", "for_you"]
+    cell_n: int = Field(ge=0)
+    derived_cell_n: int = Field(default=0, ge=0)
+    synthetic_cell_n: int = Field(default=0, ge=0)
+    exposed_total: int = Field(ge=0)
+    acted_total: int = Field(ge=0)
+    conversion_rate: float | None = Field(default=None, ge=0, le=1)
+    computed_at: datetime
+
+    SUPPRESSED_FIELDS: ClassVar[tuple[str, ...]] = ("conversion_rate",)
+
+    @model_validator(mode="after")
+    def _suppress_small_cells(self) -> "PlazaConversionAggregate":
+        if self.acted_total > self.exposed_total:
+            raise ValueError("acted_total 不能超过 exposed_total")
+        if self.cell_n < MIN_CELL_N:
+            leaked = [
+                name for name in type(self).SUPPRESSED_FIELDS
+                if getattr(self, name) is not None
+            ]
+            if leaked:
+                raise ValueError(
+                    f"样本量 {self.cell_n} < {MIN_CELL_N}，必须抑制比率并显示 "
+                    f"Insufficient evidence（B9）；仍携带：{leaked}"
                 )
         return self
 

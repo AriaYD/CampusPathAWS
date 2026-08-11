@@ -10,6 +10,7 @@ import pytest
 from pydantic import ValidationError
 
 from campuspath_contracts.aggregation import (
+    MetricProvenance,
     MAX_COHORT_DIMENSIONS,
     MIN_CELL_N,
     DimensionAggregate,
@@ -31,6 +32,7 @@ def _tuple(**kw) -> MetricTuple:
     base = dict(
         period="2025-26_FALL",
         cohort_dims=COHORT,
+        provenance=MetricProvenance.DERIVED,
         eligible_count=40,
         seen_count=22,
         acted_count=6,
