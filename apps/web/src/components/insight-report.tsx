@@ -2,21 +2,20 @@
 
 import { useState } from "react";
 import { useI18n } from "@/i18n";
-import { institution, type ResourceCoverageAggregate, type Schemas } from "@/lib/api";
+import { institution, type ResourceCoverageAggregate } from "@/lib/api";
 import { useResource } from "@/lib/useResource";
 import {
   BarRow,
   Card,
   Empty,
-  Failure,
   Funnel,
   Grid,
-  InsufficientEvidence,
   Loading,
+  Failure,
+  InsufficientEvidence,
   SectionTitle,
   Sparkline,
   SyntheticBadge,
-  WhiskerBar,
 } from "@/components/ui";
 
 /**
@@ -55,7 +54,8 @@ function CellCard({ cell }: { cell: ResourceCoverageAggregate }) {
       className="rounded-md border border-line bg-bg-sunk p-3"
     >
       <div className="t-meta mb-2 font-medium text-fg">
-        {cell.aggregate_id.replace(/^AGG-/, "")}
+        {/* 代码换成人话：SENG 这种缩写只有内部人看得懂 */}
+        {t(`school.${cell.aggregate_id.replace(/^AGG-/, "")}` as Parameters<typeof t>[0])}
       </div>
       {thin ? (
         <InsufficientEvidence n={cell.cell_n} />
@@ -80,21 +80,24 @@ function CellCard({ cell }: { cell: ResourceCoverageAggregate }) {
   );
 }
 
-export function InsightReport({
-  trend,
-  bySchool,
-  conversion,
-}: {
-  trend: ResourceCoverageAggregate[];
-  bySchool: ResourceCoverageAggregate[];
-  conversion: Schemas["PlazaConversionAggregate"][];
-}) {
-  const { t, locale } = useI18n();
+export function InsightReport() {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
-  // 展开才拉——报告里的活动质量聚合是整页最贵的一次请求，
-  // 没人点开就不该付这个代价。
-  const quality = useResource(
-    () => (open ? institution.eventQuality() : Promise.resolve([])), [open]);
+  // 2026-08-11 用户裁定：报告并入「活动反馈数据报告」页，与周期报告合成
+  // **一份**报告，不再拆成两份。所以数据由组件自取——它已经不在 /insights 上，
+  // 没有上游可以传给它了。展开才拉：没人点开就不该付这三次请求的代价。
+  const trendRes = useResource(
+    () => (open ? institution.resourceCoverage() : Promise.resolve([])), [open]);
+  const schoolRes = useResource(
+    () => (open ? institution.resourceCoverage({ cohort: "school" })
+                : Promise.resolve([])), [open]);
+  const conversionRes = useResource(
+    () => (open ? institution.plazaConversion() : Promise.resolve([])), [open]);
+  const trend = trendRes.data ?? [];
+  const bySchool = schoolRes.data ?? [];
+  const conversion = conversionRes.data ?? [];
+  const loading = trendRes.loading || schoolRes.loading || conversionRes.loading;
+  const failure = trendRes.error ?? schoolRes.error ?? conversionRes.error;
 
   const latest = trend.length ? trend[trend.length - 1] : null;
   const plaza = conversion.filter((c) => c.surface === "plaza");
@@ -121,6 +124,8 @@ export function InsightReport({
           <div>
             <SyntheticBadge />
           </div>
+          {loading && <Loading />}
+          {failure && <Failure error={failure} />}
 
           {/* ── 一、三项利用率与趋势 ── */}
           <section data-report-section="utilisation">
@@ -204,36 +209,13 @@ export function InsightReport({
             )}
           </section>
 
-          {/* ── 五、四维活动质量（带置信区间）── */}
-          <section data-report-section="quality">
-            <p className="t-micro mb-2 font-medium text-fg">{t("report.section.quality")}</p>
-            {quality.loading && <Loading />}
-            {quality.error && <Failure error={quality.error} />}
-            {(quality.data ?? []).filter((q) => q.dimensions.length).slice(0, 6).map((q) => (
-              <div key={q.aggregate_id} data-quality-agg={q.aggregate_id} className="mb-4">
-                <p className="t-micro mb-1.5 text-fg-muted">
-                  {q.series_id ?? q.occurrence_id} · {t("report.verifiedN")} {q.verified_n}
-                </p>
-                <div className="flex flex-col gap-1.5">
-                  {q.dimensions.map((d) => (
-                    <WhiskerBar
-                      key={d.dimension}
-                      // 复用校方广场那套维度标签——同一个东西在两页叫不同名字
-                      // 比叫得难听更糟
-                      label={t(`console.plaza.dim.${d.dimension}` as Parameters<typeof t>[0])}
-                      score={d.weighted_score} low={d.ci_low} high={d.ci_high} />
-                  ))}
-                </div>
-              </div>
-            ))}
-            {quality.data && quality.data.filter((q) => q.dimensions.length).length === 0
-              && !quality.loading && (
-              <p className="t-micro text-fg-faint" data-quality-empty>
-                {t("report.quality.thin")}
-              </p>
-            )}
-            <p className="t-micro mt-1 text-fg-faint">{t("report.quality.whiskerNote")}</p>
-          </section>
+          {/* 五、四维活动质量——**已撤下**（2026-08-11 用户裁定）。
+              那是**逐活动**的评分，早就在「资讯广场总览」逐行显示（含 k-匿名
+              阈值与契合分布）。在这份**跨活动的聚合报告**里再列一遍每个活动，
+              既重复又串了层级：这份报告回答的是"全校资源效能"，不是"这场活动办得好不好"。
+              实测佐证：模拟 7 份已验证反馈后，广场总览该行立刻出
+              内容深度 4.6 / 组织流程 2.6 / 实用收获 4.4 / 预期兑现 4.0，
+              周围各行仍是「样本不足」——那一页已经把这件事说清楚了。 */}
 
           <p className="t-micro border-l-2 border-line ps-3 text-fg-faint" data-report-notes>
             {t("report.notes")}

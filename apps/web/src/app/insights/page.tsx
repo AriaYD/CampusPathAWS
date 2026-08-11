@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useI18n } from "@/i18n";
 import { institution, type ResourceCoverageAggregate } from "@/lib/api";
 import { useResource } from "@/lib/useResource";
-import { InsightReport } from "@/components/insight-report";
 import {
   Card,
   Empty,
@@ -168,7 +167,9 @@ export default function InsightsPage() {
               return (
                 <div key={cell.aggregate_id} data-unmet-school={school}
                      className="rounded-md border border-line bg-bg-sunk p-3">
-                  <div className="t-meta mb-2 font-medium text-fg">{school}</div>
+                  <div className="t-meta mb-2 font-medium text-fg">
+                    {t(`school.${school}` as Parameters<typeof t>[0])}
+                  </div>
                   {cell.cell_n < 5 ? (
                     <InsufficientEvidence n={cell.cell_n} />
                   ) : rows.length === 0 ? (
@@ -257,13 +258,8 @@ export default function InsightsPage() {
         {conversion.data && <ProvenanceNote rows={conversion.data} />}
       </Card>
 
-      {/* C（2026-08-10 用户需求）：完整报告就地展开。数据复用本页已拉的三份，
-          不重复请求；只有活动质量聚合是展开时才拉（整页最贵的一次）。 */}
-      <InsightReport
-        trend={trend.data ?? []}
-        bySchool={bySchool.data ?? []}
-        conversion={conversion.data ?? []}
-      />
+      {/* 完整报告已并入「活动反馈数据报告」页（2026-08-11 用户裁定：
+          所有数据合成一份报告，不拆成两份）。本页保留四个**实时视图**。 */}
     </>
   );
 }

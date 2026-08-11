@@ -43,7 +43,7 @@ from datetime import date
 #:   ② 课程约束 Gold 的先修判定改为三值成绩感知评估，
 #:   含成绩条件的表达式不再一律 unknown。
 #: * ``seed/1.0.0``：初版。
-SEED_VERSION = "seed/1.11.0"
+SEED_VERSION = "seed/1.12.0"
 
 #: 全局随机种子。不要按环境变量覆盖——那等于放弃可复现。
 MASTER_SEED = 20260729

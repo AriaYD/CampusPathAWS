@@ -28,33 +28,44 @@ PERIODS = ("2025-26_FALL", "2025-26_SPRING", "2026-27_FALL")
 
 #: `(period, school, year_level, development_mode, n)`。
 #:
+#: 学院代码用 **HKUST 真实建制**（2026-08-11 用户指出只出三个学院不合理）：
+#: SENG 工学院 / SBM 工商管理学院 / SSCI 理学院 / SHSS 人文社会科学学院 /
+#: AIS 跨学科学院 / FYTGS 霍英东研究院。六个建制都要有格子，否则校方看到的
+#: 「按学院对比」会漏掉一半的院——而那正是这张视图存在的理由。
+#:
 #: 形状是刻意设计的，不是采样出来的：
 #: * 每期加总 ≥ MIN_CELL_N —— institution 行才出得了数（B9 评测器的前提）；
-#: * ENGG/BUS 的几格 ≥ 5 —— 分组对比里有真出数的格；
+#: * SENG/SBM/SSCI/SHSS/AIS 各有 ≥ 5 的格 —— 分组对比里有真出数的格；
 #: * 末尾两格 n ∈ 1..4 —— 分组对比里有 `Insufficient evidence` 的格；
 #: * 三期的 seen/acted 基线逐期抬升 —— 趋势大致单调，看得出方向。
 CELL_PLAN: tuple[tuple[str, str, int, str, int], ...] = (
     # ── 2025-26_FALL ──
-    ("2025-26_FALL", "ENGG", 2, "employment", 9),
-    ("2025-26_FALL", "ENGG", 3, "academia", 6),
-    ("2025-26_FALL", "BUS", 2, "employment", 7),
-    ("2025-26_FALL", "BUS", 3, "entrepreneurship", 5),
-    ("2025-26_FALL", "SCI", 1, "exploration", 6),
-    ("2025-26_FALL", "SCI", 4, "academia", 3),          # 薄格：抑制
+    ("2025-26_FALL", "SENG", 2, "employment", 9),
+    ("2025-26_FALL", "SENG", 3, "academia", 6),
+    ("2025-26_FALL", "SBM", 2, "employment", 7),
+    ("2025-26_FALL", "SBM", 3, "entrepreneurship", 5),
+    ("2025-26_FALL", "SSCI", 1, "exploration", 6),
+    ("2025-26_FALL", "SHSS", 2, "personal_interest", 6),
+    ("2025-26_FALL", "AIS", 3, "entrepreneurship", 5),
+    ("2025-26_FALL", "FYTGS", 4, "academia", 3),        # 薄格：抑制
     # ── 2025-26_SPRING ──
-    ("2025-26_SPRING", "ENGG", 2, "employment", 11),
-    ("2025-26_SPRING", "ENGG", 3, "academia", 7),
-    ("2025-26_SPRING", "BUS", 2, "employment", 8),
-    ("2025-26_SPRING", "BUS", 3, "entrepreneurship", 6),
-    ("2025-26_SPRING", "SCI", 1, "exploration", 7),
-    ("2025-26_SPRING", "SCI", 4, "academia", 2),        # 薄格：抑制
+    ("2025-26_SPRING", "SENG", 2, "employment", 11),
+    ("2025-26_SPRING", "SENG", 3, "academia", 7),
+    ("2025-26_SPRING", "SBM", 2, "employment", 8),
+    ("2025-26_SPRING", "SBM", 3, "entrepreneurship", 6),
+    ("2025-26_SPRING", "SSCI", 1, "exploration", 7),
+    ("2025-26_SPRING", "SHSS", 2, "personal_interest", 7),
+    ("2025-26_SPRING", "AIS", 3, "entrepreneurship", 6),
+    ("2025-26_SPRING", "FYTGS", 4, "academia", 2),      # 薄格：抑制
     # ── 2026-27_FALL（当前期）──
-    ("2026-27_FALL", "ENGG", 2, "employment", 12),
-    ("2026-27_FALL", "ENGG", 3, "academia", 8),
-    ("2026-27_FALL", "BUS", 2, "employment", 9),
-    ("2026-27_FALL", "BUS", 3, "entrepreneurship", 6),
-    ("2026-27_FALL", "SCI", 1, "exploration", 8),
-    ("2026-27_FALL", "SCI", 4, "academia", 4),          # 薄格：抑制
+    ("2026-27_FALL", "SENG", 2, "employment", 12),
+    ("2026-27_FALL", "SENG", 3, "academia", 8),
+    ("2026-27_FALL", "SBM", 2, "employment", 9),
+    ("2026-27_FALL", "SBM", 3, "entrepreneurship", 6),
+    ("2026-27_FALL", "SSCI", 1, "exploration", 8),
+    ("2026-27_FALL", "SHSS", 2, "personal_interest", 8),
+    ("2026-27_FALL", "AIS", 3, "entrepreneurship", 6),
+    ("2026-27_FALL", "FYTGS", 4, "academia", 4),        # 薄格：抑制
 )
 
 #: 每期的基线发现率与行动率。逐期小幅抬升，让趋势读得出方向。

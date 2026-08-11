@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRole } from "@/app/providers";
 import { useI18n, localized, pickLang } from "@/i18n";
 import { api, institution, type ModerationDecision } from "@/lib/api";
@@ -67,13 +66,27 @@ export default function ConsolePage() {
       .catch(() => {});   // 404 = 还没跑过，静默
     return () => { stop = true; };
   }, [role]);
+  // 巡检期间**边跑边刷**列表（2026-08-11 用户报障）。
+  //
+  // 原本只在 `job.state !== "running"` 时才 `sources.reload()`。真实抓取
+  // 每个源要几秒、同域名还有礼貌间隔，85 个源跑完是分钟级——这段时间里
+  // 状态灯与「最近核查」全停在旧值，看起来就是「按了没反应」。
+  // 服务端其实每抓完一个就写进去了，是前端没去取。
+  // **一有推进就刷**：93 行的 GET 很便宜，而「按了有反应」值这个钱。
+  const reloadedAt = useRef(0);
   useEffect(() => {
     if (sweep?.state !== "running") return;
     const timer = setInterval(async () => {
       try {
         const job = await institution.sourcesSweepStatus();
         setSweep(job);
-        if (job.state !== "running") sources.reload();
+        if (job.state !== "running") {
+          reloadedAt.current = 0;
+          sources.reload();
+        } else if (job.done > reloadedAt.current) {
+          reloadedAt.current = job.done;
+          sources.reload();
+        }
       } catch { /* 保持上一次状态 */ }
     }, 2000);
     return () => clearInterval(timer);
@@ -363,23 +376,9 @@ export default function ConsolePage() {
         </div>
       </Card>
 
-      {/* ── 聚合洞察搬去 /insights（2026-08-11 用户裁定，兑现 P0 计划第 3 条）──
-          这里原本有两张极简聚合卡，读的是**同一个无参 `resourceCoverage()`**
-          与**同一个 `eventQuality()`**，却只渲染三项比率里的一项、五个维度里的零个。
-          严格的子集重复没有价值；更糟的是样本不足时它渲染 `"—"`，
-          而 `/insights` 明令那种情况必须写 `Insufficient evidence`——
-          同一个数字在两页遵守不同的诚实规则，比重复危险。
-          控制台从此只管运维：源注册表 + 健康度 + 隔离探针。 */}
-      <Card className="mb-5" data-insights-link-card>
-        <SectionTitle>{t("console.insights.title")}</SectionTitle>
-        <p className="t-meta mb-3 max-w-[70ch] text-fg-muted">
-          {t("console.insights.lead")}
-        </p>
-        <Link href="/insights" data-insights-link
-              className="pressable btn btn-secondary t-meta">
-          {t("console.insights.cta")} →
-        </Link>
-      </Card>
+      {/* 聚合洞察在 /insights（2026-08-11 用户裁定：这里连跳转卡也不放——
+          左侧导航已经直达，多一张卡只是重复一次导航）。
+          控制台只管运维：源注册表 + 健康度 + 隔离探针。 */}
 
       {/* ── 隔离探针：主动去撞墙，把状态码摆出来 ─────────── */}
       <Card>

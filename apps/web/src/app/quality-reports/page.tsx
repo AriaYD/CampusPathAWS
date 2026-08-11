@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRole } from "@/app/providers";
 import { useI18n, localized } from "@/i18n";
 import { institution, type Schemas } from "@/lib/api";
+import { InsightReport } from "@/components/insight-report";
 import {
   Bar, Card, Empty, Loading, Metric, PageHeader, SectionTitle, Segmented,
 } from "@/components/ui";
@@ -226,6 +227,11 @@ export default function QualityReportsPage() {
           )}
         </>
       )}
+
+      {/* 2026-08-11 用户裁定：资源效能的数据分析与可视化并入本页——
+          周期反馈报告与资源效能报告本来就是同一件事的两半，
+          拆成两份会让人两边对不上。 */}
+      <InsightReport />
     </>
   );
 }

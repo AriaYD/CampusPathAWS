@@ -3369,7 +3369,9 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     # Agent（`make llm-free` 的四层扫描守住），这条分工不是风格问题。
 
     #: 专业 → 学院。与 seed 的映射同源；分组维度必须粗到无法反推个人。
-    _SCHOOL_OF_PROGRAM = {"BSC-COMP": "ENGG", "BENG-IEDA": "ENGG", "BBA-ISOM": "BUS"}
+    #: 专业 → HKUST 建制代码。与 seed 的 `_SCHOOLS` 同一套，别造第二份。
+    _SCHOOL_OF_PROGRAM = {"BSC-COMP": "SENG", "BENG-IEDA": "SENG",
+                          "BBA-ISOM": "SBM"}
 
     def _cohort_dims_of(profile) -> CohortDims:
         return CohortDims(
@@ -5905,8 +5907,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             raise HTTPException(404, {"error": "unknown_opportunity",
                                       "detail": f"未知机会 {form.subject_id}"})
         program = student.program_id.upper()
-        school = ("ENGG" if program.startswith("BENG")
-                  else "SCI" if program.startswith("BSC") else "BM")
+        school = ("SENG" if program.startswith(("BENG", "BSC"))
+                  else "SBM" if program.startswith("BBA") else "SSCI")
         modes = getattr(student, "development_modes", ())
         development_mode = (
             max(modes, key=lambda m: m.weight).mode if modes

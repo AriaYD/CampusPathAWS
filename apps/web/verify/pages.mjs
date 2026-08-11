@@ -83,9 +83,6 @@ export const PAGES = [
       "[data-unmet-by-school]",
       "[data-view='cohort']",
       "[data-view='conversion']",
-      // C：完整报告的入口必须在（展开态由专门探针验，门禁只认入口在场——
-      // 断言"展开后有什么"会让门禁依赖点击顺序，那是另一种脆）
-      "[data-report-toggle]",
       "[data-provenance-note]",
     ],
   },

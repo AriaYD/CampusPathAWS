@@ -467,7 +467,10 @@ MUTATIONS: tuple[Mutation, ...] = (
      lambda b: b.__setitem__(
          "metric_tuples",
          [r for r in b["metric_tuples"]
-          if not (r["cohort_dims"]["school"] == "SCI"
+          # 薄格子现在在 FYTGS/Y4（HKUST 建制扩到 5 学院 + 研究院之后）。
+          # 变异样例必须跟着数据走——它指着一个不存在的格子时，
+          # 检查器没被抓住看起来像检查器坏了，其实是样例过期了。
+          if not (r["cohort_dims"]["school"] == "FYTGS"
                   and r["cohort_dims"]["year_level"] == 4)]),
      "check_metric_tuple_cells_demonstrate_suppression"),
     ("出现真实邮箱形状",

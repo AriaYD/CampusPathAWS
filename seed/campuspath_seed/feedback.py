@@ -48,7 +48,8 @@ class FeedbackBundle:
     under_threshold_occurrences: list[str]
 
 
-_SCHOOLS = ("ENGG", "BUS", "SCI")
+#: HKUST 真实建制（5 学院 + 研究院）。见 metrics.py 的说明。
+_SCHOOLS = ("SENG", "SBM", "SSCI", "SHSS", "AIS", "FYTGS")
 _MODES = ("employment", "exploration", "academia", "entrepreneurship")
 
 
