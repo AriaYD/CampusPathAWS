@@ -55,6 +55,12 @@ a{color:var(--accent-deep)}
   font-size:13px; white-space:nowrap; transition:background .15s,color .15s;
 }
 .navlinks a:hover{background:var(--bg-sunk); color:var(--fg)}
+/* 当前分页面。导航现在是标签而不是锚点，"我在哪一页"必须一眼看得出
+   （ui-ux-pro-max §9 nav-state-active）。没有 JS 时全部页面都显示，
+   这时高亮第一项也不会误导——那页确实就在最上面。 */
+.navlinks a[aria-current="page"]{
+  background:var(--accent-soft); color:var(--accent-deep); font-weight:640;
+}
 .topbar-end{display:flex; align-items:center; gap:10px; flex:0 0 auto}
 .langsel{
   appearance:none; border:1px solid var(--line-strong); background:var(--bg-card);
@@ -202,9 +208,13 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 
 /* ── 窄屏 ── */
 @media (max-width:1120px){
-  .navlinks{display:none}
+  /* 导航**不能再隐藏**：它从"页内锚点"变成了"分页面标签"，藏起来等于
+     手机上除了第一页哪都去不了。改成折到第二行的可横滚标签条，
+     顶栏因此改为自适应高度。 */
+  .topbar{height:auto; min-height:var(--nav-h)}
+  .topbar .wrap{flex-wrap:wrap; gap:10px; padding-block:8px; row-gap:4px}
+  .navlinks{order:3; width:100%; margin-inline:0; padding-bottom:2px}
   .brand-sub{display:none}
-  .topbar .wrap{gap:10px}
   .topbar-end{margin-inline-start:auto}
 }
 @media (max-width:640px){
@@ -225,7 +235,14 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
   .copy{min-width:44px; min-height:44px}
   .navlinks a{min-height:44px; display:flex; align-items:center}
 }
-@media print{.topbar{display:none} .section{break-inside:avoid}}
+/* 打印与「没有 JS」这两种情况下，分页必须自己让开：
+   .view 默认就是显示的，是脚本给非当前页加上 hidden；打印时把它掀回来，
+   一份 PDF 仍然是完整的十章，不是当前那一页。 */
+@media print{
+  .topbar{display:none}
+  .section{break-inside:avoid}
+  .view[hidden]{display:block !important}
+}
 </style>
 </head>
 <body>
@@ -238,7 +255,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <span class="brand-sub" data-brand-sub>校园成长路径</span>
       </span>
     </a>
-    <div class="navlinks" data-navlinks><a href="#zh-Hans-what">做什么</a><a href="#zh-Hans-pain">痛点</a><a href="#zh-Hans-who">给谁用</a><a href="#zh-Hans-value">能得到什么</a><a href="#zh-Hans-memory">记忆</a><a href="#zh-Hans-how">怎么用</a><a href="#zh-Hans-tech">技术</a></div>
+    <div class="navlinks" data-navlinks><a href="#zh-Hans-what" data-view-link="zh-Hans-what" aria-current="page">做什么</a><a href="#zh-Hans-pain" data-view-link="zh-Hans-pain">痛点</a><a href="#zh-Hans-who" data-view-link="zh-Hans-who">给谁用</a><a href="#zh-Hans-value" data-view-link="zh-Hans-value">能得到什么</a><a href="#zh-Hans-memory" data-view-link="zh-Hans-memory">记忆</a><a href="#zh-Hans-how" data-view-link="zh-Hans-how">怎么用</a><a href="#zh-Hans-tech" data-view-link="zh-Hans-tech">技术</a></div>
     <div class="topbar-end">
       <select class="langsel" data-lang-select aria-label="Language">
         <option value="zh-Hans">简体中文</option>
@@ -257,28 +274,30 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 <main id="top">
 
     <div class="pane" data-lang-pane="zh-Hans" lang="zh-Hans">
-      <header class="hero">
-        <div class="wrap">
-          <p class="kicker">面向在校本科生 · 由大学部署</p>
-          <h1>一个目标 → 一条今天就能走的路，每一步都说得出为什么</h1>
-          <p class="hero-lead">以学生「你想成为谁」为中心的成长规划系统，与校方的资源效能分析构成双闭环：把目标拆成能力小目标，倒推成从今天到未来的每一步行动；学生的真实行动变成证据与记忆，再用这些新证据校准下一轮路径。而这些反馈同时回到学校，让资源投到真正缺的地方。</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
-               data-cta="hero">试用 CampusPath <span aria-hidden="true">→</span></a>
-            <span class="passcode" data-passcode>
-              <span class="passcode-label">体验口令</span>
-              <code>OceanMeetsTheSky!</code>
-              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
-                      aria-label="copy">⧉</button>
-            </span>
+
+      <div class="view" data-view="zh-Hans-what">
+        <header class="hero">
+          <div class="wrap">
+            <p class="kicker">面向在校本科生 · 由大学部署</p>
+            <h1>一个目标 → 一条今天就能走的路，每一步都说得出为什么</h1>
+            <p class="hero-lead">以学生「你想成为谁」为中心的成长规划系统，与校方的资源效能分析构成双闭环：把目标拆成能力小目标，倒推成从今天到未来的每一步行动；学生的真实行动变成证据与记忆，再用这些新证据校准下一轮路径。而这些反馈同时回到学校，让资源投到真正缺的地方。</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="hero">试用 CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">体验口令</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+            <dl class="stats">
+              <div><dt>1,534</dt><dd>门真实抓取的课程</dd></div>
+              <div><dt>93</dt><dd>个信息源（85 个真实抓取）</dd></div>
+              <div><dt>13/13</dt><dd>条评测红线通过</dd></div>
+            </dl>
           </div>
-          <dl class="stats">
-            <div><dt>1,534</dt><dd>门真实抓取的课程</dd></div>
-            <div><dt>93</dt><dd>个信息源（85 个真实抓取）</dd></div>
-            <div><dt>13/13</dt><dd>条评测红线通过</dd></div>
-          </dl>
-        </div>
-      </header>
+        </header>
 
       <section id="zh-Hans-what" class="section">
         <div class="wrap">
@@ -303,6 +322,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hans-pain">
 
       <section id="zh-Hans-pain" class="section">
         <div class="wrap">
@@ -319,6 +341,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">还有一件更隐蔽的事：活动宣传通常只说「有什么」，很少说「适合谁、能补什么差距、时间投入值不值」；而学生做完之后的真实体验，几乎从不回到下一轮推荐和学校的资源改进里。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hans-who">
 
       <section id="zh-Hans-who" class="section">
         <div class="wrap">
@@ -356,6 +381,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">国际身份、经济条件、照护责任、健康与精力、通勤、语言、无障碍需求不是「第六类人」，而是每一种发展模式都必须尊重的个人约束——通过可插拔的 Context Pack 注入已有流程，不复制一套新 Agent。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hans-value">
 
       <section id="zh-Hans-value" class="section">
         <div class="wrap">
@@ -391,6 +419,24 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
       </section>
 
+      <section id="zh-Hans-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">和市面上的产品有什么不同</p>
+          <h2>别人给你一段回复，我们给你一条路径</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>产品类型</th><th>它们的重心</th><th>CampusPath 的区别</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>职业身份、网络、职位与内容</td><td>连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动</td></tr><tr><td class="first">Handshake</td><td>大学生职位、实习、雇主、招聘活动</td><td>不止展示机会，还把课程、研究、比赛、社团和实习组合成有依赖关系的动态能力路径</td></tr><tr><td class="first">职业测评产品</td><td>兴趣、价值观、职业匹配</td><td>测评只是输入：系统通过真实实践持续验证，而不是一次测完就定型</td></tr><tr><td class="first">简历 / 面试工具</td><td>简历反馈、面试学习与模拟</td><td>覆盖进入申请阶段之前数月或数年的能力建设与证据积累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>对话建议、简历与职业问答</td><td>有真实来源、资格状态、工具调用、长期记忆、时间约束、行动闭环和可量化评测</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">最短的一句话：别人给你一段回复，我们给你一条能落实到每日日历、能追溯来源、会随你变化滚动更新的路径，并且把结果回流给学校。</p>
+        </div>
+      </section>
+      </div>
+
+      <div class="view" data-view="zh-Hans-memory">
+
       <section id="zh-Hans-memory" class="section">
         <div class="wrap">
           <p class="kicker">越用越懂你</p>
@@ -423,21 +469,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">关键设计：个人不适配与全局低质是分开的。「太基础」「太难」走个人契合标签，只调整你自己的推荐难度，不惩罚这个活动；「宣传夸大、内容空泛」达到样本阈值后才降低该届次的置信度并进入复核。</p>
         </div>
       </section>
+      </div>
 
-      <section id="zh-Hans-compare" class="section">
-        <div class="wrap">
-          <p class="kicker">和市面上的产品有什么不同</p>
-          <h2>别人给你一段回复，我们给你一条路径</h2>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>产品类型</th><th>它们的重心</th><th>CampusPath 的区别</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>职业身份、网络、职位与内容</td><td>连接课程、先修、校内资源、学生负荷与长期成长路径：把机会变成校园行动</td></tr><tr><td class="first">Handshake</td><td>大学生职位、实习、雇主、招聘活动</td><td>不止展示机会，还把课程、研究、比赛、社团和实习组合成有依赖关系的动态能力路径</td></tr><tr><td class="first">职业测评产品</td><td>兴趣、价值观、职业匹配</td><td>测评只是输入：系统通过真实实践持续验证，而不是一次测完就定型</td></tr><tr><td class="first">简历 / 面试工具</td><td>简历反馈、面试学习与模拟</td><td>覆盖进入申请阶段之前数月或数年的能力建设与证据积累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>对话建议、简历与职业问答</td><td>有真实来源、资格状态、工具调用、长期记忆、时间约束、行动闭环和可量化评测</td></tr></tbody>
-          </table>
-        </div>
-        <p class="note">最短的一句话：别人给你一段回复，我们给你一条能落实到每日日历、能追溯来源、会随你变化滚动更新的路径，并且把结果回流给学校。</p>
-        </div>
-      </section>
+      <div class="view" data-view="zh-Hans-how">
 
       <section id="zh-Hans-how" class="section">
         <div class="wrap">
@@ -505,6 +539,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">闭环合上了：学生精准找到匹配目标的活动 → 参加 → 写反思 → 沉淀成证据推动下一轮规划；而这些反馈同时回到学校，让学校看到真实需求与趋势变化，据此补缺口、给高质量活动倾斜资源。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hans-tech">
 
       <section id="zh-Hans-tech" class="section">
         <div class="wrap">
@@ -587,6 +624,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">判定类指标要求双跑逐字节一致，且 Gold Label 与引擎故意分开实现——用同一份代码生成标签又用它评测，等于自己给自己打分。学生、成绩、日历、机会与投稿数据一律为合成数据，页面全站标注 Synthetic / Demo Data；已核实为真实公开来源的条目另有「官方」标记，两者不混。</p>
         </div>
       </section>
+      </div>
 
       <section class="cta-band">
         <div class="wrap">
@@ -620,28 +658,30 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
     </div>
 
     <div class="pane" data-lang-pane="zh-Hant" lang="zh-Hant" hidden>
-      <header class="hero">
-        <div class="wrap">
-          <p class="kicker">面向在校本科生 · 由大學部署</p>
-          <h1>一個目標 → 一條今天就能走的路，每一步都説得出為什麼</h1>
-          <p class="hero-lead">以學生「你想成為誰」為中心的成長規劃系統，與校方的資源效能分析構成雙閉環：把目標拆成能力小目標，倒推成從今天到未來的每一步行動；學生的真實行動變成證據與記憶，再用這些新證據校準下一輪路徑。而這些反饋同時回到學校，讓資源投到真正缺的地方。</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
-               data-cta="hero">試用 CampusPath <span aria-hidden="true">→</span></a>
-            <span class="passcode" data-passcode>
-              <span class="passcode-label">體驗口令</span>
-              <code>OceanMeetsTheSky!</code>
-              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
-                      aria-label="copy">⧉</button>
-            </span>
+
+      <div class="view" data-view="zh-Hant-what">
+        <header class="hero">
+          <div class="wrap">
+            <p class="kicker">面向在校本科生 · 由大學部署</p>
+            <h1>一個目標 → 一條今天就能走的路，每一步都説得出為什麼</h1>
+            <p class="hero-lead">以學生「你想成為誰」為中心的成長規劃系統，與校方的資源效能分析構成雙閉環：把目標拆成能力小目標，倒推成從今天到未來的每一步行動；學生的真實行動變成證據與記憶，再用這些新證據校準下一輪路徑。而這些反饋同時回到學校，讓資源投到真正缺的地方。</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="hero">試用 CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">體驗口令</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+            <dl class="stats">
+              <div><dt>1,534</dt><dd>門真實抓取的課程</dd></div>
+              <div><dt>93</dt><dd>個信息源（85 個真實抓取）</dd></div>
+              <div><dt>13/13</dt><dd>條評測紅線通過</dd></div>
+            </dl>
           </div>
-          <dl class="stats">
-            <div><dt>1,534</dt><dd>門真實抓取的課程</dd></div>
-            <div><dt>93</dt><dd>個信息源（85 個真實抓取）</dd></div>
-            <div><dt>13/13</dt><dd>條評測紅線通過</dd></div>
-          </dl>
-        </div>
-      </header>
+        </header>
 
       <section id="zh-Hant-what" class="section">
         <div class="wrap">
@@ -666,6 +706,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hant-pain">
 
       <section id="zh-Hant-pain" class="section">
         <div class="wrap">
@@ -682,6 +725,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">還有一件更隱蔽的事：活動宣傳通常只説「有什麼」，很少説「適合誰、能補什麼差距、時間投入值不值」；而學生做完之後的真實體驗，幾乎從不回到下一輪推薦和學校的資源改進裏。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hant-who">
 
       <section id="zh-Hant-who" class="section">
         <div class="wrap">
@@ -719,6 +765,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">國際身份、經濟條件、照護責任、健康與精力、通勤、語言、無障礙需求不是「第六類人」，而是每一種發展模式都必須尊重的個人約束——通過可插拔的 Context Pack 注入已有流程，不復制一套新 Agent。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hant-value">
 
       <section id="zh-Hant-value" class="section">
         <div class="wrap">
@@ -754,6 +803,24 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
       </section>
 
+      <section id="zh-Hant-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">和市面上的產品有什麼不同</p>
+          <h2>別人給你一段回覆，我們給你一條路徑</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>產品類型</th><th>它們的重心</th><th>CampusPath 的區別</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>職業身份、網絡、職位與內容</td><td>連接課程、先修、校內資源、學生負荷與長期成長路徑：把機會變成校園行動</td></tr><tr><td class="first">Handshake</td><td>大學生職位、實習、僱主、招聘活動</td><td>不止展示機會，還把課程、研究、比賽、社團和實習組合成有依賴關係的動態能力路徑</td></tr><tr><td class="first">職業測評產品</td><td>興趣、價值觀、職業匹配</td><td>測評只是輸入：系統通過真實實踐持續驗證，而不是一次測完就定型</td></tr><tr><td class="first">簡歷 / 面試工具</td><td>簡歷反饋、面試學習與模擬</td><td>覆蓋進入申請階段之前數月或數年的能力建設與證據積累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>對話建議、簡歷與職業問答</td><td>有真實來源、資格狀態、工具調用、長期記憶、時間約束、行動閉環和可量化評測</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">最短的一句話：別人給你一段回覆，我們給你一條能落實到每日日曆、能追溯來源、會隨你變化滾動更新的路徑，並且把結果迴流給學校。</p>
+        </div>
+      </section>
+      </div>
+
+      <div class="view" data-view="zh-Hant-memory">
+
       <section id="zh-Hant-memory" class="section">
         <div class="wrap">
           <p class="kicker">越用越懂你</p>
@@ -786,21 +853,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">關鍵設計：個人不適配與全局低質是分開的。「太基礎」「太難」走個人契合標籤，只調整你自己的推薦難度，不懲罰這個活動；「宣傳誇大、內容空泛」達到樣本閾值後才降低該屆次的置信度並進入複核。</p>
         </div>
       </section>
+      </div>
 
-      <section id="zh-Hant-compare" class="section">
-        <div class="wrap">
-          <p class="kicker">和市面上的產品有什麼不同</p>
-          <h2>別人給你一段回覆，我們給你一條路徑</h2>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>產品類型</th><th>它們的重心</th><th>CampusPath 的區別</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>職業身份、網絡、職位與內容</td><td>連接課程、先修、校內資源、學生負荷與長期成長路徑：把機會變成校園行動</td></tr><tr><td class="first">Handshake</td><td>大學生職位、實習、僱主、招聘活動</td><td>不止展示機會，還把課程、研究、比賽、社團和實習組合成有依賴關係的動態能力路徑</td></tr><tr><td class="first">職業測評產品</td><td>興趣、價值觀、職業匹配</td><td>測評只是輸入：系統通過真實實踐持續驗證，而不是一次測完就定型</td></tr><tr><td class="first">簡歷 / 面試工具</td><td>簡歷反饋、面試學習與模擬</td><td>覆蓋進入申請階段之前數月或數年的能力建設與證據積累</td></tr><tr><td class="first">通用 AI Career Coach</td><td>對話建議、簡歷與職業問答</td><td>有真實來源、資格狀態、工具調用、長期記憶、時間約束、行動閉環和可量化評測</td></tr></tbody>
-          </table>
-        </div>
-        <p class="note">最短的一句話：別人給你一段回覆，我們給你一條能落實到每日日曆、能追溯來源、會隨你變化滾動更新的路徑，並且把結果迴流給學校。</p>
-        </div>
-      </section>
+      <div class="view" data-view="zh-Hant-how">
 
       <section id="zh-Hant-how" class="section">
         <div class="wrap">
@@ -868,6 +923,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">閉環合上了：學生精準找到匹配目標的活動 → 參加 → 寫反思 → 沉澱成證據推動下一輪規劃；而這些反饋同時回到學校，讓學校看到真實需求與趨勢變化，據此補缺口、給高質量活動傾斜資源。</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="zh-Hant-tech">
 
       <section id="zh-Hant-tech" class="section">
         <div class="wrap">
@@ -950,6 +1008,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">判定類指標要求雙跑逐字節一致，且 Gold Label 與引擎故意分開實現——用同一份代碼生成標籤又用它評測，等於自己給自己打分。學生、成績、日曆、機會與投稿數據一律為合成數據，頁面全站標註 Synthetic / Demo Data；已核實為真實公開來源的條目另有「官方」標記，兩者不混。</p>
         </div>
       </section>
+      </div>
 
       <section class="cta-band">
         <div class="wrap">
@@ -983,28 +1042,30 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
     </div>
 
     <div class="pane" data-lang-pane="en" lang="en" hidden>
-      <header class="hero">
-        <div class="wrap">
-          <p class="kicker">For undergraduates · deployed by the university</p>
-          <h1>One goal → a path you can start walking today, and every step says why</h1>
-          <p class="hero-lead">A growth-planning system built around the student's own question — who do you want to become — closed on the other side by the university's view of how well its resources actually land. Goals become capability gaps, gaps become steps on a real calendar, actions become evidence, and that evidence recalibrates the next round. The same feedback flows back to the school, so resources go where the gaps really are.</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
-               data-cta="hero">Try CampusPath <span aria-hidden="true">→</span></a>
-            <span class="passcode" data-passcode>
-              <span class="passcode-label">Demo passcode</span>
-              <code>OceanMeetsTheSky!</code>
-              <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
-                      aria-label="copy">⧉</button>
-            </span>
+
+      <div class="view" data-view="en-what">
+        <header class="hero">
+          <div class="wrap">
+            <p class="kicker">For undergraduates · deployed by the university</p>
+            <h1>One goal → a path you can start walking today, and every step says why</h1>
+            <p class="hero-lead">A growth-planning system built around the student's own question — who do you want to become — closed on the other side by the university's view of how well its resources actually land. Goals become capability gaps, gaps become steps on a real calendar, actions become evidence, and that evidence recalibrates the next round. The same feedback flows back to the school, so resources go where the gaps really are.</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="https://campuspath-web-786160486093.asia-east2.run.app" target="_blank" rel="noopener"
+                 data-cta="hero">Try CampusPath <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">Demo passcode</span>
+                <code>OceanMeetsTheSky!</code>
+                <button type="button" class="copy" data-copy="OceanMeetsTheSky!"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+            <dl class="stats">
+              <div><dt>1,534</dt><dd>real courses, scraped</dd></div>
+              <div><dt>93</dt><dd>registered sources (85 real)</dd></div>
+              <div><dt>13/13</dt><dd>blocker checks passing</dd></div>
+            </dl>
           </div>
-          <dl class="stats">
-            <div><dt>1,534</dt><dd>real courses, scraped</dd></div>
-            <div><dt>93</dt><dd>registered sources (85 real)</dd></div>
-            <div><dt>13/13</dt><dd>blocker checks passing</dd></div>
-          </dl>
-        </div>
-      </header>
+        </header>
 
       <section id="en-what" class="section">
         <div class="wrap">
@@ -1029,6 +1090,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="en-pain">
 
       <section id="en-pain" class="section">
         <div class="wrap">
@@ -1045,6 +1109,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">And something subtler: event promotion says what an event is, rarely who it suits, which gap it closes, or whether the hours are worth it. Meanwhile what students actually experienced almost never returns to the next round of recommendations, or to the school's decisions about resources.</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="en-who">
 
       <section id="en-who" class="section">
         <div class="wrap">
@@ -1082,6 +1149,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">International status, finances, caregiving duties, health and energy, commuting, language and accessibility needs are not a sixth category of person. They are personal constraints every mode must respect — injected into existing flows through pluggable Context Packs, not by cloning a new agent.</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="en-value">
 
       <section id="en-value" class="section">
         <div class="wrap">
@@ -1117,6 +1187,24 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         </div>
       </section>
 
+      <section id="en-compare" class="section">
+        <div class="wrap">
+          <p class="kicker">How this is different</p>
+          <h2>Others hand you a reply; we hand you a path</h2>
+
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Product type</th><th>Their centre of gravity</th><th>Where CampusPath differs</th></tr></thead>
+            <tbody><tr><td class="first">LinkedIn</td><td>Professional identity, network, jobs and content</td><td>Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions</td></tr><tr><td class="first">Handshake</td><td>Student jobs, internships, employers, careers events</td><td>Doesn't stop at listing: composes courses, research, competitions, societies and internships into a dependency-aware capability path</td></tr><tr><td class="first">Career assessments</td><td>Interests, values, occupational fit</td><td>The assessment is only an input — the system keeps validating it through real practice instead of fixing you in place after one test</td></tr><tr><td class="first">Résumé / interview tools</td><td>Résumé feedback, interview prep and mock rounds</td><td>Covers the months or years of capability building and evidence gathering before the application stage</td></tr><tr><td class="first">General AI career coaches</td><td>Conversational advice, résumé and career Q&amp;A</td><td>Real sources, eligibility states, tool calls, long-term memory, time constraints, an action loop and measurable evaluation</td></tr></tbody>
+          </table>
+        </div>
+        <p class="note">The short version: others give you a reply. We give you a path that lands on your calendar, traces back to its sources, keeps updating as you change, and returns its results to the school.</p>
+        </div>
+      </section>
+      </div>
+
+      <div class="view" data-view="en-memory">
+
       <section id="en-memory" class="section">
         <div class="wrap">
           <p class="kicker">It learns you</p>
@@ -1149,21 +1237,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">A deliberate split: personal mismatch and genuine low quality are separate. &quot;Too basic&quot; and &quot;too hard&quot; become a personal fit tag that adjusts your own difficulty and does not penalise the event. &quot;Overstated, thin content&quot; only lowers that occurrence's confidence once it clears a sample threshold, and then it goes to review.</p>
         </div>
       </section>
+      </div>
 
-      <section id="en-compare" class="section">
-        <div class="wrap">
-          <p class="kicker">How this is different</p>
-          <h2>Others hand you a reply; we hand you a path</h2>
-
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>Product type</th><th>Their centre of gravity</th><th>Where CampusPath differs</th></tr></thead>
-            <tbody><tr><td class="first">LinkedIn</td><td>Professional identity, network, jobs and content</td><td>Connects courses, prerequisites, campus resources and student load into a long-range path: opportunities become campus actions</td></tr><tr><td class="first">Handshake</td><td>Student jobs, internships, employers, careers events</td><td>Doesn't stop at listing: composes courses, research, competitions, societies and internships into a dependency-aware capability path</td></tr><tr><td class="first">Career assessments</td><td>Interests, values, occupational fit</td><td>The assessment is only an input — the system keeps validating it through real practice instead of fixing you in place after one test</td></tr><tr><td class="first">Résumé / interview tools</td><td>Résumé feedback, interview prep and mock rounds</td><td>Covers the months or years of capability building and evidence gathering before the application stage</td></tr><tr><td class="first">General AI career coaches</td><td>Conversational advice, résumé and career Q&amp;A</td><td>Real sources, eligibility states, tool calls, long-term memory, time constraints, an action loop and measurable evaluation</td></tr></tbody>
-          </table>
-        </div>
-        <p class="note">The short version: others give you a reply. We give you a path that lands on your calendar, traces back to its sources, keeps updating as you change, and returns its results to the school.</p>
-        </div>
-      </section>
+      <div class="view" data-view="en-how">
 
       <section id="en-how" class="section">
         <div class="wrap">
@@ -1231,6 +1307,9 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">The loop closes: a student finds work that matches their goal, does it, reflects, and that evidence drives the next round of planning — while the same feedback reaches the school, showing real demand and shifting trends so it can fill gaps and back what works.</p>
         </div>
       </section>
+      </div>
+
+      <div class="view" data-view="en-tech">
 
       <section id="en-tech" class="section">
         <div class="wrap">
@@ -1313,6 +1392,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <p class="note">Judgement metrics must produce byte-identical results across two runs, and the gold labels are implemented separately from the engine on purpose — generating labels with the same code you evaluate with is marking your own homework. Student, grade, calendar, opportunity and submission data are all synthetic, and every page is marked Synthetic / Demo Data; entries verified as real public sources carry an Official marker instead.</p>
         </div>
       </section>
+      </div>
 
       <section class="cta-band">
         <div class="wrap">
@@ -1354,21 +1434,68 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
   var links = document.querySelector("[data-navlinks]");
   var ctaLabel = document.querySelector("[data-cta-label]");
   var sub = document.querySelector("[data-brand-sub]");
+  var current = { code: "zh-Hans", view: NAV["zh-Hans"].nav[0][0] };
+
+  /** 显示某个分页面：只在**当前语言**的面板里切，其余语言整块本来就 hidden。
+   *  语言切换时按同一个 view id 复位，读者不会因为换语言被丢回第一页。 */
+  function showView(viewId, scroll) {
+    current.view = viewId;
+    document.querySelectorAll("[data-view]").forEach(function (v) {
+      v.hidden = v.getAttribute("data-view") !== current.code + "-" + viewId;
+    });
+    links.querySelectorAll("a").forEach(function (a) {
+      if (a.getAttribute("data-view-link") === current.code + "-" + viewId) {
+        a.setAttribute("aria-current", "page");
+      } else {
+        a.removeAttribute("aria-current");
+      }
+    });
+    if (scroll) window.scrollTo(0, 0);
+  }
 
   function apply(code) {
     if (!NAV[code]) code = "zh-Hans";
+    current.code = code;
     document.querySelectorAll("[data-lang-pane]").forEach(function (p) {
       p.hidden = p.getAttribute("data-lang-pane") !== code;
     });
     document.documentElement.lang = NAV[code].lang;
     links.innerHTML = NAV[code].nav.map(function (n) {
-      return '<a href="#' + code + "-" + n[0] + '">' + n[1] + "</a>";
+      return '<a href="#' + code + "-" + n[0] + '" data-view-link="'
+        + code + "-" + n[0] + '">' + n[1] + "</a>";
     }).join("");
     ctaLabel.querySelector("[data-cta-full]").textContent = NAV[code].cta;
     ctaLabel.querySelector("[data-cta-short]").textContent = NAV[code].short;
     sub.textContent = NAV[code].sub;
     sel.value = code;
+    // 换语言不改当前在看哪一页；那一页在新语言里若不存在（不会发生，
+    // 三份 nav 同构）则回到第一页
+    var ids = NAV[code].nav.map(function (n) { return n[0]; });
+    showView(ids.indexOf(current.view) >= 0 ? current.view : ids[0], false);
     try { localStorage.setItem(KEY, code); } catch (e) {}
+  }
+
+  /** 导航点击 = 换页，不是页内滚动。hash 仍然写进去，所以链接可以直接分享
+   *  到某一页；#zh-Hans-compare 这类**藏在某页里的章节 id** 也认，
+   *  它会打开包含它的那一页。 */
+  function viewOfHash(hash) {
+    var h = (hash || "").replace(/^#/, "");
+    if (!h) return null;
+    var box = null;
+    var all = document.querySelectorAll("[data-view]");
+    for (var i = 0; i < all.length && !box; i++) {
+      if (all[i].getAttribute("data-view") === h) box = all[i];
+    }
+    if (!box) {
+      var sec = document.getElementById(h);
+      box = sec && sec.closest ? sec.closest("[data-view]") : null;
+    }
+    if (!box) return null;
+    // 前缀是语言码，而 "zh-Hans" 自己带连字符——**不能按 "-" 切**，
+    // 只能按已知的语言码长度裁。（第一版就是这么错的。）
+    var paneEl = box.closest("[data-lang-pane]");
+    var code = paneEl ? paneEl.getAttribute("data-lang-pane") : current.code;
+    return box.getAttribute("data-view").slice(code.length + 1);
   }
 
   var stored = null;
@@ -1381,7 +1508,33 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
       : (l.indexOf("zh") === -1 && l ? "en" : "zh-Hans");
   }
   apply(stored);
+  // 进来时如果 URL 带 hash，直接开到那一页（分享链接能落到具体一页）
+  var fromHash = viewOfHash(location.hash);
+  if (fromHash) showView(fromHash, false);
   sel.addEventListener("change", function () { apply(sel.value); });
+
+  // 导航 = 换页。用委托绑在容器上——apply() 会重建这几个 a，
+  // 逐个绑事件会在换一次语言后全部失效。
+  links.addEventListener("click", function (e) {
+    var a = e.target.closest("[data-view-link]");
+    if (!a) return;
+    e.preventDefault();
+    var id = a.getAttribute("data-view-link");
+    showView(id.slice(current.code.length + 1), true);
+    if (history.replaceState) history.replaceState(null, "", "#" + id);
+    else location.hash = id;
+  });
+  // 浏览器前进/后退
+  window.addEventListener("hashchange", function () {
+    var v = viewOfHash(location.hash);
+    if (v) showView(v, true);
+  });
+  // 站标回到第一页
+  var brand = document.querySelector(".brand");
+  if (brand) brand.addEventListener("click", function (e) {
+    e.preventDefault();
+    showView(NAV[current.code].nav[0][0], true);
+  });
 
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-copy]");

@@ -98,32 +98,90 @@ ${paras(s.body)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${callout(s.c
         </div>
       </section>`;
 
-/** 一份语言的完整 <div lang>。三份同时在 DOM 里，切换只改 hidden——
- *  这样锚点导航、Ctrl+F 与打印都不依赖 JS 先跑一遍。 */
-const pane = (code, d) => `
+/**
+ * 顶栏与两处 CTA 的链接属性。
+ *
+ * **两份产物走两种链接**（2026-08-11 用户裁定）：
+ * · `standalone` —— docs/ 与 Artifact 那两份，可能被离线双击打开、也可能挂在
+ *   别的域名上，所以必须是**绝对地址 + 新标签页**；相对路径在 `file://` 下直接失效。
+ * · `site` —— 随 web app 一起部署的那一份（同一个 Cloud Run 服务、同一个域名），
+ *   宣传页与产品本来就是一个站，跳自己家的 `/login` 用**同标签页相对路径**：
+ *   不新开标签、不写死域名（换自定义域名时不用重新生成）。
+ */
+const ctaLink = (mode) => mode === "site"
+  ? 'href="/login"'
+  : `href="${APP_URL}" target="_blank" rel="noopener"`;
+
+/**
+ * 导航七项 → 各自的分页面装哪些章节。
+ *
+ * 用户 2026-08-11 裁定：导航要**切分页面**，不是在同一张长页上来回跳。
+ * 十个章节里有三个不在导航上，必须各自有归宿——**内容一条都不许因为
+ * 改成分页而丢掉**：
+ * · `compare`（与竞品对比）跟着「能得到什么」——两者回答的是同一个问题的正反面；
+ * · `control`（谁说了算）与 `numbers`（数字与还没做的）跟着「技术」——
+ *   红线与"不宣称没有基线的事"都是"这东西是怎么造的"的一部分。
+ */
+const VIEW_GROUPS = {
+  what: ["what"],
+  pain: ["pain"],
+  who: ["who"],
+  value: ["value", "compare"],
+  memory: ["memory"],
+  how: ["how"],
+  tech: ["tech", "control", "numbers"],
+};
+
+/** 一份语言的完整 <div lang>。三份同时在 DOM 里，切换只改 hidden。
+ *
+ *  分页面同理：**十个章节全部留在 DOM 里**，切换只改 `hidden`。
+ *  这样没有 JS 时整页照旧是一张长页（渐进增强），Ctrl+F 与打印也仍然
+ *  搜得到、印得全——把内容真的删掉才是不可接受的那一种"分页"。 */
+const pane = (code, d, mode) => {
+  const byId = Object.fromEntries(d.sections.map((s) => [s.id, s]));
+  // 导航之外的章节若漏了归宿，构建期当场报错——不许静默丢内容
+  const placed = new Set(Object.values(VIEW_GROUPS).flat());
+  const orphans = d.sections.map((s) => s.id).filter((id) => !placed.has(id));
+  if (orphans.length) {
+    throw new Error(`章节没有归宿，会在分页模式下消失：${orphans.join(", ")}`
+      + "——把它加进 VIEW_GROUPS 或加进 nav");
+  }
+
+  // Hero 只属于**第一个分页面**。它是这一页的开场白，跟着每个标签重复出现
+  // 就不再是开场白了；而常驻的 CTA 与口令仍由顶栏和底部 CTA 带栏承担，
+  // 所以切到任何一页都还找得到入口。
+  const hero = `
+        <header class="hero">
+          <div class="wrap">
+            <p class="kicker">${esc(d.hero.kicker)}</p>
+            <h1>${esc(d.hero.title)}</h1>
+            <p class="hero-lead">${esc(d.hero.lead)}</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" ${ctaLink(mode)}
+                 data-cta="hero">${esc(d.cta)} <span aria-hidden="true">→</span></a>
+              <span class="passcode" data-passcode>
+                <span class="passcode-label">${esc(d.ctaHint)}</span>
+                <code>${esc(PASSCODE)}</code>
+                <button type="button" class="copy" data-copy="${esc(PASSCODE)}"
+                        aria-label="copy">⧉</button>
+              </span>
+            </div>
+            <dl class="stats">${d.hero.stats.map(([n, label]) => `
+              <div><dt>${esc(n)}</dt><dd>${esc(label)}</dd></div>`).join("")}
+            </dl>
+          </div>
+        </header>`;
+
+  const views = d.nav.map(([navId], i) => `
+      <div class="view" data-view="${code}-${navId}">${i === 0 ? hero : ""}
+${(VIEW_GROUPS[navId] ?? [navId]).filter((id) => byId[id])
+  .map((id) => section(code)(byId[id])).join("\n")}
+      </div>`).join("\n");
+
+  return `
     <div class="pane" data-lang-pane="${code}" lang="${d.htmlLang}"${
       code === "zh-Hans" ? "" : " hidden"}>
-      <header class="hero">
-        <div class="wrap">
-          <p class="kicker">${esc(d.hero.kicker)}</p>
-          <h1>${esc(d.hero.title)}</h1>
-          <p class="hero-lead">${esc(d.hero.lead)}</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="${APP_URL}" target="_blank" rel="noopener"
-               data-cta="hero">${esc(d.cta)} <span aria-hidden="true">→</span></a>
-            <span class="passcode" data-passcode>
-              <span class="passcode-label">${esc(d.ctaHint)}</span>
-              <code>${esc(PASSCODE)}</code>
-              <button type="button" class="copy" data-copy="${esc(PASSCODE)}"
-                      aria-label="copy">⧉</button>
-            </span>
-          </div>
-          <dl class="stats">${d.hero.stats.map(([n, label]) => `
-            <div><dt>${esc(n)}</dt><dd>${esc(label)}</dd></div>`).join("")}
-          </dl>
-        </div>
-      </header>
-${d.sections.map(section(code)).join("\n")}
+${views}
 
       <section class="cta-band">
         <div class="wrap">
@@ -135,7 +193,7 @@ ${d.sections.map(section(code)).join("\n")}
               <p class="cta-note">${esc(d.ctaBand.note)}</p>
             </div>
             <div class="cta-act">
-              <a class="btn btn-primary" href="${APP_URL}" target="_blank" rel="noopener"
+              <a class="btn btn-primary" ${ctaLink(mode)}
                  data-cta="band">${esc(d.cta)} <span aria-hidden="true">→</span></a>
               <span class="passcode" data-passcode>
                 <span class="passcode-label">${esc(d.ctaHint)}</span>
@@ -155,6 +213,7 @@ ${d.sections.map(section(code)).join("\n")}
         </div>
       </footer>
     </div>`;
+};
 
 /* ------------------------------------------------------------------ */
 /* 页面                                                                */
@@ -162,10 +221,12 @@ ${d.sections.map(section(code)).join("\n")}
 
 /** 三个语言面板同时在 DOM 里，所以章节 id **必须**按语言加前缀——
  *  否则 `#how` 有三份，锚点会跳到当前隐藏的那个面板上（实测过，会跳错）。 */
-const navFor = (code, d) => d.nav.map(([id, label]) =>
-  `<a href="#${code}-${id}">${esc(label)}</a>`).join("");
+const navFor = (code, d) => d.nav.map(([id, label], i) =>
+  `<a href="#${code}-${id}" data-view-link="${code}-${id}"${
+    i === 0 ? ' aria-current="page"' : ""}>${esc(label)}</a>`).join("");
 
-const html = `<!doctype html>
+/** 整页。`mode` 决定 CTA 走绝对地址新标签页（standalone）还是站内相对路径（site）。 */
+const renderPage = (mode) => `<!doctype html>
 <html lang="zh-Hans" data-landing>
 <head>
 <meta charset="utf-8">
@@ -222,6 +283,12 @@ a{color:var(--accent-deep)}
   font-size:13px; white-space:nowrap; transition:background .15s,color .15s;
 }
 .navlinks a:hover{background:var(--bg-sunk); color:var(--fg)}
+/* 当前分页面。导航现在是标签而不是锚点，"我在哪一页"必须一眼看得出
+   （ui-ux-pro-max §9 nav-state-active）。没有 JS 时全部页面都显示，
+   这时高亮第一项也不会误导——那页确实就在最上面。 */
+.navlinks a[aria-current="page"]{
+  background:var(--accent-soft); color:var(--accent-deep); font-weight:640;
+}
 .topbar-end{display:flex; align-items:center; gap:10px; flex:0 0 auto}
 .langsel{
   appearance:none; border:1px solid var(--line-strong); background:var(--bg-card);
@@ -369,9 +436,13 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 
 /* ── 窄屏 ── */
 @media (max-width:1120px){
-  .navlinks{display:none}
+  /* 导航**不能再隐藏**：它从"页内锚点"变成了"分页面标签"，藏起来等于
+     手机上除了第一页哪都去不了。改成折到第二行的可横滚标签条，
+     顶栏因此改为自适应高度。 */
+  .topbar{height:auto; min-height:var(--nav-h)}
+  .topbar .wrap{flex-wrap:wrap; gap:10px; padding-block:8px; row-gap:4px}
+  .navlinks{order:3; width:100%; margin-inline:0; padding-bottom:2px}
   .brand-sub{display:none}
-  .topbar .wrap{gap:10px}
   .topbar-end{margin-inline-start:auto}
 }
 @media (max-width:640px){
@@ -392,7 +463,14 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
   .copy{min-width:44px; min-height:44px}
   .navlinks a{min-height:44px; display:flex; align-items:center}
 }
-@media print{.topbar{display:none} .section{break-inside:avoid}}
+/* 打印与「没有 JS」这两种情况下，分页必须自己让开：
+   .view 默认就是显示的，是脚本给非当前页加上 hidden；打印时把它掀回来，
+   一份 PDF 仍然是完整的十章，不是当前那一页。 */
+@media print{
+  .topbar{display:none}
+  .section{break-inside:avoid}
+  .view[hidden]{display:block !important}
+}
 </style>
 </head>
 <body>
@@ -412,7 +490,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
         <option value="zh-Hant">繁體中文</option>
         <option value="en">English</option>
       </select>
-      <a class="btn btn-primary" href="${APP_URL}" target="_blank" rel="noopener"
+      <a class="btn btn-primary" ${ctaLink(mode)}
          data-cta="topbar" data-cta-label>
         <span data-cta-full>${esc(zhHans.cta)}</span
         ><span data-cta-short>${esc(zhHans.ctaShort)}</span>
@@ -422,7 +500,7 @@ td.first{font-weight:600; color:var(--fg); white-space:nowrap}
 </nav>
 
 <main id="top">
-${Object.entries(DICTS).map(([code, d]) => pane(code, d)).join("\n")}
+${Object.entries(DICTS).map(([code, d]) => pane(code, d, mode)).join("\n")}
 </main>
 
 <script>
@@ -436,21 +514,68 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d)).join("\n")}
   var links = document.querySelector("[data-navlinks]");
   var ctaLabel = document.querySelector("[data-cta-label]");
   var sub = document.querySelector("[data-brand-sub]");
+  var current = { code: "zh-Hans", view: NAV["zh-Hans"].nav[0][0] };
+
+  /** 显示某个分页面：只在**当前语言**的面板里切，其余语言整块本来就 hidden。
+   *  语言切换时按同一个 view id 复位，读者不会因为换语言被丢回第一页。 */
+  function showView(viewId, scroll) {
+    current.view = viewId;
+    document.querySelectorAll("[data-view]").forEach(function (v) {
+      v.hidden = v.getAttribute("data-view") !== current.code + "-" + viewId;
+    });
+    links.querySelectorAll("a").forEach(function (a) {
+      if (a.getAttribute("data-view-link") === current.code + "-" + viewId) {
+        a.setAttribute("aria-current", "page");
+      } else {
+        a.removeAttribute("aria-current");
+      }
+    });
+    if (scroll) window.scrollTo(0, 0);
+  }
 
   function apply(code) {
     if (!NAV[code]) code = "zh-Hans";
+    current.code = code;
     document.querySelectorAll("[data-lang-pane]").forEach(function (p) {
       p.hidden = p.getAttribute("data-lang-pane") !== code;
     });
     document.documentElement.lang = NAV[code].lang;
     links.innerHTML = NAV[code].nav.map(function (n) {
-      return '<a href="#' + code + "-" + n[0] + '">' + n[1] + "</a>";
+      return '<a href="#' + code + "-" + n[0] + '" data-view-link="'
+        + code + "-" + n[0] + '">' + n[1] + "</a>";
     }).join("");
     ctaLabel.querySelector("[data-cta-full]").textContent = NAV[code].cta;
     ctaLabel.querySelector("[data-cta-short]").textContent = NAV[code].short;
     sub.textContent = NAV[code].sub;
     sel.value = code;
+    // 换语言不改当前在看哪一页；那一页在新语言里若不存在（不会发生，
+    // 三份 nav 同构）则回到第一页
+    var ids = NAV[code].nav.map(function (n) { return n[0]; });
+    showView(ids.indexOf(current.view) >= 0 ? current.view : ids[0], false);
     try { localStorage.setItem(KEY, code); } catch (e) {}
+  }
+
+  /** 导航点击 = 换页，不是页内滚动。hash 仍然写进去，所以链接可以直接分享
+   *  到某一页；#zh-Hans-compare 这类**藏在某页里的章节 id** 也认，
+   *  它会打开包含它的那一页。 */
+  function viewOfHash(hash) {
+    var h = (hash || "").replace(/^#/, "");
+    if (!h) return null;
+    var box = null;
+    var all = document.querySelectorAll("[data-view]");
+    for (var i = 0; i < all.length && !box; i++) {
+      if (all[i].getAttribute("data-view") === h) box = all[i];
+    }
+    if (!box) {
+      var sec = document.getElementById(h);
+      box = sec && sec.closest ? sec.closest("[data-view]") : null;
+    }
+    if (!box) return null;
+    // 前缀是语言码，而 "zh-Hans" 自己带连字符——**不能按 "-" 切**，
+    // 只能按已知的语言码长度裁。（第一版就是这么错的。）
+    var paneEl = box.closest("[data-lang-pane]");
+    var code = paneEl ? paneEl.getAttribute("data-lang-pane") : current.code;
+    return box.getAttribute("data-view").slice(code.length + 1);
   }
 
   var stored = null;
@@ -463,7 +588,33 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d)).join("\n")}
       : (l.indexOf("zh") === -1 && l ? "en" : "zh-Hans");
   }
   apply(stored);
+  // 进来时如果 URL 带 hash，直接开到那一页（分享链接能落到具体一页）
+  var fromHash = viewOfHash(location.hash);
+  if (fromHash) showView(fromHash, false);
   sel.addEventListener("change", function () { apply(sel.value); });
+
+  // 导航 = 换页。用委托绑在容器上——apply() 会重建这几个 a，
+  // 逐个绑事件会在换一次语言后全部失效。
+  links.addEventListener("click", function (e) {
+    var a = e.target.closest("[data-view-link]");
+    if (!a) return;
+    e.preventDefault();
+    var id = a.getAttribute("data-view-link");
+    showView(id.slice(current.code.length + 1), true);
+    if (history.replaceState) history.replaceState(null, "", "#" + id);
+    else location.hash = id;
+  });
+  // 浏览器前进/后退
+  window.addEventListener("hashchange", function () {
+    var v = viewOfHash(location.hash);
+    if (v) showView(v, true);
+  });
+  // 站标回到第一页
+  var brand = document.querySelector(".brand");
+  if (brand) brand.addEventListener("click", function (e) {
+    e.preventDefault();
+    showView(NAV[current.code].nav[0][0], true);
+  });
 
   document.addEventListener("click", function (e) {
     var b = e.target.closest("[data-copy]");
@@ -486,6 +637,13 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d)).join("\n")}
 </html>
 `;
 
+/** 离线 / 外链那一档：CTA 是绝对地址 + 新标签页。 */
+const html = renderPage("standalone");
+
+/** 随站点部署那一档：CTA 是站内 `/login`，同标签页。
+ *  两份**只差链接**——正文若开始漂移，说明有人手改了 HTML。 */
+const siteHtml = renderPage("site");
+
 const target = fileURLToPath(new URL("../../../docs/campuspath-landing.html", import.meta.url));
 
 /** Artifact 发布用的变体：宿主自带 doctype/html/head/body 外壳，
@@ -498,8 +656,9 @@ const fragmentTarget = fileURLToPath(
   new URL("../../../docs/landing/artifact.html", import.meta.url));
 
 /** 第三个出口：随站点部署的那一份（Cloud Run 上 `/landing`）。
- *  与 docs/ 那份**逐字节相同**——两处内容会漂移的唯一原因是有人手改了其中一份，
- *  所以 `--check` 三份一起校验。 */
+ *  它与 docs/ 那份**只应该差 CTA 的链接**，正文逐字节相同；
+ *  `--check` 用「把它的站内链接换回绝对地址后必须等于 docs 那份」来守这一点，
+ *  比放着不校验强——只校验其中一份，另一份被手改就永远发现不了。 */
 const publicTarget = fileURLToPath(
   new URL("../public/landing.html", import.meta.url));
 
@@ -523,7 +682,7 @@ if (process.argv.includes("--check")) {
   }
   let pub = "";
   try { pub = readFileSync(publicTarget, "utf-8"); } catch {}
-  if (pub !== html) {
+  if (pub !== siteHtml) {
     console.error("apps/web/public/landing.html 与 docs/ 那份不一致——重新生成，"
       + "别只改一处（线上发出去的是 public/ 这份）");
     process.exit(1);
@@ -532,7 +691,7 @@ if (process.argv.includes("--check")) {
 } else {
   writeFileSync(target, html, "utf-8");
   writeFileSync(fragmentTarget, fragment, "utf-8");
-  writeFileSync(publicTarget, html, "utf-8");
+  writeFileSync(publicTarget, siteHtml, "utf-8");
   console.log(`已生成 campuspath-landing.html（三语，${html.length.toLocaleString()} 字节）`
     + ` + landing/artifact.html + apps/web/public/landing.html`);
 }

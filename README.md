@@ -141,6 +141,12 @@ make check                      # preflight + 契约/Seed 一致性 + 全量测�
   改 `content.mjs` 后 `bun run landing` 重新生成三份产物即可。
   改宣传页内容 → 改 `docs/landing/content.mjs` → `bun run landing` →
   **必须重新部署 web 才会生效**（它是构建期打进镜像的静态文件）
+  - **导航 = 分页面**（2026-08-11）：七个导航项各切一个视图，不是同页锚点滚动。
+    十个章节全部留在 DOM 里、只改 `hidden`——所以没有 JS 时它仍是一张完整长页，
+    Ctrl+F 与打印也照旧全的。章节没归宿会在**构建期报错**（`VIEW_GROUPS`）
+  - **一份内容两种链接**：`docs/` 与 Artifact 那两份可能离线打开，CTA 用绝对地址 +
+    新标签页；`apps/web/public/landing.html` 与 app 同域部署，CTA 用站内 `/login`
+    同标签页（换自定义域名时不用重新生成）
 - **PWA**：学生端可「添加到主屏」——manifest / `sw.js` / 图标都在**口令门外**
   （middleware 的 `PUBLIC_PATHS`），否则它们会被 302 成 HTML，安装提示直接消失。
   Service Worker **只在生产注册**（本地要验证：`localStorage.setItem("campuspath.sw","on")`）；
