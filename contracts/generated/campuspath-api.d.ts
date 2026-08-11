@@ -2902,6 +2902,41 @@ export interface components {
             student_id: string;
         };
         /**
+         * CurationBadge
+         * @description 「编辑推荐」徽章（2026-08-10 用户需求 D）。
+         *
+         *     用户裁定：**不搞活动比分**——所以这里只有徽章与理由，
+         *     **没有分数字段**。分数留在校方端（那里有 k-匿名抑制与「非质量分」的
+         *     分区说明）；广场上贴出一个 4.7 分会立刻把资讯广场变成排行榜，
+         *     而 §6.13 明确反对「平均低分就往下排」的粗暴处理与永久黑名单。
+         *
+         *     自动置位的门槛是**两条同时成立**：四维均分 ≥ 4.0 且已验证反馈
+         *     ≥ `MIN_CELL_N`。只看分数会让「一个人打了五分」的活动被贴标；
+         *     k-匿名阈值本是隐私红线，这里顺带替我们挡住了这种噪声。
+         */
+        CurationBadge: {
+            reason: components["schemas"]["CurationReason"];
+            /**
+             * Set At
+             * Format: date-time
+             */
+            set_at: string;
+            /**
+             * Set By
+             * @enum {string}
+             */
+            set_by: "auto" | "curator";
+        };
+        /**
+         * CurationReason
+         * @description 官方推荐的**理由**（Spec §6.12：「官方推荐应显示原因」）。
+         *
+         *     §6.12 明写官方加权「不能遮盖学生的个人不适配，也不能伪装成纯算法排序」——
+         *     所以徽章必须带理由，而不是一个说不清来历的星标。
+         * @enum {string}
+         */
+        CurationReason: "high_verified_student_value" | "verified_by_school" | "strategic_campus_priority";
+        /**
          * DataCoverage
          * @description 这条信号是基于多少数据得出的。覆盖不足时不得升级严重度。
          */
@@ -4507,6 +4542,8 @@ export interface components {
              * @default []
              */
             category_tags: string[];
+            /** @default null */
+            curation: components["schemas"]["CurationBadge"] | null;
             /**
              * Deadline
              * @default null

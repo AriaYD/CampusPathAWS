@@ -60,6 +60,18 @@ def build_feedback(
     if not events:
         return FeedbackBundle([], [], [], [])
 
+    # 2026-08-10（配合用户需求 D「编辑推荐」）：反馈要优先落在**还在架**的活动上。
+    #
+    # 旧写法按列表顺序取前 `count` 条，而前面几乎全是早已办完的场次——
+    # 实测后果：全库唯一均分 ≥4 且已验证 ≥5 的活动 `OPP-EVT-006` **本身是过期的**，
+    # 于是「编辑推荐」徽章在学生广场上永远看不到，功能等于没有。
+    # 稳定排序（`sort` 保序），只把在架的整体提到前面，不引入新的随机性。
+    def _still_live(o: Opportunity) -> bool:
+        end = o.ends_at or o.starts_at or o.deadline
+        return end is None or end.date() >= SEED_TODAY
+
+    events.sort(key=lambda o: not _still_live(o))
+
     low_series = sorted({e.series_id for e in events})[:2]
     thin_occurrences = [e.occurrence_id for e in events[-2:]]
 

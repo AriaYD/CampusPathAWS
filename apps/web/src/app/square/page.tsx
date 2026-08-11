@@ -16,6 +16,7 @@ import {
   Grid,
   Loading,
   PageHeader,
+  Segmented,
   TriState,
   type TriValue,
 } from "@/components/ui";
@@ -59,10 +60,18 @@ export default function SquarePage() {
   const [explanation, setExplanation] = useState<EligibilityExplanation | null>(null);
   const [explaining, setExplaining] = useState(false);
 
-  // 已截止的默认不取。学生想找"过去有过什么"时再打开——
-  // Spec 允许它们作未来参考，但不该混在"现在可以报名"里。
-  const [showExpired, setShowExpired] = useState(false);
-  const catalog = useResource(() => api.catalog(500, showExpired), [showExpired]);
+  /**
+   * 在架 / 已过期 / 全部（2026-08-10 用户需求 E，取代原来的一个复选框）。
+   *
+   * 用户原话：「已经过了活动时间的那些活动……**必须归入已过期分类里面**，
+   * 且给这些过期的活动加上『已过期』的标签」。复选框只能做到「混着看」，
+   * 做不到「归类」——分段控件才能让「现在能报的」与「过去有过的」
+   * 是两份互不打扰的清单。默认落在「在架」。
+   */
+  const [status, setStatus] = useState<"live" | "expired" | "all">("live");
+  const [pickedOnly, setPickedOnly] = useState(false);
+  const catalog = useResource(
+    () => api.catalog(500, status !== "live"), [status]);
   // 收藏不是另一张表，是行动流的一个切片（action_type === "save"）
   const actions = useResource(() => api.actions(studentId), [studentId]);
   // 已报名标记与「为你推荐」同源：同一条行动流的 apply 切片（用户裁定 2026-08-01）
@@ -173,6 +182,14 @@ export default function SquarePage() {
         (o) => (o.organizer_category ?? "uncategorized") === organizerFilter,
       );
     }
+    // 过期分类（E）：服务端已按演示时钟把状态改写为 expired，前端只按它归类，
+    // **不自己再算一遍日期**——两处各算各的就会出现「广场说过期、推荐说没有」。
+    if (status === "live") {
+      rows = rows.filter((o) => o.publication_status !== "expired");
+    } else if (status === "expired") {
+      rows = rows.filter((o) => o.publication_status === "expired");
+    }
+    if (pickedOnly) rows = rows.filter((o) => Boolean(o.curation));
     if (deadlineOnly) rows = rows.filter((o) => Boolean(o.deadline));
     if (savedOnly) rows = rows.filter((o) => savedIds.has(o.opportunity_id));
     if (plannedOnly) rows = rows.filter((o) => plannedIds.has(o.opportunity_id));
@@ -189,7 +206,8 @@ export default function SquarePage() {
     }
     return rows;
   }, [catalog.data, intlOn, typeFilter, tagFilter, organizerFilter, deadlineOnly,
-      savedOnly, savedIds, plannedOnly, plannedIds, query, locale]);
+      savedOnly, savedIds, plannedOnly, plannedIds, query, locale,
+      status, pickedOnly]);
 
   async function explain(opportunityId: string) {
     setSelected(opportunityId);
@@ -292,14 +310,26 @@ export default function SquarePage() {
             />
             {t("square.filter.deadline")}
           </label>
+          <span data-square-status>
+            <Segmented
+              ariaLabel={t("square.status")}
+              value={status}
+              onChange={setStatus}
+              options={[
+                { value: "live", label: t("square.status.live") },
+                { value: "expired", label: t("square.status.expired") },
+                { value: "all", label: t("square.status.all") },
+              ]}
+            />
+          </span>
           <label className="t-meta flex items-center gap-1.5 text-fg-muted">
             <input
               type="checkbox"
-              data-filter="expired"
-              checked={showExpired}
-              onChange={(e) => setShowExpired(e.target.checked)}
+              data-filter="picked"
+              checked={pickedOnly}
+              onChange={(e) => setPickedOnly(e.target.checked)}
             />
-            {t("square.showExpired")}
+            {t("square.pickedOnly")}
           </label>
           <label className="t-meta flex items-center gap-1.5 text-fg-muted">
             <input
@@ -377,6 +407,25 @@ export default function SquarePage() {
                     }}
                   >
                     {t("square.expired")}
+                  </span>
+                )}
+                {/* 编辑推荐（D）：**只有徽章，没有分数**——用户裁定不搞活动比分。
+                    徽章带理由（§6.12「官方推荐应显示原因」），鼠标悬停可读；
+                    没有徽章 ≠ 质量差，只是样本不够或分数没到线（§6.13）。 */}
+                {opportunity.curation && (
+                  <span
+                    className="t-micro rounded-sm px-1.5 py-0.5"
+                    data-curation={opportunity.curation.reason}
+                    title={t(
+                      `square.curation.${opportunity.curation.reason}` as Parameters<typeof t>[0],
+                    )}
+                    style={{
+                      border: "1px solid var(--color-moss-500)",
+                      color: "var(--color-moss-600)",
+                      background: "var(--color-moss-100)",
+                    }}
+                  >
+                    {t("square.curation.badge")}
                   </span>
                 )}
                 {isOfficialLive(opportunity) ? (

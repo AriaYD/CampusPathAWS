@@ -119,6 +119,9 @@ export default function PublisherPage() {
           type: "workshop",
           title,
           organizer: organisation,
+          // 投稿产出的是草稿，徽章由校方侧决定（读时自动派生或 curator 手动置位）——
+          // 投稿人不能给自己的活动贴「编辑推荐」
+          curation: null,
           occurrence_id: null,
           series_id: null,
           category_tags: [category],

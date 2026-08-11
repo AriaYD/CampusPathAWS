@@ -1,0 +1,42 @@
+{
+  "$defs": {
+    "CurationReason": {
+      "description": "官方推荐的**理由**（Spec §6.12：「官方推荐应显示原因」）。\n\n§6.12 明写官方加权「不能遮盖学生的个人不适配，也不能伪装成纯算法排序」——\n所以徽章必须带理由，而不是一个说不清来历的星标。",
+      "enum": [
+        "high_verified_student_value",
+        "verified_by_school",
+        "strategic_campus_priority"
+      ],
+      "title": "CurationReason",
+      "type": "string"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/CurationBadge.json",
+  "additionalProperties": false,
+  "description": "「编辑推荐」徽章（2026-08-10 用户需求 D）。\n\n用户裁定：**不搞活动比分**——所以这里只有徽章与理由，\n**没有分数字段**。分数留在校方端（那里有 k-匿名抑制与「非质量分」的\n分区说明）；广场上贴出一个 4.7 分会立刻把资讯广场变成排行榜，\n而 §6.13 明确反对「平均低分就往下排」的粗暴处理与永久黑名单。\n\n自动置位的门槛是**两条同时成立**：四维均分 ≥ 4.0 且已验证反馈\n≥ `MIN_CELL_N`。只看分数会让「一个人打了五分」的活动被贴标；\nk-匿名阈值本是隐私红线，这里顺带替我们挡住了这种噪声。",
+  "properties": {
+    "reason": {
+      "$ref": "#/components/schemas/CurationReason"
+    },
+    "set_at": {
+      "format": "date-time",
+      "title": "Set At",
+      "type": "string"
+    },
+    "set_by": {
+      "enum": [
+        "auto",
+        "curator"
+      ],
+      "title": "Set By",
+      "type": "string"
+    }
+  },
+  "required": [
+    "reason",
+    "set_by",
+    "set_at"
+  ],
+  "title": "CurationBadge",
+  "type": "object"
+}

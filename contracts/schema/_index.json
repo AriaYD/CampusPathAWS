@@ -1,5 +1,5 @@
 {
-  "contracts_version": "1.36.0",
+  "contracts_version": "1.37.0",
   "models": [
     "AcademicProgram",
     "AcademicState",
@@ -43,6 +43,7 @@
     "CoursePlanItem",
     "CourseRecommendation",
     "CrisisProtocolInvocation",
+    "CurationBadge",
     "DataCoverage",
     "DataUncertainty",
     "DateRange",

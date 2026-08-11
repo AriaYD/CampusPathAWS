@@ -76,6 +76,8 @@ from campuspath_contracts.common import (
 from campuspath_contracts.messages import render as render_message
 from campuspath_contracts.openapi import API_ENDPOINTS
 from campuspath_contracts.opportunity import (
+    CurationBadge,
+    CurationReason,
     EligibilityExplanation,
     EligibilityStateName,
     MatchResult,
@@ -2608,19 +2610,27 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         的 Archive 分页用）。派生判定不改物理存储，幂等可复现。
         """
         now = datetime.now(timezone.utc)
-        rows = deps.opportunities + (
-            deps.expired_opportunities + deps.withdrawn_opportunities
+        # 2026-08-10（用户需求 E）：过期改为**读时判定**。启动期分区只是
+        # 一份预分好的快照，它看不见「进程起来之后才越线」的条目，也从来
+        # 不看只有 ends_at/starts_at 的活动。这里按 `_is_expired` 重新分一次。
+        still_live = [o for o in deps.opportunities if not _is_expired(o, deps.today)]
+        newly_expired = [_mark_expired(o) for o in deps.opportunities
+                         if _is_expired(o, deps.today)]
+        rows = still_live + (
+            deps.expired_opportunities + newly_expired + deps.withdrawn_opportunities
             if include_expired else []
         )
         if view == "archive":
             # 审查 #4：withdrawn 是管理动作产物，只在 include_expired（管理端
             # 监看口径）下拼入——普通学生的 archive 视图看不到已下架条目
-            pool = deps.opportunities + deps.expired_opportunities + (
+            pool = still_live + newly_expired + deps.expired_opportunities + (
                 deps.withdrawn_opportunities if include_expired else [])
             rows = [o for o in pool if _stats_frozen_at(o, now)]
         else:
             rows = [o for o in rows if not _stats_frozen_at(o, now)]
-        return rows[:limit]
+        # 徽章在**切片之后**再派生：`_occurrence_summary` 每条要过一遍聚合，
+        # 对 174 条全量算完再丢掉 160 条纯属浪费
+        return [_with_curation(o, now) for o in rows[:limit]]
 
     @implements("PUT", "/catalog/opportunities/{opportunity_id}",
                 response_model=Opportunity)
@@ -3333,6 +3343,61 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     def _event_end(o: Opportunity) -> datetime | None:
         return o.ends_at or o.starts_at or o.deadline
 
+    def _is_expired(o: Opportunity, as_of: date) -> bool:
+        """「这条还能报名/参加吗」的**单一出处**（2026-08-10 用户需求 E）。
+
+        旧实现有两个洞，都在 `Deps.__init__` 里：判定**只算一次**（进程启动时），
+        而且**只看 `deadline`**。于是两类死条目以在架身份继续流通——
+        更糟的是 `_compute_matches` 遍历的正是同一个池子，
+        它们会被**推荐进 For You**（用户原话：禁止把这些活动推送给用户）。
+
+        取并集而不是二选一：
+        - 报名截止了 → 过期（哪怕活动本身还没办，报不上就是报不上）；
+        - 活动办完了 → 过期（哪怕它压根没设 deadline）。
+
+        参照时钟统一用 `deps.today`（seed manifest 的 as_of），与启动期分区
+        同一把尺子——演示时钟与真实时钟在本仓库并不相等，混用会让
+        「广场说过期、推荐说没过期」这种自相矛盾重新长出来。
+        """
+        if o.deadline is not None and o.deadline.date() < as_of:
+            return True
+        end = _event_end(o)
+        return end is not None and end.date() < as_of
+
+    #: 自动「编辑推荐」的分数门槛（用户 2026-08-10：默认 4 分以上编辑推荐）。
+    #: 样本门槛不在这里——它复用聚合层的 `MIN_CELL_N`，两处不许各定一个。
+    _EDITOR_PICK_MIN_AVG = 4.0
+
+    def _with_curation(o: Opportunity, now: datetime) -> Opportunity:
+        """读时派生「编辑推荐」徽章（D，2026-08-10）。
+
+        确定性、零 LLM：分子分母就是 `_occurrence_summary` 已经在算的那两个
+        （四维均分 + 已验证反馈数），口径与校方报告完全一致——
+        「广场说推荐、报告说不够样本」这种自相矛盾在源头就不可能出现。
+
+        **curator 手动置位优先**：人已经拍过板的，系统不覆盖它，
+        也不因为分数掉下去就把它撤了（§6.12 官方推荐是人的判断）。
+        """
+        if o.curation is not None:
+            return o                      # 手动置位优先，不被自动派生覆盖
+        feedback = [f for f in deps.quality_feedback
+                    if (f.occurrence_id or "") in {o.occurrence_id, o.opportunity_id}]
+        summary = _occurrence_summary(o, feedback, now)
+        if (summary.avg_overall is None
+                or summary.avg_overall < _EDITOR_PICK_MIN_AVG):
+            return o
+        return o.model_copy(update={"curation": CurationBadge(
+            reason=CurationReason.HIGH_VERIFIED_STUDENT_VALUE,
+            set_by="auto", set_at=now,
+        )})
+
+    def _mark_expired(o: Opportunity) -> Opportunity:
+        """读时改写状态，**不动物理存储**：幂等、可复现，
+        且归档视图仍能按原对象走自己的规则。"""
+        if o.publication_status is PublicationStatus.EXPIRED:
+            return o
+        return o.model_copy(update={"publication_status": PublicationStatus.EXPIRED})
+
     def _stats_frozen_at(o: Opportunity, now: datetime) -> bool:
         end = _event_end(o)
         return end is not None and end + timedelta(days=_STATS_FREEZE_DAYS) < now
@@ -3930,6 +3995,12 @@ def create_app(deps: Deps | None = None) -> FastAPI:
 
         scored = []
         for opportunity in deps.opportunities:
+            # 2026-08-10 用户需求 E：已过期的一律不进候选池。
+            # **这是「禁止推送给用户」的落点**——广场把它归到「已过期」分组
+            # 还不够，推荐链路读的是同一个 `deps.opportunities`，
+            # 不在这里挡住，它照样会出现在 For You 里。
+            if _is_expired(opportunity, deps.today):
+                continue
             outcome, validation = engine.validate_eligibility(
                 opportunity, facts, deps.today, now
             )

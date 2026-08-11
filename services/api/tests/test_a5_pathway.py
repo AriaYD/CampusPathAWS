@@ -126,9 +126,14 @@ def test_near_term_overload_prefits_instead_of_failing(deps):
     """钉住修复循环的容量兜底：近两周档塞进多个 20h 活动（top8 里 4 个
     超载项）时，S2 循环逐轮砍分数最低者、在 3 轮上限内收敛——A5 仍然
     成功（trigger=a5:）且近两周机会负荷回到预算内，不许静默回落夹具。"""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, time, timedelta, timezone
 
-    soon = datetime.now(timezone.utc) + timedelta(days=3)
+    # 2026-08-10：锚点从**真实 now** 改为**演示时钟 deps.today**。
+    # 本仓库有两个时钟（真实 now 与 seed manifest 的 as_of），资格判定
+    # 走的是后者；过期治理（用户需求 E）落地后也统一到后者——否则会出现
+    # 「广场说这活动过期了、资格判定说还能报」的自相矛盾。
+    # 原来写 now+3d 在演示时钟看来是**三十多天前**，整池会被判过期。
+    soon = datetime.combine(deps.today, time(9, 0), tzinfo=timezone.utc) + timedelta(days=3)
     doctored = []
     for i, o in enumerate(deps.opportunities[:40]):
         if i < 6:
@@ -217,15 +222,23 @@ def test_intensity_scales_activity_plan_not_just_courses(deps):
     两周 7 个已是极限），总活动池随档放大；课程门数 2/3/4 不变。近两周
     实际条目还受"两周内真有多少活动"限制——上限是天花板不是配额。
     为让上限可观测，把前 9 个机会都拍到 3 天后开始。"""
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, time, timedelta, timezone
 
-    soon = datetime.now(timezone.utc) + timedelta(days=3)
+    # 2026-08-10：锚点从**真实 now** 改为**演示时钟 deps.today**。
+    # 本仓库有两个时钟（真实 now 与 seed manifest 的 as_of），资格判定走后者；
+    # 过期治理（用户需求 E）落地后也统一到后者——否则会出现「广场说这活动
+    # 过期了、资格判定说还能报」的自相矛盾。原来写 now+3d，在演示时钟看来
+    # 是三十多天前，整池会被判过期，A5 拿不到候选就回落夹具。
+    soon = datetime.combine(deps.today, time(9, 0), tzinfo=timezone.utc) + timedelta(days=3)
     # 全量拍近两周：让上限成为唯一约束（假绿教训：只拍前 9 个可能
     # 进不了分数前列，断言碰巧通过什么也没证明）
     deps.opportunities = [
         o.model_copy(update={
             "starts_at": soon, "ends_at": soon + timedelta(hours=2),
-            "workload_hours_total": 2.0})
+            # deadline 也要一起挪：过期判定是**并集**（报名截止 or 活动办完），
+            # 只挪 starts_at 会留下一堆"活动还没办但早就报不上"的条目，
+            # 它们照样被判过期，池子会空掉。
+            "deadline": soon, "workload_hours_total": 2.0})
         for o in deps.opportunities]
     client = TestClient(create_app(deps))
     near_counts, total_counts = {}, {}
@@ -235,7 +248,7 @@ def test_intensity_scales_activity_plan_not_just_courses(deps):
                     f"/v1/students/STU-A/pathway?intensity={variant}").json()
         assert body["trigger"].startswith("a5:")
         opp = [i for i in body["plan_items"] if i["kind"] == "opportunity"]
-        near_cut = (datetime.now(timezone.utc) + timedelta(days=14))             .date().isoformat()
+        near_cut = (deps.today + timedelta(days=14)).isoformat()
         near_counts[variant] = sum(
             1 for i in opp if i["date_range"]["start"] <= near_cut)
         total_counts[variant] = len(opp)

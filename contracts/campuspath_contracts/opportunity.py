@@ -80,6 +80,49 @@ class OrganizerCategory(StrEnum):
     INTL_POLICY = "intl_policy"                  # 留学生相关政策（勾选国际生后可见筛选）
 
 
+class CurationReason(StrEnum):
+    """官方推荐的**理由**（Spec §6.12：「官方推荐应显示原因」）。
+
+    §6.12 明写官方加权「不能遮盖学生的个人不适配，也不能伪装成纯算法排序」——
+    所以徽章必须带理由，而不是一个说不清来历的星标。
+    """
+
+    #: 已验证参加者给出的稳定高分。**自动派生的唯一理由**。
+    HIGH_VERIFIED_STUDENT_VALUE = "high_verified_student_value"
+    #: 校方核验过主办方与内容。只能由 curator 手动置位。
+    VERIFIED_BY_SCHOOL = "verified_by_school"
+    #: 校方本学期的重点推动方向。只能由 curator 手动置位。
+    STRATEGIC_CAMPUS_PRIORITY = "strategic_campus_priority"
+
+
+class CurationBadge(CampusPathModel):
+    """「编辑推荐」徽章（2026-08-10 用户需求 D）。
+
+    用户裁定：**不搞活动比分**——所以这里只有徽章与理由，
+    **没有分数字段**。分数留在校方端（那里有 k-匿名抑制与「非质量分」的
+    分区说明）；广场上贴出一个 4.7 分会立刻把资讯广场变成排行榜，
+    而 §6.13 明确反对「平均低分就往下排」的粗暴处理与永久黑名单。
+
+    自动置位的门槛是**两条同时成立**：四维均分 ≥ 4.0 且已验证反馈
+    ≥ `MIN_CELL_N`。只看分数会让「一个人打了五分」的活动被贴标；
+    k-匿名阈值本是隐私红线，这里顺带替我们挡住了这种噪声。
+    """
+
+    reason: CurationReason
+    set_by: Literal["auto", "curator"]
+    set_at: datetime
+
+    @model_validator(mode="after")
+    def _auto_has_only_one_legal_reason(self) -> "CurationBadge":
+        if (self.set_by == "auto"
+                and self.reason is not CurationReason.HIGH_VERIFIED_STUDENT_VALUE):
+            raise ValueError(
+                "自动派生只允许 high_verified_student_value——"
+                "「校方核验」与「战略重点」是人的判断，系统不得代签"
+            )
+        return self
+
+
 class PublicationStatus(StrEnum):
     """Spec D5 的完整状态机。缺任何一个状态都无法演示退回/驳回分支。"""
 
@@ -178,6 +221,9 @@ class Opportunity(CampusPathModel):
     source_id: Identifier
     provenance: Provenance
     publication_status: PublicationStatus = PublicationStatus.DRAFT
+    #: 「编辑推荐」徽章（D，2026-08-10）。读时派生或 curator 手动置位；
+    #: None = 没有徽章，**不是**「质量差」——§6.13 禁止把没样本当成负面信号。
+    curation: CurationBadge | None = None
     last_verified_at: datetime | None = Field(
         default=None, description="用于 T7 Stale/Wrong Opportunity Rate"
     )
