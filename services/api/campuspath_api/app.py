@@ -17,6 +17,8 @@ from pathlib import Path
 from typing import Any
 
 from campuspath_contracts.aggregation import (
+    MetricProvenance,
+    PlazaConversionAggregate,
     EventQualityAggregate,
     MetricTuple,
     ResourceCoverageAggregate,
@@ -58,6 +60,9 @@ from campuspath_contracts.goals import (
     VgaMonthPoint,
     VgaSummary,
     GrowthTrajectoryPoint,
+    GapChangeEvent,
+    GapChangeOrigin,
+    GapLevel,
     RequirementCategory,
     SharedGap,
 )
@@ -93,6 +98,7 @@ from campuspath_contracts.agents import (
     WorkflowPlan,
 )
 from campuspath_contracts.reflection import (
+    CohortDims,
     Reflection,
     ReflectionResult,
     StudentEventFeedbackForm,
@@ -124,6 +130,8 @@ from campuspath_contracts.pathway import (
     ActionEvent,
     ActionType,
     AffectedScope,
+    ExposureBatch,
+    ExposureReceipt,
     PathwayDraft,
     PathwayDraftDiff,
     PlanItem,
@@ -517,6 +525,18 @@ class Deps:
         #: 学生的行动流（收藏、加入计划、申请…）。收藏列表是它的一个切片。
         self.actions: dict[str, list[ActionEvent]] = {}
         self.metric_tuples = [MetricTuple(**m) for m in bundle["metric_tuples"]]
+        #: P4（2026-08-10）：曝光日志。**带 student_id，永不出域**——
+        #: 出域的是 `/insights/*` 里已去标识的计数。
+        from campuspath_state.exposure import ExposureStore
+
+        self.exposures = ExposureStore()
+        #: 缺口变更事件（`gaps_closed` 的唯一来源）
+        self.gap_changes: dict[str, tuple] = {}
+        #: 上一次的缺口快照，用于差分出"关闭"事件
+        self.gap_snapshots: dict[str, dict] = {}
+        #: 派生指标的缓存代次：曝光与行动写入即 +1，缓存据此作废
+        self.metrics_version = 0
+        self.derived_metrics_cache: tuple[int, list] | None = None
         self.quality_feedback = [
             EventQualityFeedback(**f) for f in bundle["event_quality_feedback"]
         ]
@@ -1371,6 +1391,39 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         return _course_candidates_for(student_id, limit)
 
     # ── G3 / G4 ─────────────────────────────────────────────────────
+    def _record_gap_diff(student_id: str, gaps: list) -> None:
+        """把这一次的缺口快照与上一次比对，产出变更事件。
+
+        关闭必须挂证据：这里用该学期新增的 EvidenceRecord 作为「是什么关闭了它」
+        的凭据——说不出凭据的关闭**不计数**（契约层也会拒收）。
+        """
+        from campuspath_state.metrics import diff_gap_levels
+
+        snapshot = {
+            g.requirement_id: (RequirementCategory.COURSEWORK, g.gap_level)
+            for g in gaps
+        }
+        previous = deps.gap_snapshots.get(student_id)
+        deps.gap_snapshots[student_id] = snapshot
+        if previous is None:
+            return          # 第一次没有"之前"可比，不是变化
+
+        term = deps.current_term
+        evidence_ids = tuple(
+            e.evidence_id for e in deps.evidence
+            if e.student_id == student_id and _term_of_date(e.obtained_at) == term
+        )[:3]
+        events = diff_gap_levels(
+            student_id, term, previous, snapshot,
+            evidence_by_requirement={rid: evidence_ids for rid in previous},
+            detected_at=datetime.now(timezone.utc),
+            origin=GapChangeOrigin.OBSERVED,
+            id_prefix=f"GC{len(deps.gap_changes.get(student_id, ())) + 1}",
+        )
+        if events:
+            deps.gap_changes[student_id] = (
+                *deps.gap_changes.get(student_id, ()), *events)
+
     @implements("GET", "/students/{student_id}/gap-map", response_model=DynamicGapMap)
     def gap_map(student_id: str) -> DynamicGapMap:
         """主目标 + 候选目标（G3）。共享缺口按**要求类别**比对。"""
@@ -1402,6 +1455,14 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 priority=max(1, min(5, 5 - int(round(done_ratio * 4)))),
                 estimated_reach_term=deps.current_term,
             ))
+
+        # P4（2026-08-10）：缺口快照差分 → `GapChangeEvent`。
+        #
+        # **陷阱**：上面那个 `if row.satisfied: continue` 意味着缺口列表里永远
+        # 不会出现 satisfied——「关闭」在数据上表现为该 requirement 从列表里
+        # **消失**。差分必须把消失判为 satisfied，否则 `gaps_closed` 会永远是 0，
+        # 只是把硬编码 0 那个错换了个位置重犯。
+        _record_gap_diff(student_id, gaps)
 
         # 未知项照搬 A2 报上来的数据不确定性。**不折叠成缺口**：
         # "读不出来"与"你还差着"是两件事，混在一起会让学生以为自己欠得更多。
@@ -1484,8 +1545,13 @@ def create_app(deps: Deps | None = None) -> FastAPI:
           **证据档案条目数**（EvidenceRecord，含自述——校验状态在证据档案页逐条可见）；
         - ``goal_confidence`` = 主目标当前的把握度（学生在目标工作室自设/调整，
           0–1；本端点原样透传，不做逐期演化——没有历史快照就不编历史曲线）；
-        - ``gaps_closed`` 维持 0：差距↔证据的关闭判定链未接入，宁缺毋假，
-          前端不展示该指标（撤下假 0，等判定链落地再上）。
+        - ``gaps_closed``（2026-08-10 接上）= 该学期 **`gap_level` 由未满足变为
+          满足**的 Requirement 数，来源是 `GapChangeEvent` 那条事件流，
+          可经 `GET /gap-changes` 逐条回溯。此前它是硬编码 0；接的时候要绕开
+          一个陷阱——`gap_map()` 对已满足的要求是**跳过**的，所以「关闭」在
+          数据上表现为该 requirement 从缺口列表里**消失**，差分必须把消失判为
+          satisfied，否则只是把硬编码 0 换了个位置重犯。
+          没有证据的关闭不计数：这个数只数**说得出是什么关闭了它**的关闭。
         """
         goals = deps.goals.get(student_id)
         if not goals:
@@ -1500,10 +1566,13 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             if ev.student_id == student_id:
                 term = _term_of_date(ev.obtained_at)
                 evidence_by_term[term] = evidence_by_term.get(term, 0) + 1
-        terms = sorted(set(by_term) | set(evidence_by_term))
+        from campuspath_state.metrics import gaps_closed_by_term
+
+        closed = gaps_closed_by_term(tuple(deps.gap_changes.get(student_id, ())))
+        terms = sorted(set(by_term) | set(evidence_by_term) | set(closed))
         points = tuple(
             GrowthTrajectoryPoint(
-                term=term, gaps_closed=0,
+                term=term, gaps_closed=closed.get(term, 0),
                 new_confirmed_evidence=evidence_by_term.get(term, 0),
                 goal_confidence=primary.confidence,
                 verified_growth_actions=by_term.get(term, 0),
@@ -3293,27 +3362,231 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         return augmented
 
     # ── 校方：只出聚合，不可下钻 ────────────────────────────────────
+    # ── P4（2026-08-10）：校方指标的**真实**来源 ────────────────────
+    #
+    # 编排层负责把 Rules 的资格判定、A3 的缺口图、目录覆盖这些算好，
+    # 作为纯数据递给 `campuspath_state.metrics`——那一层拿不到 Rules 与
+    # Agent（`make llm-free` 的四层扫描守住），这条分工不是风格问题。
+
+    #: 专业 → 学院。与 seed 的映射同源；分组维度必须粗到无法反推个人。
+    _SCHOOL_OF_PROGRAM = {"BSC-COMP": "ENGG", "BENG-IEDA": "ENGG", "BBA-ISOM": "BUS"}
+
+    def _cohort_dims_of(profile) -> CohortDims:
+        return CohortDims(
+            school=_SCHOOL_OF_PROGRAM.get(profile.program_id, "SCI"),
+            year_level=profile.year,
+            development_mode=(profile.development_modes[0].mode.value
+                              if profile.development_modes else "exploration"),
+        )
+
+    def _eligibility_states(student_id: str) -> frozenset[str]:
+        """该学生现在合格的机会 id。**零模型调用**。
+
+        与 `_compute_matches` 共用 `RulesEngine.validate_eligibility`，
+        但不做打分与理由——指标只需要「合格与否」这一位。
+        """
+        from campuspath_rules.eligibility import StudentEligibilityFacts
+        from campuspath_rules.engine import RulesEngine
+        from campuspath_rules.prerequisites import AcademicRecord
+
+        student = deps.students.get(student_id)
+        if student is None:
+            return frozenset()
+        rows = deps.records.get(student_id, [])
+        facts = StudentEligibilityFacts(
+            student_id=student_id, year_level=student.year,
+            program_id=student.program_id,
+            academic=AcademicRecord(
+                completed=frozenset(r.course_id for r in rows
+                                    if r.status is CourseStatus.COMPLETED),
+                grades={r.course_id: r.grade for r in rows if r.grade},
+            ),
+            has_visa_constraint=any(c.kind == "visa" for c in student.constraints),
+            future_offerings=deps.future_offerings,
+        )
+        engine = RulesEngine(registry=deps.validations)
+        now = datetime.now(timezone.utc)
+        eligible = set()
+        for opportunity in deps.opportunities:
+            if _is_expired(opportunity, deps.today):
+                continue        # 过期的不算「学生本可以够到的资源」
+            outcome, _ = engine.validate_eligibility(
+                opportunity, facts, deps.today, now)
+            if outcome.state is EligibilityStateName.ELIGIBLE_NOW:
+                eligible.add(opportunity.opportunity_id)
+        return frozenset(eligible)
+
+    def _covered_requirement_categories() -> frozenset[RequirementCategory]:
+        """目录里现在**确实有东西能覆盖**的要求类别。
+
+        供给缺口榜的 `covered_by_any_resource` 此前硬编码 False——每一行都在
+        说「资源池覆盖不了」，哪怕目录里明明有。这里按实时目录算出来。
+        """
+        covered: set[RequirementCategory] = set()
+        for opportunity in deps.opportunities:
+            if _is_expired(opportunity, deps.today):
+                continue
+            covered.update(opportunity.requirement_categories)
+        return frozenset(covered)
+
+    def _student_gap_categories(student_id: str) -> tuple[RequirementCategory, ...]:
+        """该学生当前的缺口类别（学位要求 + A3 要求图的非课程要求）。"""
+        try:
+            gap_map_result = gap_map(student_id)
+        except HTTPException:
+            return ()
+        return tuple(g.category for g in getattr(gap_map_result, "gaps", ())
+                     if hasattr(g, "category"))
+
+    def _derived_metric_tuples() -> list[MetricTuple]:
+        """从真实曝光 × 资格 × 行动 × 缺口派生的元组，按 metrics_version 缓存。
+
+        12 学生 × ~110 机会的派生很便宜，但演示时的连点不该每次重算
+        （Rules 判定要跑满整个机会池）。
+        """
+        cached = deps.derived_metrics_cache
+        if cached is not None and cached[0] == deps.metrics_version:
+            return cached[1]
+
+        from campuspath_state.metrics import (
+            StudentMetricInputs, derive_metric_tuple)
+
+        period = deps.current_term
+        covered = _covered_requirement_categories()
+        rows: list[MetricTuple] = []
+        for student_id, profile in deps.students.items():
+            log = deps.exposures.log_for(student_id)
+            # 冷启动进程里没有任何曝光与行动——那时**不产出元组**，
+            # 而不是产出一条全 0 的。全 0 会被当成「学生什么都没看」，
+            # 但真相是「我们还没开始记」。诚实比好看重要。
+            actions = tuple(deps.actions.get(student_id, ()))
+            if not log.events and not actions:
+                continue
+            rows.append(derive_metric_tuple(
+                StudentMetricInputs(
+                    period=period,
+                    cohort_dims=_cohort_dims_of(profile),
+                    eligible_ids=_eligibility_states(student_id),
+                    actions=actions,
+                    gap_categories=_student_gap_categories(student_id),
+                    covered_categories=covered,
+                ),
+                log,
+            ))
+        deps.derived_metrics_cache = (deps.metrics_version, rows)
+        return rows
+
+    def _all_metric_tuples() -> list[MetricTuple]:
+        """合成 + 派生。**两者带着各自的 provenance 一起进聚合**，
+        聚合侧按它拆出 `derived_cell_n` / `synthetic_cell_n`——绝不静默合并。"""
+        return [*deps.metric_tuples, *_derived_metric_tuples()]
+
+    def _opportunity_exposure_counts():
+        """逐机会计数（曝光断层榜的数据源）。"""
+        from campuspath_state.metrics import opportunity_exposure_counts
+
+        period = deps.current_term
+        eligible_by: dict[str, frozenset[str]] = {}
+        seen_by: dict[str, set[str]] = {}
+        acted_by: dict[str, set[str]] = {}
+        for student_id in deps.students:
+            log = deps.exposures.log_for(student_id)
+            eligible_by[student_id] = _eligibility_states(student_id)
+            seen_by[student_id] = log.subjects_seen(period)
+            acted_by[student_id] = {
+                a.subject_id for a in deps.actions.get(student_id, ())
+                if a.result == "succeeded"
+            }
+        return opportunity_exposure_counts(period, eligible_by, seen_by, acted_by)
+
+    @implements("POST", "/students/{student_id}/exposures",
+                response_model=ExposureReceipt)
+    def record_exposures(student_id: str, batch: "ExposureBatch") -> ExposureReceipt:
+        """学生真的看见了哪些机会。**只经这一个学生角色端点写入。**
+
+        曝光带 student_id，只活在学生私有域；出域的是 `/insights/*` 里
+        已经去标识的计数。去重数如实回报——它是所有转化率的分母。
+        """
+        _known_student(student_id)
+        if batch.student_id != student_id:
+            raise HTTPException(422, {"error": "student_mismatch",
+                                      "detail": batch.student_id})
+        log = deps.exposures.log_for(student_id)
+        accepted, deduplicated = log.record(batch.events)
+        if accepted:
+            deps.metrics_version += 1        # 派生缓存作废
+        return ExposureReceipt(
+            student_id=student_id, accepted=accepted, deduplicated=deduplicated,
+            total_for_period=log.count_for_period(deps.current_term),
+            received_at=datetime.now(timezone.utc),
+        )
+
+    @implements("GET", "/students/{student_id}/gap-changes",
+                response_model=list[GapChangeEvent])
+    def gap_changes(student_id: str) -> list[GapChangeEvent]:
+        """`gaps_closed` 的来源。可回溯 = 可被质疑，也可被测试断言。"""
+        _known_student(student_id)
+        return list(deps.gap_changes.get(student_id, ()))
+
     @implements("GET", "/insights/resource-coverage",
                 response_model=list[ResourceCoverageAggregate])
     def resource_coverage(
         cohort: str | None = Query(None, description="分组维度，如 school"),
+        period: str | None = Query(None, description="学期码；缺省 = 全部期"),
+        include_synthetic: bool = Query(
+            True, description="false = 纯派生视图；冷启动会如实全格抑制"),
     ) -> list[ResourceCoverageAggregate]:
+        """校方四视图里的三个（全局利用率+趋势 / 分组对比 / 两个排行榜）。
+
+        **无参响应只能是 institution 行**，且每期样本量都得过阈值——评测器
+        B9 无参调这个端点，把返回里**任何** `cell_n < MIN_CELL_N` 的行判为泄漏，
+        哪怕那行已经被正确抑制。细格子一律藏在 `?cohort=` 后面。
+        """
         from campuspath_aggregation.aggregate import (
             aggregate_all_cells,
             aggregate_resource_coverage,
         )
 
         now = datetime.now(timezone.utc)
-        period = deps.metric_tuples[0].period if deps.metric_tuples else "2026-27_FALL"
+        rows = _all_metric_tuples()
+        if not include_synthetic:
+            rows = [t for t in rows if t.provenance is MetricProvenance.DERIVED]
+        periods = sorted({t.period for t in rows}) or [deps.current_term]
+        covered = _covered_requirement_categories()
         if cohort:
+            # 分组对比只看最新一期：跨期再乘 cohort 会把格子切到人人不足阈值
+            latest = period or periods[-1]
             return aggregate_all_cells(
-                deps.metric_tuples, period=period, scope="school",
-                cohort_dimensions=(cohort,), computed_at=now,
+                rows, period=latest, scope="school",
+                cohort_dimensions=(cohort,),
+                covered_categories=covered, computed_at=now,
             )
+        counts = _opportunity_exposure_counts()
         return [
             aggregate_resource_coverage(
-                deps.metric_tuples, period=period, scope="institution", computed_at=now,
+                rows, period=p, scope="institution",
+                covered_categories=covered, exposure_counts=counts,
+                computed_at=now, aggregate_id=f"AGG-{p}",
             )
+            for p in ([period] if period else periods)
+        ]
+
+    @implements("GET", "/insights/plaza-conversion",
+                response_model=list[PlazaConversionAggregate])
+    def plaza_conversion(
+        include_synthetic: bool = Query(True),
+    ) -> list[PlazaConversionAggregate]:
+        """Plaza-to-Action Conversion（§17.6）：每 (学期, 入口) 一行。"""
+        from campuspath_aggregation.aggregate import aggregate_plaza_conversion
+
+        now = datetime.now(timezone.utc)
+        rows = _all_metric_tuples()
+        if not include_synthetic:
+            rows = [t for t in rows if t.provenance is MetricProvenance.DERIVED]
+        return [
+            aggregate_plaza_conversion(rows, period=p, surface=s, computed_at=now)
+            for p in sorted({t.period for t in rows})
+            for s in ("plaza", "for_you")
         ]
 
     @implements("GET", "/insights/event-quality",

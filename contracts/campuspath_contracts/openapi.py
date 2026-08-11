@@ -336,6 +336,17 @@ _STUDENT: tuple[Endpoint, ...] = (
         errors=((422, "unreadable_resume"), (503, "model_backend_unavailable")),
     ),
     Endpoint(
+        "POST", "/v1/students/{student_id}/exposures",
+        "记录曝光（学生真的看见了哪些机会）。按 (subject, 入口, 深度, 当天) 去重，"
+        "如实回报去重数——曝光是所有转化率的分母，静默丢弃会让比率悄悄变高",
+        "ExposureReceipt", "ExposureBatch",
+    ),
+    Endpoint(
+        "GET", "/v1/students/{student_id}/gap-changes",
+        "缺口变更事件（`gaps_closed` 的来源，可回溯）",
+        "GapChangeEvent", response_is_list=True,
+    ),
+    Endpoint(
         "GET", "/v1/students/{student_id}/profile/changes",
         "已物化的档案变更台账（含已撤销的——撤销不删记录）",
         "AppliedChange", response_is_list=True,
@@ -516,8 +527,18 @@ _INSTITUTION: tuple[Endpoint, ...] = (
         errors=((409, "invalid_transition"), (404, "unknown_submission")),
     ),
     Endpoint(
-        "GET", "/v1/insights/resource-coverage", "资源覆盖洞察（仅聚合，低于阈值抑制）",
+        "GET", "/v1/insights/resource-coverage",
+        "资源覆盖洞察（仅聚合，低于阈值抑制）。**无参** ⇒ 每期一条 institution 行"
+        "（= 全局利用率 + 趋势，并带曝光断层榜与供给缺口榜）；"
+        "`?cohort=` ⇒ 最新一期的全部分组格（= 分组对比）；"
+        "`?include_synthetic=false` ⇒ 纯派生视图（冷启动会如实全格抑制）",
         "ResourceCoverageAggregate", roles=(ActorRole.CURATOR, ActorRole.CAREER_CENTER_ADMIN), response_is_list=True,
+    ),
+    Endpoint(
+        "GET", "/v1/insights/plaza-conversion",
+        "Plaza-to-Action Conversion（§17.6）：每 (学期, 入口) 一行；样本不足只出计数不出比率",
+        "PlazaConversionAggregate",
+        roles=(ActorRole.CURATOR, ActorRole.CAREER_CENTER_ADMIN), response_is_list=True,
     ),
     Endpoint(
         "GET", "/v1/insights/event-quality", "活动质量趋势（仅聚合）",

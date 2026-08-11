@@ -6,7 +6,8 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from campuspath_contracts.aggregation import MAX_COHORT_DIMENSIONS, MIN_CELL_N, MetricTuple
+from campuspath_contracts.aggregation import (
+    MAX_COHORT_DIMENSIONS, MIN_CELL_N, MetricProvenance, MetricTuple)
 from campuspath_contracts.goals import RequirementCategory
 from campuspath_contracts.reflection import (
     CohortDims,
@@ -33,6 +34,7 @@ def metric(**kw) -> MetricTuple:
         eligible_count=40, seen_count=20, acted_count=5,
         gap_total=10, gap_covered=7,
         uncovered_requirement_categories=(RequirementCategory.RESEARCH_EXPERIENCE,),
+        provenance=MetricProvenance.SYNTHETIC,
     )
     base.update(kw)
     return MetricTuple(**base)
@@ -98,6 +100,7 @@ def _mixed_population():
                                    development_mode="employment"),
             eligible_count=10, seen_count=seen, acted_count=0,
             gap_total=5, gap_covered=3,
+            provenance=MetricProvenance.SYNTHETIC,
         )
     return [one("ENGG", 2, 10) for _ in range(100)] + [one("BUS", 4, 0) for _ in range(2)]
 

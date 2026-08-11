@@ -30,7 +30,10 @@ from campuspath_contracts.aggregation import (
     DimensionAggregate,
     EventQualityAggregate,
     ExposureGapEntry,
+    MetricProvenance,
     MetricTuple,
+    OpportunityExposureCount,
+    PlazaConversionAggregate,
     ResourceCoverageAggregate,
     SuppressedCell,
     UnmetRequirementEntry,
@@ -82,6 +85,8 @@ def aggregate_resource_coverage(
     scope: str,
     cohort_dimensions: tuple[str, ...] = (),
     cohort_values: tuple[object, ...] | None = None,
+    covered_categories: frozenset[RequirementCategory] | None = None,
+    exposure_counts: tuple[OpportunityExposureCount, ...] = (),
     computed_at: datetime,
     aggregate_id: str = "AGG-1",
 ) -> ResourceCoverageAggregate:
@@ -110,11 +115,14 @@ def aggregate_resource_coverage(
             t for t in relevant if _cell_key(t, cohort_dimensions) == tuple(cohort_values)
         ]
     cell_n = len(relevant)
+    derived_n = sum(1 for t in relevant if t.provenance is MetricProvenance.DERIVED)
+    synthetic_n = cell_n - derived_n
 
     if cell_n < MIN_CELL_N:
         return ResourceCoverageAggregate(
             aggregate_id=aggregate_id, period=period, scope=scope,  # type: ignore[arg-type]
             cohort_dims_used=cohort_dimensions, cell_n=cell_n,
+            derived_cell_n=derived_n, synthetic_cell_n=synthetic_n,
             discovery_rate=None, action_rate=None, gap_coverage_rate=None,
             suppressed_cells=(
                 SuppressedCell(cell_key="|".join(cohort_dimensions) or "institution",
@@ -134,9 +142,14 @@ def aggregate_resource_coverage(
     for t in relevant:
         for category in t.uncovered_requirement_categories:
             category_counts[category] += 1
+    # 2026-08-10：`covered_by_any_resource` 此前**硬编码 False**——校方看到的
+    # 每一行都在说"资源池覆盖不了"，哪怕目录里明明有能覆盖它的活动。
+    # 现在由 API 侧按实时目录算出 `covered_categories` 传进来；不传就退回
+    # 保守值 False，但那是"没人告诉我"，不是"确实没有"。
+    covered = covered_categories or frozenset()
     unmet = tuple(
         UnmetRequirementEntry(category=category, occurrences=count,
-                              covered_by_any_resource=False)
+                              covered_by_any_resource=category in covered)
         for category, count in sorted(
             category_counts.items(), key=lambda kv: (-kv[1], kv[0].value)
         )
@@ -152,6 +165,10 @@ def aggregate_resource_coverage(
     return ResourceCoverageAggregate(
         aggregate_id=aggregate_id, period=period, scope=scope,  # type: ignore[arg-type]
         cohort_dims_used=cohort_dimensions, cell_n=cell_n,
+        derived_cell_n=derived_n, synthetic_cell_n=synthetic_n,
+        exposure_gap_ranking=build_exposure_gap_ranking(
+            {c.opportunity_id: (c.eligible_n, c.seen_n) for c in exposure_counts
+             if c.period == period}),
         discovery_rate=round(seen / eligible, 4) if eligible else None,
         action_rate=round(acted / seen, 4) if seen else None,
         gap_coverage_rate=round(gap_covered / gap_total, 4) if gap_total else None,
@@ -252,6 +269,7 @@ def aggregate_all_cells(
     period: str,
     scope: str,
     cohort_dimensions: tuple[str, ...],
+    covered_categories: frozenset[RequirementCategory] | None = None,
     computed_at: datetime,
 ) -> list[ResourceCoverageAggregate]:
     """按分组维度切出**所有**单元格，逐格聚合并逐格抑制。
@@ -269,8 +287,44 @@ def aggregate_all_cells(
             scope=scope,
             cohort_dimensions=cohort_dimensions,
             cohort_values=cell,
+            covered_categories=covered_categories,
             computed_at=computed_at,
             aggregate_id="AGG-" + "-".join(str(v) for v in cell),
         )
         for cell in cells
     ]
+
+
+def aggregate_plaza_conversion(
+    tuples: list[MetricTuple],
+    *,
+    period: str,
+    surface: str,
+    computed_at: datetime,
+    aggregate_id: str | None = None,
+) -> PlazaConversionAggregate:
+    """Plaza-to-Action Conversion（Spec §17.6）：看到的有多少变成了行动。
+
+    分母是**该入口上的全部曝光**，不是「合格的机会」——学生在广场上看到的
+    包含他并不合格的条目，而「对不合格的机会点了报名」正是校方最想知道的
+    信号之一。与资源覆盖率共用同一条抑制规则：样本不足就没有比率。
+    """
+    relevant = [t for t in tuples if t.period == period]
+    rows = [
+        (t, s) for t in relevant
+        for s in t.surface_conversions if s.surface == surface
+    ]
+    cell_n = len(rows)
+    derived_n = sum(1 for t, _ in rows if t.provenance is MetricProvenance.DERIVED)
+    exposed = sum(s.exposed_count for _, s in rows)
+    acted = sum(s.acted_count for _, s in rows)
+    return PlazaConversionAggregate(
+        aggregate_id=aggregate_id or f"PCA-{period}-{surface}",
+        period=period, surface=surface,  # type: ignore[arg-type]
+        cell_n=cell_n,
+        derived_cell_n=derived_n, synthetic_cell_n=cell_n - derived_n,
+        exposed_total=exposed, acted_total=acted,
+        conversion_rate=(round(acted / exposed, 4)
+                         if cell_n >= MIN_CELL_N and exposed else None),
+        computed_at=computed_at,
+    )

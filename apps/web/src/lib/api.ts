@@ -209,8 +209,18 @@ export const institution = {
       `/v1/advising/bookings/${encodeURIComponent(bookingId)}/summary`,
       { method: "POST", body: JSON.stringify(summary) },
     ),
-  resourceCoverage: () =>
-    request<ResourceCoverageAggregate[]>("/v1/insights/resource-coverage"),
+  /** 无参 = 每期一条 institution 行（全局利用率 + 趋势 + 两个排行榜）；
+   *  `cohort` = 最新一期的全部分组格；`includeSynthetic:false` = 纯派生视图。 */
+  resourceCoverage: (opts?: { cohort?: string; includeSynthetic?: boolean }) => {
+    const q = new URLSearchParams();
+    if (opts?.cohort) q.set("cohort", opts.cohort);
+    if (opts?.includeSynthetic === false) q.set("include_synthetic", "false");
+    const suffix = q.toString() ? `?${q}` : "";
+    return request<ResourceCoverageAggregate[]>(
+      `/v1/insights/resource-coverage${suffix}`);
+  },
+  plazaConversion: () =>
+    request<Schemas["PlazaConversionAggregate"][]>("/v1/insights/plaza-conversion"),
   eventQuality: () => request<EventQualityAggregate[]>("/v1/insights/event-quality"),
   outreachQueue: () =>
     request<WellbeingOutreachRequest[]>("/v1/wellbeing/outreach-queue"),
@@ -411,6 +421,12 @@ export const api = {
       + `/decision?decision=${decision}`,
       { method: "POST" },
     ),
+  recordExposures: (id: string, batch: Schemas["ExposureBatch"]) =>
+    request<Schemas["ExposureReceipt"]>(`${s(id)}/exposures`, {
+      method: "POST", body: JSON.stringify(batch),
+    }),
+  gapChanges: (id: string) =>
+    request<Schemas["GapChangeEvent"][]>(`${s(id)}/gap-changes`),
   profileChanges: (id: string) =>
     request<Schemas["AppliedChange"][]>(`${s(id)}/profile/changes`),
   undoProfileChange: (id: string, changeId: string) =>

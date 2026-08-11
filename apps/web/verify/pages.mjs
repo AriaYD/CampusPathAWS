@@ -70,6 +70,23 @@ export const PAGES = [
     must: ["[data-square-filters]", "[data-opportunity]", "[data-why-not]", "[data-square-count]"],
   },
   {
+    path: "/insights",
+    // 校方页：门禁默认以学生身份跑，这里显式声明身份。
+    // 不声明的话六个断言会全部"缺失"——而那是**跑错了身份**，
+    // 不是页面坏了；把它当页面坏了去改页面，才是真的坏。
+    session: { portal: "institution", role: "career_center_admin" },
+    // 五个视图各自的容器。**抑制格必须看得见**——这一页的价值一半在于
+    // 让评委看到 `Insufficient evidence` 真的会出现，而不是一片漂亮数字。
+    must: [
+      "[data-view='utilisation']",
+      "[data-view='exposure-gap']",
+      "[data-view='unmet']",
+      "[data-view='cohort']",
+      "[data-view='conversion']",
+      "[data-provenance-note]",
+    ],
+  },
+  {
     path: "/settings",
     must: ["[data-consent-scope]", "[data-delete-data]", "[data-synthetic-badge]"],
   },

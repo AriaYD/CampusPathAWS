@@ -18,7 +18,7 @@ from datetime import date, datetime, timezone
 
 from campuspath_contracts.common import ActorRole
 
-from .fixtures import api_client, seed_bundle
+from .fixtures import api_client, seed_bundle, ensure_pathway
 from .harness import Result, Severity, Verdict, check
 
 _HEADERS = {"X-CampusPath-Role": ActorRole.STUDENT.value}
@@ -194,6 +194,7 @@ def t5_replan_correctness() -> Result:
     client = api_client()
     gold = seed_bundle()["gold_set"]["replan"]
 
+    ensure_pathway(client, "STU-A")
     response = client.get("/v1/students/STU-A/pathway", headers=_HEADERS)
     if response.status_code != 200:
         return _result("T5", "Replan Correctness", "≥ 85%", False, None,
@@ -404,6 +405,7 @@ def t4_plan_constraints() -> Result:
     checked, satisfied, failures = 0, 0, []
 
     for student_id in ("STU-A", "STU-B", "STU-C"):
+        ensure_pathway(client, student_id)
         response = client.get(f"/v1/students/{student_id}/pathway", headers=_HEADERS)
         if response.status_code != 200:
             continue
@@ -458,6 +460,8 @@ def t4_plan_constraints() -> Result:
                 satisfied += 1
 
     rate = satisfied / checked if checked else 0.0
+    for student_id in ("STU-A", "STU-B", "STU-C"):
+        ensure_pathway(client, student_id)
     budgeted = sum(
         1 for student_id in ("STU-A", "STU-B", "STU-C")
         for _ in (client.get(f"/v1/students/{student_id}/pathway", headers=_HEADERS),)

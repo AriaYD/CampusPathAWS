@@ -58,9 +58,11 @@ const globalMust = isMobile
 
 try {
   await page.goto(`${base}/login`, { waitUntil: "domcontentloaded" });
-  await page.evaluate(() => {
-    localStorage.setItem("campuspath.session", JSON.stringify({ portal: "student", studentId: "STU-A" }));
-  });
+  const STUDENT_SESSION = { portal: "student", studentId: "STU-A" };
+  const setSession = (session) => page.evaluate((s) => {
+    localStorage.setItem("campuspath.session", JSON.stringify(s));
+  }, session);
+  await setSession(STUDENT_SESSION);
 
   // H5 探针（审查 M7）：--probe 给首页多塞一个不可能存在的选择器，
   // 必须报 FAIL（exit 1），否则断言循环本身坏了
@@ -73,6 +75,9 @@ try {
   if ((probeOverflow || probeSidebar) && PAGES.length) PAGES.length = 1;
 
   for (const spec of PAGES) {
+    // 每页可声明自己的身份；没声明就是学生。切身份要在导航**之前**，
+    // 否则页面守卫会先把你踢回登录页。
+    await setSession(spec.session ?? STUDENT_SESSION);
     await page.goto(`${base}${spec.path}`, { waitUntil: "domcontentloaded" });
     let pageFailed = false;
     try {

@@ -228,6 +228,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/insights/plaza-conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plaza-to-Action Conversion（§17.6）：每 (学期, 入口) 一行；样本不足只出计数不出比率 */
+        get: operations["get_v1_insights_plaza-conversion"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/insights/resource-coverage": {
         parameters: {
             query?: never;
@@ -235,7 +252,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** 资源覆盖洞察（仅聚合，低于阈值抑制） */
+        /** 资源覆盖洞察（仅聚合，低于阈值抑制）。**无参** ⇒ 每期一条 institution 行（= 全局利用率 + 趋势，并带曝光断层榜与供给缺口榜）；`?cohort=` ⇒ 最新一期的全部分组格（= 分组对比）；`?include_synthetic=false` ⇒ 纯派生视图（冷启动会如实全格抑制） */
         get: operations["get_v1_insights_resource-coverage"];
         put?: never;
         post?: never;
@@ -891,6 +908,40 @@ export interface paths {
         };
         /** 导出这个学生自己可见域的全部记录（F01 设置页承诺） */
         get: operations["get_v1_students_student_id_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/exposures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 记录曝光（学生真的看见了哪些机会）。按 (subject, 入口, 深度, 当天) 去重，如实回报去重数——曝光是所有转化率的分母，静默丢弃会让比率悄悄变高 */
+        post: operations["post_v1_students_student_id_exposures"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/gap-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 缺口变更事件（`gaps_closed` 的来源，可回溯） */
+        get: operations["get_v1_students_student_id_gap-changes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -8260,6 +8311,26 @@ export interface operations {
             };
         };
     };
+    "get_v1_insights_plaza-conversion": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlazaConversionAggregate"][];
+                };
+            };
+        };
+    };
     "get_v1_insights_resource-coverage": {
         parameters: {
             query?: never;
@@ -9721,6 +9792,54 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["StudentDataExport"];
+                };
+            };
+        };
+    };
+    post_v1_students_student_id_exposures: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExposureBatch"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureReceipt"];
+                };
+            };
+        };
+    };
+    "get_v1_students_student_id_gap-changes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["GapChangeEvent"][];
                 };
             };
         };

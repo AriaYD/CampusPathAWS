@@ -499,3 +499,73 @@ export function SyntheticBadge({ full = false }: { full?: boolean }) {
     </div>
   );
 }
+
+/**
+ * 样本不足的占位。**这是一个组件而不是一个字符串**，因为它绝不能被渲染成
+ * 0、`—` 或一个灰掉的数字——那三种写法都会被读成"这个群体的表现是零/很差"，
+ * 而真相是"人太少，说了就等于点名"（B9）。
+ */
+export function InsufficientEvidence({ n }: { n?: number }) {
+  const { t } = useI18n();
+  return (
+    <span
+      data-insufficient-evidence
+      title={n === undefined ? undefined
+        : t("insights.insufficient.why").replace("{n}", String(n))}
+      className="t-micro inline-flex items-center gap-1.5 rounded-full px-2.5 py-1"
+      style={{
+        border: "1px solid var(--hatch)",
+        color: "var(--hatch-ink)",
+        background:
+          "repeating-linear-gradient(45deg, transparent, transparent 4px," +
+          " color-mix(in srgb, var(--hatch) 16%, transparent) 4px," +
+          " color-mix(in srgb, var(--hatch) 16%, transparent) 8px)",
+      }}
+    >
+      {t("insights.insufficient")}
+    </span>
+  );
+}
+
+/**
+ * 极简折线。手写内联 SVG——不引图表库：Clay 令牌要贯通，线上有包体约束，
+ * 而成长跟踪页的逐月柱早就是同样的路子（有先例可复用）。
+ *
+ * 被抑制的点**画成空心**并跳过连线：把它当 0 连进去，趋势线就会假装
+ * "那一期掉到了谷底"。
+ */
+export function Sparkline({
+  points,
+}: {
+  points: { label: string; value: number; suppressed?: boolean }[];
+}) {
+  if (!points.length) return null;
+  const w = 100;
+  const h = 28;
+  const max = Math.max(...points.map((p) => p.value), 0.0001);
+  const at = (i: number) => (points.length === 1 ? w / 2 : (i / (points.length - 1)) * w);
+  const y = (v: number) => h - (v / max) * (h - 4) - 2;
+  const solid = points.map((p, i) => ({ ...p, x: at(i), y: y(p.value) }));
+  const path = solid
+    .filter((p) => !p.suppressed)
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+    .join(" ");
+  return (
+    <div data-sparkline className="w-full">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none"
+           className="h-8 w-full" role="img" aria-hidden>
+        <path d={path} fill="none" stroke="var(--accent-deep)" strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke" />
+        {solid.map((p) => (
+          <circle key={p.label} cx={p.x} cy={p.y} r={2}
+                  fill={p.suppressed ? "var(--bg)" : "var(--accent-deep)"}
+                  stroke="var(--accent-deep)" strokeWidth={1}
+                  vectorEffect="non-scaling-stroke" />
+        ))}
+      </svg>
+      <div className="t-micro mt-1 flex justify-between text-fg-faint">
+        {points.map((p) => <span key={p.label}>{p.label}</span>)}
+      </div>
+    </div>
+  );
+}

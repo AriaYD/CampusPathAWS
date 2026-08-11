@@ -89,15 +89,38 @@ def test_wellbeing_queue_is_not_reachable_by_career_center_roles():
         assert role not in endpoint.roles
 
 
+#: `/v1/insights/*` 允许返回的类型。**加进来之前先想清楚它会不会带出个人**——
+#: 这张白名单的价值就在于逼人回来想那一遍（2026-08-10 加 PlazaConversionAggregate）。
+INSIGHT_RESPONSE_MODELS = {
+    "ResourceCoverageAggregate",
+    "EventQualityAggregate",
+    "PlazaConversionAggregate",
+}
+
+
 def test_insights_endpoints_have_no_individual_drilldown():
     """Spec §17.1.2 硬性边界 2：后端不提供"查看构成该数字的学生"的查询。"""
     for endpoint in API_ENDPOINTS:
         if endpoint.path.startswith("/v1/insights/"):
             assert "student" not in endpoint.path
             assert "student_id" not in endpoint.path
-            assert endpoint.response_model in {
-                "ResourceCoverageAggregate", "EventQualityAggregate"
-            }
+            assert endpoint.response_model in INSIGHT_RESPONSE_MODELS
+
+
+def test_every_insight_response_model_is_free_of_individual_fields():
+    """白名单只挡住"谁能出现在这条路上"，挡不住"那个类型里有什么"。
+
+    所以再递归扫一遍字段名：任何一个 insights 响应类型里出现指向个人的字段，
+    这里就红——加类型的人不必记得同时去改别处。
+    """
+    import campuspath_contracts.aggregation as agg
+    from campuspath_contracts.guards import (
+        STUDENT_IDENTITY_TERMS, assert_no_forbidden_fields)
+
+    for name in sorted(INSIGHT_RESPONSE_MODELS):
+        model = getattr(agg, name)
+        assert_no_forbidden_fields(
+            model, STUDENT_IDENTITY_TERMS, reason=f"B9/B10（{name}）")
 
 
 def test_role_restricted_prefixes_match_the_endpoint_table():

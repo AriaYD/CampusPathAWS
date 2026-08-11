@@ -31,7 +31,7 @@ from campuspath_contracts.profile import ProposalStatus
 from campuspath_contracts.validation import Verdict as RuleVerdict
 
 from .harness import Result, Severity, Verdict, check
-from .fixtures import api_client, seed_bundle
+from .fixtures import api_client, seed_bundle, ensure_pathway
 
 _HEADERS = {"X-CampusPath-Role": ActorRole.STUDENT.value}
 
@@ -324,6 +324,7 @@ def b8_unbacked_plan_item() -> Result:
     checked = 0
     offenders: list[dict] = []
     for student_id in ("STU-A", "STU-B", "STU-C"):
+        ensure_pathway(client, student_id)
         response = client.get(f"/v1/students/{student_id}/pathway", headers=_HEADERS)
         if response.status_code != 200:
             continue

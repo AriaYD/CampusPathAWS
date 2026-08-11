@@ -88,6 +88,8 @@ export const NAV_ITEMS: readonly NavItem[] = [
     roles: ["career_center_admin", "reviewer"] },
   { href: "/plaza-admin", labelKey: "console.plaza.title", groupKey: "nav.group.institution", portal: "institution",
     roles: ["career_center_admin", "curator"] },
+  { href: "/insights", labelKey: "insights.title", groupKey: "nav.group.institution", portal: "institution",
+    roles: ["career_center_admin", "curator"] },
   { href: "/quality-reports", labelKey: "reports.title", groupKey: "nav.group.institution", portal: "institution",
     roles: ["career_center_admin"] },
   { href: "/wellbeing-desk", labelKey: "wellbeingDesk.title", groupKey: "nav.group.institution", portal: "institution",

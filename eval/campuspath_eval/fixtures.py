@@ -34,3 +34,30 @@ def api_client():
     from campuspath_api.app import create_app
 
     return TestClient(create_app(_deps()))
+
+
+def ensure_pathway(client, student_id: str) -> bool:
+    """让这个学生有一版**已采纳**的路径，然后返回是否成功。
+
+    2026-08-10（P3-G）之后 `GET /pathway` 只读已采纳版本：读一下就生成并写盘
+    的旧行为被撤掉了，因为「第一次规划直接落盘」从来没问过学生。评测器原本
+    正是靠那个副作用拿到路径的，于是 B8/T4/T5 一起变成「没有可检查的 PlanItem」。
+
+    **修法是让评测走真实流程，不是放宽断言**：起草 → 采纳 → 再读。
+    学生在界面上做的就是这两步，评测器没有理由走一条学生走不到的捷径。
+
+    幂等：已有已采纳版本时直接返回 True，不重复起草。
+    """
+    headers = {"X-CampusPath-Role": "student"}
+    if client.get(f"/v1/students/{student_id}/pathway",
+                  headers=headers).status_code == 200:
+        return True
+    drafted = client.post(f"/v1/students/{student_id}/pathway/draft",
+                          headers=headers)
+    if drafted.status_code != 200:
+        return False
+    draft_id = drafted.json()["draft_id"]
+    decided = client.post(
+        f"/v1/students/{student_id}/pathway/draft/{draft_id}/decision"
+        "?decision=adopt", headers=headers)
+    return decided.status_code == 200

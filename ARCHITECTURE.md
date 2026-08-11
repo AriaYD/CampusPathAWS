@@ -1,6 +1,23 @@
 # CampusPath 架构文档
 
-> 版本对应：Spec **v4.1.30** · Plan V2 · 契约 **1.39.0** · Seed **1.10.0**（2026-08-10 main 同步）
+> 版本对应：Spec **v4.1.31** · Plan V2 · 契约 **1.40.0** · Seed **1.11.0**（2026-08-10 main 同步）
+>
+> 2026-08-10 第八轮 P4（Spec v4.1.31，契约 1.39.0→1.40.0，Seed 1.10.0→1.11.0）：
+> **校方指标从随机数变成真实推导**。新增两条数据流：
+> **① 曝光 → 元组 → 聚合 → `/insights`**：前端 `lib/exposure.ts` 用
+> IntersectionObserver（阈值 0.5 + 停留 300ms）记录「真的进过视口」→
+> `POST /students/{id}/exposures`（按 subject×入口×深度×当天去重）→
+> `campuspath_state.exposure.ExposureStore`（**带 student_id，永不出域**）→
+> `campuspath_state.metrics.derive_metric_tuple`（**这个函数就是那条边界**：
+> 进去带 student_id，出来的 `MetricTuple` 连那个字段都没有）→
+> `campuspath_aggregation` 抑制与排行榜 → `/v1/insights/*`。
+> **② Gap 变更 → `gaps_closed`**：`gap_map()` 每次调用与上一份快照差分
+> （「关闭」= requirement 从缺口列表里**消失**，因为 gap_map 对已满足的是跳过的）
+> → `GapChangeEvent`（关闭必须挂证据）→ `GrowthTrajectory.gaps_closed`
+> 不再硬编码 0。
+> 分层硬约束：`campuspath_state` **不得 import** `campuspath_agents` / `campuspath_rules`，
+> 资格与缺口由 API 编排层算好作为纯数据递入（AST 断言钉住）。
+> 合成与派生带 `provenance` **绝不静默合并**，聚合行报 `derived_cell_n`/`synthetic_cell_n`。
 >
 > 2026-08-10 第八轮 P3（Spec v4.1.30，契约 1.38.0→1.39.0）：两条数据流的**控制权**改了。
 > **① 档案上传 → 直写 + 可撤销**：`POST /students/{id}/resume` → `resume_template.py`
@@ -251,8 +268,8 @@ sequenceDiagram
 ## 5. 分层清单
 
 ### 契约层（`contracts/`，唯一真相来源）
-声明式 OpenAPI（`openapi.py`，不从 FastAPI 反推）。**177 个数据契约类型 / 92 路径 111 操作 / 238 OpenAPI schema**（2026-08-10 实测），
-版本 **1.39.0**。对外一律称「数据契约类型」——"模型"在 AI 产品语境里会被读成大语言模型。
+声明式 OpenAPI（`openapi.py`，不从 FastAPI 反推）。**184 个数据契约类型 / 95 路径 114 操作**（2026-08-10 实测），
+版本 **1.40.0**。对外一律称「数据契约类型」——"模型"在 AI 产品语境里会被读成大语言模型。
 改动三件套：`openapi.py` 声明 → `make contracts && make types` → API 实现。
 前端 TS 类型同源生成，`make contracts-check` 守产物一致性。
 
