@@ -569,3 +569,146 @@ export function Sparkline({
     </div>
   );
 }
+
+/**
+ * 横向条：标签 + 条 + 数值。给排行榜用。
+ *
+ * `suppressed` 的那一行画**斜纹**而不是短条——短条会被读成"这项很少"，
+ * 而真相是"人太少不能说"。两者在校方的处置上完全相反。
+ */
+export function BarRow({
+  label,
+  value,
+  max,
+  suffix,
+  suppressed = false,
+  tone = "accent",
+}: {
+  label: string;
+  value: number;
+  max: number;
+  suffix?: string;
+  suppressed?: boolean;
+  tone?: "accent" | "muted";
+}) {
+  const ratio = max > 0 ? Math.max(0, Math.min(1, value / max)) : 0;
+  return (
+    <div className="flex items-center gap-3" data-bar-row={label}>
+      {/* 宽度自适应：写死 9.5rem 在学院小卡里会把条挤成一小截。
+          min-w-0 + basis 让它在宽容器里舒展、在窄容器里让位。 */}
+      <span className="t-micro min-w-0 shrink basis-[9.5rem] truncate text-fg-muted"
+            title={label}>
+        {label}
+      </span>
+      <div className="h-3 flex-1 overflow-hidden rounded-full bg-bg-sunk">
+        <div
+          className="h-full rounded-full"
+          style={
+            suppressed
+              ? {
+                  width: "100%",
+                  background:
+                    "repeating-linear-gradient(45deg, transparent, transparent 4px," +
+                    " color-mix(in srgb, var(--hatch) 24%, transparent) 4px," +
+                    " color-mix(in srgb, var(--hatch) 24%, transparent) 8px)",
+                }
+              : {
+                  width: `${ratio * 100}%`,
+                  background:
+                    tone === "muted" ? "var(--color-mist-400, var(--line-strong))" : "var(--accent)",
+                }
+          }
+        />
+      </div>
+      <span className="t-micro w-14 shrink-0 text-end tabular-nums text-fg-muted">
+        {suppressed ? "—" : `${value}${suffix ?? ""}`}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * 漏斗：一层比一层窄。用**面积**而不是长度表达衰减，因为漏斗的重点是
+ * "掉了多少"，长度条已经有 BarRow 在做了。
+ */
+export function Funnel({
+  steps,
+}: {
+  steps: { label: string; value: number }[];
+}) {
+  const top = steps[0]?.value ?? 0;
+  return (
+    <div data-funnel className="flex flex-col gap-1.5">
+      {steps.map((step, i) => {
+        const ratio = top > 0 ? step.value / top : 0;
+        return (
+          <div key={step.label} className="flex items-center gap-3">
+            <span className="t-micro w-[7.5rem] shrink-0 text-fg-muted">{step.label}</span>
+            <div className="flex-1">
+              <div
+                className="h-7 rounded-md"
+                style={{
+                  width: `${Math.max(ratio * 100, 2)}%`,
+                  background: `color-mix(in srgb, var(--accent) ${
+                    Math.round(70 - i * 14)
+                  }%, var(--bg-sunk))`,
+                }}
+              />
+            </div>
+            <span className="t-micro w-24 shrink-0 text-end tabular-nums text-fg-muted">
+              {step.value.toLocaleString()}
+              {i > 0 && top > 0 && (
+                <span className="ms-1 text-fg-faint">
+                  {Math.round(ratio * 100)}%
+                </span>
+              )}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
+ * 带置信区间须线的分数条（1–5）。
+ *
+ * **须线不是装饰**：样本少的时候区间会很宽，那正是"别太当真"的可视化说法。
+ * 只画点不画须，5 个人的 4.6 分和 200 个人的 4.6 分看起来一模一样。
+ */
+export function WhiskerBar({
+  label,
+  score,
+  low,
+  high,
+}: {
+  label: string;
+  score: number;
+  low: number;
+  high: number;
+}) {
+  const pos = (v: number) => ((v - 1) / 4) * 100;
+  return (
+    <div className="flex items-center gap-3" data-whisker={label}>
+      <span className="t-micro w-[6.5rem] shrink-0 leading-tight text-fg-muted">{label}</span>
+      <div className="relative h-6 flex-1">
+        <div className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-bg-sunk" />
+        <div
+          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full"
+          style={{
+            left: `${pos(low)}%`,
+            width: `${Math.max(pos(high) - pos(low), 1)}%`,
+            background: "color-mix(in srgb, var(--accent) 34%, transparent)",
+          }}
+        />
+        <div
+          className="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-sm"
+          style={{ left: `${pos(score)}%`, background: "var(--accent-deep)" }}
+        />
+      </div>
+      <span className="t-micro w-16 shrink-0 text-end tabular-nums text-fg-muted">
+        {score.toFixed(2)}
+      </span>
+    </div>
+  );
+}

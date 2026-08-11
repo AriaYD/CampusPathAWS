@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useI18n } from "@/i18n";
 import { institution, type ResourceCoverageAggregate } from "@/lib/api";
 import { useResource } from "@/lib/useResource";
+import { InsightReport } from "@/components/insight-report";
 import {
   Card,
   Empty,
@@ -141,7 +142,9 @@ export default function InsightsPage() {
           {(latest?.unmet_requirement_ranking ?? []).map((row) => (
             <li key={row.category} data-unmet={row.category}
                 className="flex flex-wrap items-baseline justify-between gap-2 rounded-md border border-line bg-bg-sunk p-3">
-              <span className="t-meta text-fg">{row.category}</span>
+              <span className="t-meta text-fg">
+                {t(`category.${row.category}` as Parameters<typeof t>[0])}
+              </span>
               <span className="t-micro text-fg-muted">
                 <span className="tabular-nums">{row.occurrences}</span> ·{" "}
                 {row.covered_by_any_resource
@@ -175,7 +178,7 @@ export default function InsightsPage() {
                       {rows.slice(0, 6).map((row) => (
                         <li key={row.category} data-unmet-row={`${school}:${row.category}`}
                             className="t-micro flex items-baseline justify-between gap-2 text-fg-muted">
-                          <span>{row.category}</span>
+                          <span>{t(`category.${row.category}` as Parameters<typeof t>[0])}</span>
                           <span className="tabular-nums">{row.occurrences}</span>
                         </li>
                       ))}
@@ -253,6 +256,14 @@ export default function InsightsPage() {
         </Grid>
         {conversion.data && <ProvenanceNote rows={conversion.data} />}
       </Card>
+
+      {/* C（2026-08-10 用户需求）：完整报告就地展开。数据复用本页已拉的三份，
+          不重复请求；只有活动质量聚合是展开时才拉（整页最贵的一次）。 */}
+      <InsightReport
+        trend={trend.data ?? []}
+        bySchool={bySchool.data ?? []}
+        conversion={conversion.data ?? []}
+      />
     </>
   );
 }
