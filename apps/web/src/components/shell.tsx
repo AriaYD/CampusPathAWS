@@ -485,16 +485,56 @@ function usePortalGuard(): "checking" | "login" | "app" {
   useEffect(() => {
     if (!ready || bare) return;
     if (session === null && !onLogin) router.replace("/login");
-    else if (session !== null && (onLogin || wrongDesk)) {
+    // **不再因为"本地有会话"就把人从 /login 弹走**（2026-08-11 真机复现）：
+    // 手机上 localStorage 存着旧会话、而口令 cookie 已失效时，
+    // /login → 守卫弹去 /console → middleware 307 回 /login → 再弹……
+    // 每一轮都渲染那个空的 checking 占位，于是**永久白屏**，
+    // 而唯一能重新过门的输入框就在这一页上，等于把出路自己封死了。
+    // 省下的那一次点击不值这个代价；已登录的人在 /login 会看到自己的会话
+    // 与「继续」入口（登录页自己处理），不会迷路。
+    else if (session !== null && wrongDesk) {
       router.replace(homeFor(session));
     }
   }, [ready, session, onLogin, wrongDesk, bare, router]);
 
   if (bare) return "login";
   if (!ready) return "checking";
-  if (onLogin) return session === null ? "login" : "checking";
+  if (onLogin) return "login";
   if (session === null || wrongDesk) return "checking";
   return "app";
+}
+
+/**
+ * 守卫过渡态。
+ *
+ * 它以前是**一个空 div**——正常情况下只闪一帧，没人看得见；可一旦跳转成环
+ * （2026-08-11 真机实发：本地有会话 + 口令 cookie 失效），用户得到的就是
+ * 一张永远的白纸，连"出了什么事"都无从知道。
+ *
+ * 现在：先给 1.2 秒的安静（不闪文案），仍未解决就说人话并给一条出路。
+ * **不做自动跳转**——把人送去哪一页正是刚才出错的那件事。
+ */
+function GuardChecking() {
+  const { t } = useI18n();
+  const [stuck, setStuck] = useState(false);
+  useEffect(() => {
+    const id = setTimeout(() => setStuck(true), 1200);
+    return () => clearTimeout(id);
+  }, []);
+  return (
+    <div className="flex min-h-dvh items-center justify-center p-6" data-guard-checking>
+      {stuck && (
+        <div className="max-w-[34ch] text-center" data-guard-stuck>
+          <p className="t-body text-fg">{t("guard.stuck.title")}</p>
+          <p className="t-meta mt-2 text-fg-muted">{t("guard.stuck.body")}</p>
+          <a href="/login" data-guard-escape
+             className="pressable btn btn-primary t-meta mt-4 inline-flex font-medium">
+            {t("guard.stuck.action")}
+          </a>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function Shell({ children }: { children: React.ReactNode }) {
@@ -506,7 +546,7 @@ export function Shell({ children }: { children: React.ReactNode }) {
 
   // 登录页不带导航壳——门户的导航只属于登录后的那个门户
   if (phase === "login") return <>{children}</>;
-  if (phase === "checking") return <div className="min-h-dvh" data-guard-checking />;
+  if (phase === "checking") return <GuardChecking />;
 
   return (
     <div className="min-h-dvh">
