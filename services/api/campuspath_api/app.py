@@ -14,6 +14,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from campuspath_contracts.aggregation import (
@@ -2987,6 +2988,7 @@ def create_app(deps: Deps | None = None) -> FastAPI:
 
     def _build_pathway_candidate(
         student_id: str, intensity: str,
+        on_step: Callable[[int, str], None] | None = None,
     ) -> tuple[PathwayVersion | None, tuple[str, ...]]:
         """排一版路径出来，**不写任何东西**。返回 (路径, 记忆依据)。
 
@@ -3021,6 +3023,12 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             if (fp is not None
                     and deps.a5_failed.get(failed_key) != date.today()):
                 today = deps.today
+                # 这三档把原来那一整段"25%"切开（2026-08-11 用户要求）：
+                # 它在线上实测停了约 90 秒，读起来像卡住。停留本身不是撒谎
+                # ——那一刻确实在做这件事——但一档报三件事，学生就无从知道
+                # 到底卡在哪一步。
+                if on_step:
+                    on_step(25, "match")        # 取候选、按确定性分排序
                 cached = deps.match_cache.get(student_id)
                 try:
                     if cached and cached[0] == today:
@@ -3055,6 +3063,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                     i for i in (found.plan_items if found else ())
                     if i.subject_id in approved_opps)
                 if matches:
+                    if on_step:
+                        on_step(45, "generate")   # ← 全流程最慢的一步：调模型
                     # 生成不许 500（与审查 M10 同一条纪律）：任何异常都回落
                     # 夹具并计入失败负缓存，否则每次重烧模型再炸一遍
                     # （2026-08-03 用户报障：y1s2 撞名炸出的正是这条路）
@@ -3070,6 +3080,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                             f"(student={student_id}, intensity={variant.value})")
                         built = None
                 if built is not None:
+                    if on_step:
+                        on_step(65, "backing")    # 每条计划的规则凭据校验
                     # 审查 M10：B8 闸门是这条路上唯一可能抛出的调用——
                     # 凭据绑定对不上时回落夹具并留日志
                     try:
@@ -3227,17 +3239,17 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 deps.draft_jobs[student_id] = deps.draft_jobs[student_id].model_copy(
                     update={"percent": percent, "phase": phase})
             try:
-                step(25, "compare")
-                built, memory_notes = _build_pathway_candidate(student_id, intensity)
-                step(70, "decompose")
+                step(15, "compare")
+                built, memory_notes = _build_pathway_candidate(
+                    student_id, intensity, on_step=step)
                 if built is None:
                     deps.draft_jobs[student_id] = job.model_copy(update={
                         "state": PathwayDraftJobState.FAILED, "percent": 100,
                         "phase": "failed", "finished_at": datetime.now(timezone.utc),
                         "detail": "no_pathway_version"})
                     return
+                step(85, "verify")
                 built = _with_conflicts(built, student_id)
-                step(90, "verify")
                 draft = _assemble_draft(student_id, intensity, built, memory_notes)
                 deps.pathway_drafts[draft.draft_id] = draft
                 deps.draft_jobs[student_id] = job.model_copy(update={
