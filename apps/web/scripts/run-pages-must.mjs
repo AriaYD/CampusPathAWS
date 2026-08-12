@@ -43,6 +43,21 @@ const KNOWN_STATE_DEPENDENT = new Set([
   "[data-availability-grid]",
 ]);
 
+/**
+ * `--wide-controls`：把原生表单控件强撑到 **Android 的真实宽度**再量溢出。
+ *
+ * 2026-08-11 用户手机实测报障：日历页「日常作息」的时间选择器溢出卡片，
+ * 连带把固定标签栏撑宽、第 6 格滑出屏幕。桌面 Chrome **复现不出来**——
+ * 它的 `<input type="time">` 约 90px，而那台 vivo 上实测 **160px**。
+ * 门禁跑在桌面 Chrome 里，于是这一整类缺陷天生看不见。
+ *
+ * 160 不是拍脑袋：它就是真机量出来的数。
+ */
+const wideControls = process.argv.includes("--wide-controls");
+const NATIVE_WIDE_CSS =
+  'input[type="time"],input[type="date"],input[type="datetime-local"],'
+  + 'input[type="month"],input[type="week"]{min-width:160px !important}';
+
 const probe = process.argv.includes("--probe");
 const probeOverflow = process.argv.includes("--probe-overflow");
 const probeSidebar = process.argv.includes("--probe-sidebar");
@@ -136,6 +151,11 @@ try {
         el.style.width = "210px";
         el.style.height = "40px";
       });
+    }
+
+    if (wideControls) {
+      await page.addStyleTag({ content: NATIVE_WIDE_CSS });
+      await new Promise((r) => setTimeout(r, 250));
     }
 
     if (isMobile) {

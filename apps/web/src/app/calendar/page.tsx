@@ -121,17 +121,21 @@ function RoutineCard({
     set: (v: { start: string; end: string }) => void,
     tag: string,
   ) => (
-    <span className="flex items-center gap-1">
+    // `min-w-0` + `flex-wrap`：**原生时间控件的宽度不归我们管**——
+    // Android/vivo 上它比桌面 Chrome 宽得多（用户 2026-08-11 手机实测，
+    // 桌面模拟复现不出来）。所以不能假设"它应该放得下"，只能让它
+    // 撑不破：这一行可以自己折行，两个输入框可以被压缩。
+    <span className="flex min-w-0 flex-wrap items-center gap-1">
       <input
         type="time" value={value.start} data-routine={`${tag}-start`}
         onChange={(e) => set({ ...value, start: e.target.value })}
-        className="field t-meta px-1.5 py-1"
+        className="field t-meta w-full min-w-0 max-w-[9.5rem] flex-1 px-1.5 py-1"
       />
-      –
+      <span aria-hidden>–</span>
       <input
         type="time" value={value.end} data-routine={`${tag}-end`}
         onChange={(e) => set({ ...value, end: e.target.value })}
-        className="field t-meta px-1.5 py-1"
+        className="field t-meta w-full min-w-0 max-w-[9.5rem] flex-1 px-1.5 py-1"
       />
     </span>
   );
@@ -142,8 +146,8 @@ function RoutineCard({
       <p className="t-meta mb-3 max-w-[70ch] text-fg-muted">
         {t("calendar.routine.lead")}
       </p>
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <label className="t-meta flex items-center gap-2 text-fg">
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6">
+        <label className="t-meta flex min-w-0 flex-wrap items-center gap-2 text-fg">
           {t("calendar.routine.sleep")}
           {timeInput(sleep, setSleep, "sleep")}
         </label>
@@ -154,7 +158,8 @@ function RoutineCard({
             ["dinner", dinner, setDinner],
           ] as const
         ).map(([name, meal, set]) => (
-          <label key={name} className="t-meta flex items-center gap-2 text-fg">
+          <label key={name}
+                 className="t-meta flex min-w-0 flex-wrap items-center gap-2 text-fg">
             <input
               type="checkbox"
               checked={meal.on}
