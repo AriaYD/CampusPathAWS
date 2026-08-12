@@ -5363,6 +5363,11 @@ export interface components {
              * @default []
              */
             assumptions: components["schemas"]["LocalizedText"][];
+            /**
+             * Conflicts
+             * @default []
+             */
+            conflicts: components["schemas"]["PlanItemConflict"][];
             date_range: components["schemas"]["DateRange"];
             /**
              * Dependencies
@@ -5398,6 +5403,49 @@ export interface components {
              */
             workload_hours: number;
         };
+        /**
+         * PlanItemConflict
+         * @description 一条**时段重叠的事实**（用户 2026-08-11 报障 A/B，Fable 5 裁定）。
+         *
+         *     它只陈述「与谁重叠、重叠多少分钟」。**不含"该不该去"**——
+         *     课能不能翘是学生的私人取舍（他知道那节课点不点名），系统不知道。
+         *     取舍归 A5 排序，拍板归学生批准；这里只负责让冲突**说得出口**。
+         *
+         *     检测发生在 Capacity & Calendar Service（纯区间数学、零 LLM，
+         *     且全量时段真相只在它手里）；事实随 `PlanItem.validation_id` 一起
+         *     过 B8 那道门。**前端不许自己再算一遍**——两套真相必然漂移。
+         */
+        PlanItemConflict: {
+            /**
+             * Ends At
+             * Format: date-time
+             */
+            ends_at: string;
+            kind: components["schemas"]["PlanItemConflictKind"];
+            /** @description 给学生看的名字，如「HUMA 1030 · 汉语结构」 */
+            label: components["schemas"]["LocalizedText"];
+            /**
+             * Overlap Minutes
+             * @description 重叠分钟数。**下限是 1**：零重叠不是冲突
+             */
+            overlap_minutes: number;
+            /**
+             * Starts At
+             * Format: date-time
+             */
+            starts_at: string;
+            /**
+             * With Id
+             * @description 冲突对象：block_id 或 plan_item_id
+             */
+            with_id: string;
+        };
+        /**
+         * PlanItemConflictKind
+         * @description 冲突对象的性质。分类只影响**怎么说**，不影响**要不要说**。
+         * @enum {string}
+         */
+        PlanItemConflictKind: "course" | "protected" | "planned_activity" | "commitment";
         /**
          * PlanItemKind
          * @enum {string}

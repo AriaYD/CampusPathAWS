@@ -385,19 +385,27 @@ function CalendarInner() {
   }
 
   /** 把区块按天分组，取第 `weekOffset` 周的 7 天。 */
-  const { days, weekLabel, hasTitles, allDays, byDay, months, displayToOriginal, planDetails } =
+  const { days, weekLabel, hasTitles, allDays, byDay, months, displayToOriginal,
+          planDetails, planLayout } =
     useMemo(() => {
     const real = blocks.data ?? [];
     // 规划中活动 → 虚线伪块（用户验收标准：规划里的活动必须在日历上看得见）。
-    // 多日活动**按天切段**、同日多条**合并为一条**（标题 +N）——五个同时段
-    // 活动叠成一摞糊标题是实测踩过的坑；已批准写入（AB-…-plan-…）的不再重复画。
+    // 多日活动**按天切段**；已批准写入（AB-…-plan-…）的不再重复画。
+    //
+    // **聚合键是「真实重叠」，不是「同一天」**（2026-08-11 用户报障 B，Fable 5 裁定）。
+    // 旧写法把同日全部条目并成一块、span 取 min(start)→max(end)：
+    // 10:00–12:00 与 16:00–18:00 会被画成 10:00–18:00，**把空档画成占用**——
+    // 那是界面在撒谎，加提示救不了，只能换聚合键。
+    // 现在：不重叠的各画各的；真重叠两条并排分两列；三条以上才聚成一块并标「N 项重叠」
+    // （"五个同时段活动叠成一摞糊标题"那个实测的坑仍然要绕开，但只在真叠上时绕）。
     const written = new Set(
       real.filter((b) => b.block_id.includes("-plan-"))
           .map((b) => b.block_id));
     const oppById = new Map(
       (plannedCatalog.data ?? []).map((o) => [o.opportunity_id, o]));
     type Seg = { day: string; start: string; end: string; title: string;
-                 url: string | null; brief: string | null };
+                 url: string | null; brief: string | null;
+                 subjectId: string; conflicts: number };
     const segments: Seg[] = [];
     for (const item of plannedPathway.data?.plan_items ?? []) {
       if (item.kind !== "opportunity") continue;
@@ -421,6 +429,10 @@ function CalendarInner() {
           title,
           url: opp.official_url ?? null,
           brief: opp.provenance?.evidence_snippet ?? null,
+          subjectId: item.subject_id,
+          // 冲突事实**来自服务端**（Capacity 算的），前端只显示不重算——
+          // 两套真相迟早漂移
+          conflicts: item.conflicts?.length ?? 0,
         });
       }
     }
@@ -428,30 +440,63 @@ function CalendarInner() {
     for (const seg of segments) {
       byPlanDay.set(seg.day, [...(byPlanDay.get(seg.day) ?? []), seg]);
     }
-    const planned: AvailabilityBlock[] = [...byPlanDay.entries()].map(
-      ([day, segs]) => ({
-        block_id: `PLAN-${day}`,
-        student_id: studentId,
-        span: {
-          start: segs.reduce((a, s) => (s.start < a ? s.start : a), segs[0].start),
-          end: segs.reduce((a, s) => (s.end > a ? s.end : a), segs[0].end),
-        },
-        type: "flexible",
-        source: "derived",
-        detail_level: "event_titles",
-        title: segs.length > 1
-          ? `${segs[0].title} +${segs.length - 1}`
-          : segs[0].title,
-        privacy_level: "student_defined",
-      } as unknown as AvailabilityBlock));
+    /** 块 id → 并排布局（第几列 / 共几列）与冲突数。绝对定位要用它算左偏移。 */
+    const planLayout = new Map<string, { col: number; cols: number;
+                                         overlap: number; conflicts: number }>();
+    const planned: AvailabilityBlock[] = [];
+    for (const [day, segs] of byPlanDay.entries()) {
+      const sorted = [...segs].sort((a, b) => a.start.localeCompare(b.start));
+      // 贪心切重叠簇：只要下一条的开始早于当前簇的结束，就还在同一簇里。
+      // 相邻（前一条 17:00 结束、后一条 17:00 开始）**不算重叠**——
+      // 半开区间，与服务端 `overlap_minutes` 同一口径。
+      const clusters: Seg[][] = [];
+      for (const seg of sorted) {
+        const last = clusters[clusters.length - 1];
+        const lastEnd = last?.reduce((a, s) => (s.end > a ? s.end : a), last[0].end);
+        if (last && lastEnd !== undefined && seg.start < lastEnd) last.push(seg);
+        else clusters.push([seg]);
+      }
+      clusters.forEach((cluster, ci) => {
+        if (cluster.length >= 3) {
+          // 三条以上：390px 上分三列每列不足 60px，标题必糊。画重叠组的
+          // **并集**（组内本就连续，不虚占）并标数量，细节交给日视图/议程。
+          const id = `PLAN-${day}-c${ci}`;
+          planLayout.set(id, { col: 0, cols: 1, overlap: cluster.length,
+                               conflicts: cluster.reduce((a, s) => a + s.conflicts, 0) });
+          planned.push({
+            block_id: id, student_id: studentId,
+            span: {
+              start: cluster.reduce((a, s) => (s.start < a ? s.start : a), cluster[0].start),
+              end: cluster.reduce((a, s) => (s.end > a ? s.end : a), cluster[0].end),
+            },
+            type: "flexible", source: "derived", detail_level: "event_titles",
+            title: `${cluster.length} 项重叠 · ${cluster[0].title}`,
+            privacy_level: "student_defined",
+          } as unknown as AvailabilityBlock);
+          return;
+        }
+        cluster.forEach((seg, col) => {
+          const id = `PLAN-${day}-c${ci}-${col}`;
+          planLayout.set(id, { col, cols: cluster.length, overlap: cluster.length,
+                               conflicts: seg.conflicts });
+          planned.push({
+            block_id: id, student_id: studentId,
+            span: { start: seg.start, end: seg.end },
+            type: "flexible", source: "derived", detail_level: "event_titles",
+            title: seg.title, privacy_level: "student_defined",
+          } as unknown as AvailabilityBlock);
+        });
+      });
+    }
     const rows = [...real, ...planned];
     const empty = {
       days: [] as Day[], weekLabel: "", hasTitles: false,
       allDays: [] as string[], byDay: new Map<string, AvailabilityBlock[]>(),
       months: [] as string[],
       displayToOriginal: new Map<string, AvailabilityBlock>(),
-      planDetails: new Map<string, { day: string; start: string; end: string;
-        title: string; url: string | null; brief: string | null }[]>(),
+      planDetails: new Map<string, Seg[]>(),
+      planLayout: new Map<string, { col: number; cols: number;
+                                    overlap: number; conflicts: number }>(),
     };
     if (!rows.length) return empty;
 
@@ -516,6 +561,7 @@ function CalendarInner() {
       months: [...new Set(allDays.map((d) => d.slice(0, 7)))].sort(),
       displayToOriginal,
       planDetails: byPlanDay,
+      planLayout,
     };
   }, [blocks.data, plannedPathway.data, plannedCatalog.data, studentId,
       weekOffset, locale]);
@@ -996,6 +1042,7 @@ function CalendarInner() {
                     {day.blocks.map((block) => {
                       const { top, height, visible } = position(block);
                       if (!visible || block.type === "free") return null;
+                      const layout = planLayout.get(block.block_id);
                       return (
                         <button
                           type="button"
@@ -1017,8 +1064,21 @@ function CalendarInner() {
                           // 相邻时段互相压叠，所以这块豁免全局的 44px 规则；
                           // 手机上真正的解法是下面的日视图/议程（周网格 lg 起）。
                           data-tap-exempt
-                          className="pressable absolute inset-x-[2px] overflow-hidden rounded-xs px-1 text-start"
-                          style={{ top, height, ...blockStyle(block) }}
+                          data-plan-overlap={layout?.overlap}
+                          data-plan-conflicts={layout?.conflicts}
+                          className="pressable absolute overflow-hidden rounded-xs px-1 text-start"
+                          style={{
+                            top, height, ...blockStyle(block),
+                            // 真重叠的两条**并排**，各占一半宽——叠在一起会藏掉
+                            // 其中一条，而藏掉正是缺陷 B 的老毛病
+                            left: `calc(2px + ${(layout?.col ?? 0)} * (100% - 4px) / ${layout?.cols ?? 1})`,
+                            width: `calc((100% - 4px) / ${layout?.cols ?? 1} - ${(layout?.cols ?? 1) > 1 ? 2 : 0}px)`,
+                            // 与课/保护块撞上的，边框换成实线警示——冲突事实来自
+                            // 服务端，这里只负责让它看得见
+                            ...(layout?.conflicts
+                              ? { borderStyle: "solid", borderColor: "var(--color-clay-600)" }
+                              : {}),
+                          }}
                         >
                           {/* 标题只有在二级授权或学生自己命名时才存在。没有就不写，
                               **不填一个"忙"字充数**——那会让两种层级看起来一样。 */}
@@ -1093,8 +1153,11 @@ function CalendarInner() {
           const fmt = (iso: string) =>
             `${iso.slice(0, 10)} ${iso.slice(11, 16)}`;
           const isPlan = detail.block_id.startsWith("PLAN-");
-          const planSegs = isPlan
-            ? planDetails.get(detail.block_id.replace("PLAN-", "")) ?? []
+          // 新块 id 是 `PLAN-<day>-c<簇>[-<列>]`，只取日期那一段；
+          // 旧写法 `replace("PLAN-", "")` 会连簇号一起当成 key，取不到东西。
+          const planDay = detail.block_id.match(/^PLAN-(\d{4}-\d{2}-\d{2})/)?.[1];
+          const planSegs = isPlan && planDay
+            ? planDetails.get(planDay) ?? []
             : [];
           const oppId = detail.block_id.match(/-plan-(OPP-[A-Za-z0-9-]+)/)?.[1];
           const opp = oppId

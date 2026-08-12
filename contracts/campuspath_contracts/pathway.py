@@ -48,6 +48,48 @@ class PlanItemStatus(StrEnum):
     BLOCKED = "blocked"
 
 
+class PlanItemConflictKind(StrEnum):
+    """冲突对象的性质。分类只影响**怎么说**，不影响**要不要说**。"""
+
+    COURSE = "course"                    # 教务同步的课
+    PROTECTED = "protected"              # 学生自己声明的保护块（睡眠、三餐）
+    PLANNED_ACTIVITY = "planned_activity"  # 计划里的另一个活动
+    COMMITMENT = "commitment"            # 日历上已占用的其他安排
+
+
+class PlanItemConflict(FrozenModel):
+    """一条**时段重叠的事实**（用户 2026-08-11 报障 A/B，Fable 5 裁定）。
+
+    它只陈述「与谁重叠、重叠多少分钟」。**不含"该不该去"**——
+    课能不能翘是学生的私人取舍（他知道那节课点不点名），系统不知道。
+    取舍归 A5 排序，拍板归学生批准；这里只负责让冲突**说得出口**。
+
+    检测发生在 Capacity & Calendar Service（纯区间数学、零 LLM，
+    且全量时段真相只在它手里）；事实随 `PlanItem.validation_id` 一起
+    过 B8 那道门。**前端不许自己再算一遍**——两套真相必然漂移。
+    """
+
+    with_id: Identifier = Field(description="冲突对象：block_id 或 plan_item_id")
+    kind: PlanItemConflictKind
+    label: LocalizedText = Field(description="给学生看的名字，如「HUMA 1030 · 汉语结构」")
+    starts_at: datetime
+    ends_at: datetime
+    overlap_minutes: int = Field(
+        ge=1, description="重叠分钟数。**下限是 1**：零重叠不是冲突")
+
+    @model_validator(mode="after")
+    def _overlap_is_possible(self) -> "PlanItemConflict":
+        if self.ends_at <= self.starts_at:
+            raise ValueError("冲突对象的时段必须是正向的（end > start）")
+        span = int((self.ends_at - self.starts_at).total_seconds() // 60)
+        if self.overlap_minutes > span:
+            # 80 分钟的课不可能与你重叠 200 分钟。算错了在这里停住，
+            # 好过让界面告诉学生一个物理上不成立的数字。
+            raise ValueError(
+                f"重叠 {self.overlap_minutes} 分钟超过了冲突对象自身的 {span} 分钟")
+        return self
+
+
 class PlanItem(CampusPathModel):
     """A5 输出的最小单元。**每一个都必须携带 validation_id**（Spec §8.9.3）。"""
 
@@ -65,6 +107,9 @@ class PlanItem(CampusPathModel):
     )
     assumptions: tuple[LocalizedText, ...] = ()
     validation_id: ValidationId
+    #: 与这条计划撞在一起的时段（Capacity 算出、读时附加）。
+    #: **默认空元组而不是 None**——"没有冲突"和"没算过"不该长得一样。
+    conflicts: tuple[PlanItemConflict, ...] = ()
 
 
 class CapacityBudget(CampusPathModel):

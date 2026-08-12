@@ -38,8 +38,13 @@ def adopt_pathway(client, student: str = "STU-A", intensity: str | None = None,
     if drafted.status_code != 200:
         return drafted
     draft_id = drafted.json()["draft_id"]
+    # `acknowledge_conflicts=true` 代表**学生看过冲突后仍然采纳**这一步点击
+    # （2026-08-11 起带冲突的草案要显式确认）。助手替的是"点击"，
+    # 不是替谁做决定——需要断言"没确认就不该落盘"的用例请手写每一步，
+    # 那正是 `test_schedule_conflicts_api.py` 的职责。
     decided = client.post(
-        f"/v1/students/{student}/pathway/draft/{draft_id}/decision?decision=adopt",
+        f"/v1/students/{student}/pathway/draft/{draft_id}/decision"
+        "?decision=adopt&acknowledge_conflicts=true",
         headers=_headers(headers))
     if decided.status_code != 200:
         return decided

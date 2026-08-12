@@ -75,7 +75,7 @@ def test_switching_intensity_on_a_read_does_not_replan(deps):
                  "/v1/students/STU-A/pathway/draft?intensity=balanced").json()
     call(client, "POST",
          f"/v1/students/STU-A/pathway/draft/{draft['draft_id']}/decision"
-         "?decision=adopt")
+         "?decision=adopt&acknowledge_conflicts=true")
     adopted = call(client, "GET", "/v1/students/STU-A/pathway").json()
 
     again = call(client, "GET", "/v1/students/STU-A/pathway?intensity=ambitious")
@@ -106,7 +106,7 @@ def test_adopting_a_draft_lands_it(deps):
                  "/v1/students/STU-A/pathway/draft?intensity=balanced").json()
     decided = call(client, "POST",
                    f"/v1/students/STU-A/pathway/draft/{draft['draft_id']}"
-                   "/decision?decision=adopt")
+                   "/decision?decision=adopt&acknowledge_conflicts=true")
     assert decided.status_code == 200, decided.text
     assert decided.json()["adopted_at"] is not None
 
@@ -133,7 +133,7 @@ def test_a_decided_draft_cannot_be_decided_again(deps):
     draft = call(client, "POST",
                  "/v1/students/STU-A/pathway/draft?intensity=balanced").json()
     path = (f"/v1/students/STU-A/pathway/draft/{draft['draft_id']}"
-            "/decision?decision=adopt")
+            "/decision?decision=adopt&acknowledge_conflicts=true")
     assert call(client, "POST", path).status_code == 200
     assert call(client, "POST", path).status_code == 409
 
@@ -151,7 +151,7 @@ def test_draft_of_another_student_cannot_be_adopted(deps):
                  "/v1/students/STU-A/pathway/draft?intensity=balanced").json()
     r = call(client, "POST",
              f"/v1/students/STU-B/pathway/draft/{draft['draft_id']}"
-             "/decision?decision=adopt")
+             "/decision?decision=adopt&acknowledge_conflicts=true")
     assert r.status_code == 404
 
 
@@ -174,7 +174,7 @@ def test_second_draft_diffs_against_the_adopted_version(deps):
                  "/v1/students/STU-A/pathway/draft?intensity=low_load").json()
     call(client, "POST",
          f"/v1/students/STU-A/pathway/draft/{first['draft_id']}/decision"
-         "?decision=adopt")
+         "?decision=adopt&acknowledge_conflicts=true")
     second = call(client, "POST",
                   "/v1/students/STU-A/pathway/draft?intensity=ambitious").json()
     assert second["diff"]["is_first_plan"] is False

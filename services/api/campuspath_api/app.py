@@ -103,6 +103,8 @@ from campuspath_contracts.reflection import (
     ReflectionResult,
     StudentEventFeedbackForm,
 )
+from campuspath_capacity.conflicts import (
+    Occupancy, detect_conflicts, overlap_minutes)
 from campuspath_contracts.pathway import PathwayVersion, enforce_validation_binding
 from campuspath_contracts.memory import (
     DeletionReceipt,
@@ -138,6 +140,7 @@ from campuspath_contracts.pathway import (
     PlanItemKind,
     PlanItemStatus,
     ReplanRequest,
+    PlanItemConflictKind,
 )
 from campuspath_contracts.profile import (
     AppliedChange,
@@ -2366,7 +2369,10 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             start, end = slot.span.start, slot.span.end
             conflicts = []
             for block in blocks:
-                if block.span.start >= end or block.span.end <= start:
+                # 区间数学只留一份实现（Capacity 的 `overlap_minutes`）。
+                # 这里原本手写了一遍不等式——同一个"算不算重叠"的判断有两处
+                # 写法，迟早在半开区间的边界上分家。
+                if overlap_minutes(start, end, block.span.start, block.span.end) <= 0:
                     continue
                 if block.type is AvailabilityType.PROTECTED:
                     conflicts.append(ScheduleConflict(
@@ -3092,6 +3098,9 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         if built is None:
             raise HTTPException(404, {"error": "no_pathway_version",
                                       "detail": "没有可用的规划输入"})
+        # 冲突在**草案**里就得可见：审批弹窗是学生唯一一次通盘看这版计划的机会，
+        # 等采纳之后才告诉他"其中两个撞在一起"，那这个批准就是骗来的。
+        built = _with_conflicts(built, student_id)
         current = deps.pathways.get(student_id)
         # diff 的基线永远是**已采纳版本**。反过来减会让第一次规划报出一堆
         # "移除"，弹窗就成了劝学生批准一份在删他东西的计划——契约层的
@@ -3134,11 +3143,20 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                 response_model=PathwayDraft)
     def decide_pathway_draft(student_id: str, draft_id: str,
                              decision: str = Query(...),
+                             acknowledge_conflicts: bool = Query(False),
                              ) -> PathwayDraft:
         """学生的批准是**唯一**能让规划落盘的动作。
 
         与 B3 的 `decide_proposal` 同一形状：拒绝也留记录，
         "为什么这版没生效"要能回答。
+
+        **带冲突的草案要显式确认**（2026-08-11 用户报障 A/B，Fable 5 裁定）：
+        课能不能翘是学生的私人取舍，系统不替他决定——但也不能让他在
+        "不知道有冲突"的情况下按下批准。所以不拦"要不要去"，只拦
+        "你看见了吗"：`acknowledge_conflicts=true` 才放行。
+        拦在服务端而不是前端，是因为前端拦不住直连 API 的人。
+
+        **「再想想」永远不拦**：拦住放弃等于逼学生接受。
         """
         _known_student(student_id)
         draft = deps.pathway_drafts.get(draft_id)
@@ -3153,6 +3171,16 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                                       "detail": decision})
         now = datetime.now(timezone.utc)
         if decision == "adopt":
+            clashing = [i for i in draft.pathway.plan_items if i.conflicts]
+            if clashing and not acknowledge_conflicts:
+                raise HTTPException(409, {
+                    "error": "schedule_conflicts_unacknowledged",
+                    "detail": [
+                        {"plan_item_id": i.plan_item_id,
+                         "subject_id": i.subject_id,
+                         "conflicts": [c.model_dump(mode="json") for c in i.conflicts]}
+                        for i in clashing],
+                })
             # 已采纳版本才过 B8 闸门的最终确认——草案阶段已经查过一遍，
             # 这里是落盘前的最后一道，宁可重复也不给未背书的条目开口子。
             try:
@@ -3186,7 +3214,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         found = deps.pathways.get(student_id)
         if found is None:
             raise HTTPException(404, {"error": "no_pathway_version"})
-        return _augment_pathway_with_intl(found, student_id)
+        return _with_conflicts(_augment_pathway_with_intl(found, student_id),
+                               student_id)
 
     @implements("DELETE", "/students/{student_id}/pathway/items/{plan_item_id}",
                 response_model=PathwayVersion)
@@ -3228,6 +3257,92 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             timestamp=datetime.now(timezone.utc),
         ))
         return _augment_pathway_with_intl(updated, student_id)
+
+    #: 没有标题的块在冲突里也得有个说得出口的名字。
+    #: 二级授权没开时课表以外的块**本来就没有标题**（B5），
+    #: 这时说"与一段已占用时间重叠"，而不是编一个名字出来。
+    _TYPE_LABEL_ZH = {
+        AvailabilityType.BUSY: "已占用时段",
+        AvailabilityType.PROTECTED: "保护时段",
+        AvailabilityType.FLEXIBLE: "弹性安排",
+        AvailabilityType.BUFFER: "缓冲",
+        AvailabilityType.FREE: "空闲",
+    }
+
+    # ── 时段冲突：读时附加，不落盘（用户 2026-08-11 报障 A/B，Fable 5 裁定）──
+    #
+    # **为什么读时算**：冲突取决于日历当下的样子。落盘的冲突会随日历变动
+    # 而过期，而过期的冲突比没有冲突更糟——它会让学生躲开一场已经不冲突的活动。
+    #
+    # **为什么在服务端算**：前端本来就能拿到活动时间与日历块，看着像可以自己算；
+    # 但那样就有两套真相，迟早漂移。检测归 Capacity（纯区间数学、零 LLM，
+    # 且全量时段真相只在它手里），前端只负责显示。
+
+    def _occupancy_kind(block: AvailabilityBlock) -> PlanItemConflictKind | None:
+        """哪些块算"被占用"。**free/buffer 不算**——缓冲被压缩是容量问题，
+        不是冲突；把它算成冲突会让每条计划都报一堆噪声。"""
+        if block.source is BlockSource.COURSE_TIMETABLE:
+            return PlanItemConflictKind.COURSE
+        if block.type is AvailabilityType.PROTECTED:
+            return PlanItemConflictKind.PROTECTED
+        if block.type is AvailabilityType.BUSY:
+            return PlanItemConflictKind.COMMITMENT
+        return None
+
+    def _item_span(item: PlanItem) -> tuple[datetime, datetime] | None:
+        """计划条目的真实时刻。只有活动类有——课程/行动类只有日期范围，
+        没有时刻就谈不上"重叠多少分钟"，硬编一个时刻等于编数据。"""
+        if item.kind is not PlanItemKind.OPPORTUNITY:
+            return None
+        opp = next((o for o in deps.opportunities
+                    if o.opportunity_id == item.subject_id), None)
+        if opp is None or opp.starts_at is None:
+            return None
+        end = opp.ends_at or (opp.starts_at + timedelta(hours=2))
+        return (opp.starts_at, end) if end > opp.starts_at else None
+
+    def _with_conflicts(pathway: PathwayVersion,
+                        student_id: str) -> PathwayVersion:
+        """给每个有真实时刻的条目附上它撞到的东西。"""
+        spans = {i.plan_item_id: _item_span(i) for i in pathway.plan_items}
+        if not any(spans.values()):
+            return pathway
+        # 已批准写进日历的块与计划条目是同一件事，**不能两边都算**，
+        # 否则每个已落日历的活动都会报"与自己冲突"。
+        planned_subjects = {i.subject_id for i in pathway.plan_items}
+        occupied: list[Occupancy] = []
+        for b in deps.availability:
+            if b.student_id != student_id:
+                continue
+            if any(f"-plan-{s}" in b.block_id for s in planned_subjects):
+                continue
+            kind = _occupancy_kind(b)
+            if kind is None:
+                continue
+            occupied.append(Occupancy(
+                subject_id=b.block_id, kind=kind,
+                label=LocalizedText(zh_Hans=b.title or _TYPE_LABEL_ZH[b.type],
+                                    en=b.title or b.type.value),
+                starts_at=b.span.start, ends_at=b.span.end))
+
+        decorated: list[PlanItem] = []
+        for item in pathway.plan_items:
+            span = spans.get(item.plan_item_id)
+            if span is None:
+                decorated.append(item.model_copy(update={"conflicts": ()}))
+                continue
+            peers = [
+                Occupancy(subject_id=other.plan_item_id,
+                          kind=PlanItemConflictKind.PLANNED_ACTIVITY,
+                          label=other.title,
+                          starts_at=s[0], ends_at=s[1])
+                for other in pathway.plan_items
+                if other.plan_item_id != item.plan_item_id
+                and (s := spans.get(other.plan_item_id)) is not None
+            ]
+            decorated.append(item.model_copy(update={
+                "conflicts": detect_conflicts(span[0], span[1], [*occupied, *peers])}))
+        return pathway.model_copy(update={"plan_items": tuple(decorated)})
 
     def _augment_pathway_with_intl(pathway: PathwayVersion,
                                    student_id: str) -> PathwayVersion:

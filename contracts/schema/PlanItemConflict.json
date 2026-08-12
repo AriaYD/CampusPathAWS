@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "LocalizedText": {
+      "additionalProperties": false,
+      "description": "需要在 UI 展示的系统生成文案，两种语言都必须存在（Plan §2 UI 语言）。\n\n学生自己写的内容（Note、Reflection）**不用**这个类型——那是原文，不翻译。",
+      "properties": {
+        "en": {
+          "minLength": 1,
+          "title": "En",
+          "type": "string"
+        },
+        "zh_Hans": {
+          "minLength": 1,
+          "title": "Zh Hans",
+          "type": "string"
+        }
+      },
+      "required": [
+        "zh_Hans",
+        "en"
+      ],
+      "title": "LocalizedText",
+      "type": "object"
+    },
+    "PlanItemConflictKind": {
+      "description": "冲突对象的性质。分类只影响**怎么说**，不影响**要不要说**。",
+      "enum": [
+        "course",
+        "protected",
+        "planned_activity",
+        "commitment"
+      ],
+      "title": "PlanItemConflictKind",
+      "type": "string"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/PlanItemConflict.json",
+  "additionalProperties": false,
+  "description": "一条**时段重叠的事实**（用户 2026-08-11 报障 A/B，Fable 5 裁定）。\n\n它只陈述「与谁重叠、重叠多少分钟」。**不含\"该不该去\"**——\n课能不能翘是学生的私人取舍（他知道那节课点不点名），系统不知道。\n取舍归 A5 排序，拍板归学生批准；这里只负责让冲突**说得出口**。\n\n检测发生在 Capacity & Calendar Service（纯区间数学、零 LLM，\n且全量时段真相只在它手里）；事实随 `PlanItem.validation_id` 一起\n过 B8 那道门。**前端不许自己再算一遍**——两套真相必然漂移。",
+  "properties": {
+    "ends_at": {
+      "format": "date-time",
+      "title": "Ends At",
+      "type": "string"
+    },
+    "kind": {
+      "$ref": "#/components/schemas/PlanItemConflictKind"
+    },
+    "label": {
+      "$ref": "#/components/schemas/LocalizedText",
+      "description": "给学生看的名字，如「HUMA 1030 · 汉语结构」"
+    },
+    "overlap_minutes": {
+      "description": "重叠分钟数。**下限是 1**：零重叠不是冲突",
+      "minimum": 1,
+      "title": "Overlap Minutes",
+      "type": "integer"
+    },
+    "starts_at": {
+      "format": "date-time",
+      "title": "Starts At",
+      "type": "string"
+    },
+    "with_id": {
+      "description": "冲突对象：block_id 或 plan_item_id",
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "With Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "with_id",
+    "kind",
+    "label",
+    "starts_at",
+    "ends_at",
+    "overlap_minutes"
+  ],
+  "title": "PlanItemConflict",
+  "type": "object"
+}

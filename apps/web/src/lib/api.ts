@@ -415,10 +415,15 @@ export const api = {
       { method: "POST" },
     ),
   decidePathwayDraft: (id: string, draftId: string,
-                       decision: "adopt" | "discard") =>
+                       decision: "adopt" | "discard",
+                       acknowledgeConflicts = false) =>
     request<Schemas["PathwayDraft"]>(
       `${s(id)}/pathway/draft/${encodeURIComponent(draftId)}`
-      + `/decision?decision=${decision}`,
+      + `/decision?decision=${decision}`
+      // 带冲突的草案要显式确认才放行（服务端 409 拦着）。
+      // 这个参数代表的是**学生看过冲突后仍然按下批准**，
+      // 所以它只能由那个按钮传 true，不许在这里写死。
+      + (acknowledgeConflicts ? "&acknowledge_conflicts=true" : ""),
       { method: "POST" },
     ),
   recordExposures: (id: string, batch: Schemas["ExposureBatch"]) =>

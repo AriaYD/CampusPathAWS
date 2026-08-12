@@ -28,7 +28,8 @@ export type PathwayPlan = {
   /** 还没有任何已采纳版本——该显示"开始规划"，不是显示错误。 */
   neverPlanned: boolean;
   startPlanning: () => Promise<void>;
-  decide: (decision: "adopt" | "discard") => Promise<void>;
+  decide: (decision: "adopt" | "discard",
+           acknowledgeConflicts?: boolean) => Promise<void>;
   dismissDraft: () => void;
 };
 
@@ -48,11 +49,13 @@ export function usePathwayPlan(studentId: string, intensity?: string): PathwayPl
     }
   }
 
-  async function decide(decision: "adopt" | "discard") {
+  async function decide(decision: "adopt" | "discard",
+                        acknowledgeConflicts = false) {
     if (!draft) return;
     setState("deciding");
     try {
-      await api.decidePathwayDraft(studentId, draft.draft_id, decision);
+      await api.decidePathwayDraft(studentId, draft.draft_id, decision,
+                                   acknowledgeConflicts);
       setDraft(null);
       setState("idle");
       // 采纳后已采纳版本才存在——重读，让三个时间视图同时更新
@@ -83,6 +86,11 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
   const semi = pickLang(locale, "；", "; ");
   const d = plan.draft;
   const busy = plan.state === "drafting" || plan.state === "deciding";
+  // 「我知道有冲突」的勾选。**每来一份新草案都要重新勾**——
+  // 上一版看过不等于这一版看过。
+  const [ack, setAck] = useState(false);
+  const clashCount = (plan.draft?.pathway.plan_items ?? [])
+    .filter((i) => (i.conflicts ?? []).length > 0).length;
 
   return (
     <>
@@ -198,16 +206,49 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
                     {item.date_range.start}
                     {item.date_range.end ? ` → ${item.date_range.end}` : ""}
                   </span>
+                  {/* 冲突事实由服务端（Capacity）算好随条目下发。这里只陈述
+                      「与谁撞、撞多久」——**不写"建议放弃"**：课能不能翘是
+                      学生的私人取舍，他知道那节课点不点名，系统不知道。 */}
+                  {(item.conflicts ?? []).length > 0 && (
+                    <ul className="mt-1.5 flex flex-col gap-1"
+                        data-item-conflicts={item.conflicts.length}>
+                      {item.conflicts.map((c) => (
+                        <li key={c.with_id} className="t-micro flex flex-wrap items-baseline gap-1.5"
+                            style={{ color: "var(--color-clay-600)" }}>
+                          <span aria-hidden>▲</span>
+                          <span>{t(`pathway.conflict.${c.kind}` as Parameters<typeof t>[0])}</span>
+                          <span className="text-fg-muted">{localized(c.label, locale)}</span>
+                          <span className="tabular-nums">
+                            {t("pathway.conflict.minutes").replace("{n}", String(c.overlap_minutes))}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </li>
               ))}
             </ul>
 
+            {clashCount > 0 && (
+              <label className="mb-3 flex items-start gap-2 rounded-md p-2.5"
+                     data-conflict-ack
+                     style={{ background: "var(--color-clay-100)",
+                              border: "1px solid var(--color-clay-500)" }}>
+                <input type="checkbox" checked={ack}
+                       onChange={(e) => setAck(e.target.checked)} />
+                <span className="t-meta" style={{ color: "var(--color-clay-600)" }}>
+                  {t("pathway.draft.ackConflicts").replace("{n}", String(clashCount))}
+                </span>
+              </label>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
                 data-adopt-draft
-                disabled={busy}
-                onClick={() => plan.decide("adopt")}
+                // 有冲突就必须先勾——**不拦"要不要去"，只拦"你看见了吗"**。
+                // 服务端同样会拦（409），因为前端拦不住直连 API 的人。
+                disabled={busy || (clashCount > 0 && !ack)}
+                onClick={() => plan.decide("adopt", ack)}
                 className="pressable btn btn-primary t-body flex-1 disabled:opacity-60"
               >
                 {t("pathway.draft.adopt")}

@@ -1,5 +1,5 @@
 {
-  "contracts_version": "1.40.0",
+  "contracts_version": "1.41.0",
   "models": [
     "AcademicProgram",
     "AcademicState",
@@ -118,6 +118,7 @@
     "PathwayDraftDiff",
     "PathwayVersion",
     "PlanItem",
+    "PlanItemConflict",
     "PlazaConversionAggregate",
     "ProfileChangeEvent",
     "ProfileEntry",
