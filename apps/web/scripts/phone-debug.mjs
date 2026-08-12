@@ -8,6 +8,8 @@
  * **只操作 CampusPath 的标签页**——手机上还开着用户自己的别的页面，不碰。
  * 抓的是真机上真实发生的事：页面异常、失败请求、body 到底有没有内容。
  */
+import { fileURLToPath } from "node:url";
+
 import puppeteer from "puppeteer-core";
 
 const TARGET = process.argv[2]
@@ -64,8 +66,10 @@ try {
   if (failed.length) console.log("\n失败请求:\n  " + [...new Set(failed)].slice(0, 10).join("\n  "));
   const errLogs = logs.filter((l) => /^(error|warning)/.test(l));
   if (errLogs.length) console.log("\nconsole:\n  " + errLogs.slice(0, 8).join("\n  "));
+  // 相对本文件定位，**不写绝对家目录**——那会把用户名带进公开仓库
+  // （2026-08-11 快照扫描当场抓到过一次）
   await page.screenshot({ path: process.env.SHOT
-    ?? "/Users/aria_macmini/AllProjects/HKUST_CampusPath/docs/verification/phone-live.png" });
+    ?? fileURLToPath(new URL("../../../docs/verification/phone-live.png", import.meta.url)) });
 } finally {
   browser.disconnect();
 }
