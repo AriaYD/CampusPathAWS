@@ -201,6 +201,49 @@ class PathwayDraftDiff(CampusPathModel):
         return self
 
 
+class PathwayDraftJobState(StrEnum):
+    IDLE = "idle"
+    RUNNING = "running"
+    DONE = "done"
+    FAILED = "failed"
+
+
+class PathwayDraftJob(CampusPathModel):
+    """排一版方案这件事的**进度**（2026-08-11 用户要求 D）。
+
+    用户原话：「这个规划过程有点久……要在界面显示这个规划的进度」，
+    以及「即使用户切换或者关闭页面，也不会打断系统后台在做规划这件事情，
+    等用户切换回来这个规划页面的时候再弹窗」。
+
+    所以排程从"一次请求同步等着"改成**服务端的一件事**：请求只负责发起，
+    进度与结果都存在服务端。页面关掉、切走、换设备回来，问一次状态即可——
+    因为**做这件事的是服务器，不是那个页面**。
+
+    `percent` 是**阶段推进**而不是插值动画：每一档都对应一件真做完的事
+    （取数 / 比对 / 生成 / 校验）。假装匀速前进的进度条在慢的时候会
+    停在 99% 骗人，那比没有进度条更糟。
+    """
+
+    student_id: StudentId
+    state: PathwayDraftJobState
+    percent: int = Field(ge=0, le=100)
+    #: 当前阶段的人话说明（三语由前端按 key 渲染，这里只给 key）
+    phase: str = Field(default="", max_length=64)
+    draft_id: Identifier | None = Field(
+        default=None, description="state=done 时指向那份待批准的草案")
+    started_at: datetime | None = None
+    finished_at: datetime | None = None
+    detail: str | None = Field(default=None, description="失败时的原因，成功时为 None")
+
+    @model_validator(mode="after")
+    def _done_means_there_is_something_to_approve(self) -> "PathwayDraftJob":
+        if self.state is PathwayDraftJobState.DONE and self.draft_id is None:
+            raise ValueError("state=done 却没有 draft_id——那不叫做完了")
+        if self.state is PathwayDraftJobState.RUNNING and self.percent >= 100:
+            raise ValueError("还在跑却报 100%——进度条不许骗人")
+        return self
+
+
 class PathwayDraftDecision(CampusPathModel):
     """学生对草案的逐条取舍（2026-08-11 用户报障 A）。
 

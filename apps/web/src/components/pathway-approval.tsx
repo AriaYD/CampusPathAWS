@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { localized, pickLang, useI18n } from "@/i18n";
 import { ApiError, api, type Schemas } from "@/lib/api";
 import { useResource, type Resource } from "@/lib/useResource";
@@ -28,6 +28,7 @@ export type PathwayPlan = {
   /** 还没有任何已采纳版本——该显示"开始规划"，不是显示错误。 */
   neverPlanned: boolean;
   startPlanning: () => Promise<void>;
+  progress: { percent: number; phase: string } | null;
   decide: (decision: "adopt" | "discard",
            acknowledgeConflicts?: boolean,
            keepPlanItemIds?: string[]) => Promise<void>;
@@ -40,13 +41,56 @@ export function usePathwayPlan(studentId: string, intensity?: string): PathwayPl
   const [draft, setDraft] = useState<Schemas["PathwayDraft"] | null>(null);
   const [state, setState] = useState<PathwayPlan["state"]>("idle");
 
+  const [progress, setProgress] = useState<{ percent: number; phase: string } | null>(null);
+
+  /** 轮询排程进度，直到跑完或失败。**回到页面也调它**——重点不是"我发起过"，
+   *  而是"服务器现在做到哪了"。 */
+  const followJob = useCallback(async function follow() {
+    for (;;) {
+      let job;
+      try {
+        job = await api.pathwayDraftStatus(studentId);
+      } catch {
+        setState("error");
+        setProgress(null);
+        return;
+      }
+      if (job.state === "running") {
+        setState("drafting");
+        setProgress({ percent: job.percent, phase: job.phase });
+        await new Promise((r) => setTimeout(r, 1500));
+        continue;
+      }
+      setProgress(null);
+      if (job.state === "done" && job.draft_id) {
+        try {
+          setDraft(await api.pathwayDraftById(studentId, job.draft_id));
+          setState("idle");
+        } catch {
+          setState("error");
+        }
+        return;
+      }
+      if (job.state === "failed") { setState("error"); return; }
+      setState("idle");
+      return;
+    }
+  }, [studentId]);
+
+  // 切走再回来：问一次服务器。**做这件事的是服务器，不是这个页面**——
+  // 所以页面卸载不该打断它，重新挂载也不该重新开始
+  // （2026-08-11 用户要求 D）。
+  useEffect(() => { void followJob(); }, [followJob]);
+
   async function startPlanning() {
     setState("drafting");
+    setProgress({ percent: 0, phase: "collect" });
     try {
-      setDraft(await api.pathwayDraft(studentId, intensity));
-      setState("idle");
+      await api.startPathwayDraft(studentId, intensity);
+      await followJob();
     } catch {
       setState("error");
+      setProgress(null);
     }
   }
 
@@ -71,6 +115,7 @@ export function usePathwayPlan(studentId: string, intensity?: string): PathwayPl
     pathway,
     draft,
     state,
+    progress,
     neverPlanned:
       pathway.error instanceof ApiError && pathway.error.isMissing,
     startPlanning,
@@ -122,6 +167,30 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
               ? t("pathway.empty.drafting")
               : t("pathway.empty.cta")}
           </button>
+          {/* 进度条（2026-08-11 用户要求 D）。每一档对应一件真做完的事——
+              取数 → 比对 → 拆解 → 校验；**不做插值动画**，假装匀速的进度条
+              在慢的时候会卡在 99% 骗人，那比没有进度条更糟。
+              刷新、切页、关页都不影响：进度存在服务端，回来一问就接上。 */}
+          {plan.progress && (
+            <div className="mt-3 max-w-[42ch]" data-draft-progress={plan.progress.percent}>
+              <div className="t-micro mb-1 flex items-baseline justify-between text-fg-muted">
+                <span>{t(`pathway.progress.${plan.progress.phase}` as Parameters<typeof t>[0])}</span>
+                <span className="tabular-nums">{plan.progress.percent}%</span>
+              </div>
+              <div className="h-1.5 w-full overflow-hidden rounded-full"
+                   role="progressbar" aria-valuenow={plan.progress.percent}
+                   aria-valuemin={0} aria-valuemax={100}
+                   style={{ background: "var(--bg-sunk)" }}>
+                <div className="h-full rounded-full"
+                     style={{ width: `${plan.progress.percent}%`,
+                              background: "var(--accent-deep)",
+                              transition: "width .4s ease-out" }} />
+              </div>
+              <p className="t-micro mt-1.5 text-fg-faint">
+                {t("pathway.progress.keepGoing")}
+              </p>
+            </div>
+          )}
           {plan.state === "error" && (
             <p className="t-meta mt-2" style={{ color: "var(--color-clay-600)" }}>
               {t("pathway.draft.failed")}

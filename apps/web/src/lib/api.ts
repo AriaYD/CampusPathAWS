@@ -414,6 +414,21 @@ export const api = {
       `${s(id)}/pathway/draft${intensity ? `?intensity=${intensity}` : ""}`,
       { method: "POST" },
     ),
+  /** 发起排程作业：立刻返回，真活在服务端后台做（2026-08-11 用户要求 D）。 */
+  startPathwayDraft: (id: string, intensity?: string) =>
+    request<Schemas["PathwayDraftJob"]>(
+      `${s(id)}/pathway/draft/start${intensity ? `?intensity=${intensity}` : ""}`,
+      { method: "POST" },
+    ),
+  /** 排到哪了。**回到页面时问这一句**——做事的是服务器，不是那个页面。 */
+  pathwayDraftStatus: (id: string) =>
+    request<Schemas["PathwayDraftJob"]>(`${s(id)}/pathway/draft/status`),
+  /** 按 id 取回草案（状态轮询只给 id，不每 1.5 秒搬一次整份计划）。
+   *  与上面那个**发起**草案的 `pathwayDraft` 不是一回事——名字撞了会
+   *  让"发起一次新排程"和"取回已排好的那份"互相顶掉。 */
+  pathwayDraftById: (id: string, draftId: string) =>
+    request<Schemas["PathwayDraft"]>(
+      `${s(id)}/pathway/draft/${encodeURIComponent(draftId)}`),
   decidePathwayDraft: (id: string, draftId: string,
                        decision: "adopt" | "discard",
                        acknowledgeConflicts = false,

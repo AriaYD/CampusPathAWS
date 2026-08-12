@@ -1,0 +1,101 @@
+{
+  "$defs": {
+    "PathwayDraftJobState": {
+      "enum": [
+        "idle",
+        "running",
+        "done",
+        "failed"
+      ],
+      "title": "PathwayDraftJobState",
+      "type": "string"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/PathwayDraftJob.json",
+  "additionalProperties": false,
+  "description": "排一版方案这件事的**进度**（2026-08-11 用户要求 D）。\n\n用户原话：「这个规划过程有点久……要在界面显示这个规划的进度」，\n以及「即使用户切换或者关闭页面，也不会打断系统后台在做规划这件事情，\n等用户切换回来这个规划页面的时候再弹窗」。\n\n所以排程从\"一次请求同步等着\"改成**服务端的一件事**：请求只负责发起，\n进度与结果都存在服务端。页面关掉、切走、换设备回来，问一次状态即可——\n因为**做这件事的是服务器，不是那个页面**。\n\n`percent` 是**阶段推进**而不是插值动画：每一档都对应一件真做完的事\n（取数 / 比对 / 生成 / 校验）。假装匀速前进的进度条在慢的时候会\n停在 99% 骗人，那比没有进度条更糟。",
+  "properties": {
+    "detail": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "失败时的原因，成功时为 None",
+      "title": "Detail"
+    },
+    "draft_id": {
+      "anyOf": [
+        {
+          "maxLength": 128,
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "state=done 时指向那份待批准的草案",
+      "title": "Draft Id"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
+    },
+    "percent": {
+      "maximum": 100,
+      "minimum": 0,
+      "title": "Percent",
+      "type": "integer"
+    },
+    "phase": {
+      "default": "",
+      "maxLength": 64,
+      "title": "Phase",
+      "type": "string"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "state": {
+      "$ref": "#/components/schemas/PathwayDraftJobState"
+    },
+    "student_id": {
+      "maxLength": 128,
+      "minLength": 1,
+      "title": "Student Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "student_id",
+    "state",
+    "percent"
+  ],
+  "title": "PathwayDraftJob",
+  "type": "object"
+}

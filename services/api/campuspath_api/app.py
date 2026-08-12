@@ -137,6 +137,8 @@ from campuspath_contracts.pathway import (
     PathwayDraft,
     PathwayDraftDecision,
     PathwayDraftDiff,
+    PathwayDraftJob,
+    PathwayDraftJobState,
     PlanItem,
     PlanItemKind,
     PlanItemStatus,
@@ -211,6 +213,7 @@ from campuspath_contracts.wellbeing import (
     WellbeingSignalType,
 )
 import logging
+import threading
 import os
 import re
 
@@ -411,6 +414,10 @@ class Deps:
         #: 「不参加」名单（2026-08-03 用户需求 B）：student_id → 被拒 subject 集合；
         #: A5 重新生成与演示夹具都要跳过——删了的活动不许复活
         self.declined: dict[str, set[str]] = {}
+        #: 排程作业的进度（2026-08-11 用户要求 D）。**存在服务端**——
+        #: 页面关掉、切走、换个设备回来，问一次状态就知道进行到哪了，
+        #: 因为做这件事的是服务器，不是那个页面。
+        self.draft_jobs: dict[str, PathwayDraftJob] = {}
         #: Bug-1（2026-08-03）：研究任务发起时的目标名（规范化）——
         #: 目标改名后旧结果按此判stale，不再顶替新岗位的画像
         self.research_target: dict[tuple[str, str], str] = {}
@@ -3091,7 +3098,30 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         #
         # 放在这里而不是放进 A5 的提示词里：这是确定性过滤，不该指望模型
         # 记住"别再推这个"；夹具那条路同样要过这一关。
+        # ── 课程不进规划条目（2026-08-11 用户裁定）────────────────────────
+        # 学生的必修与选修时间是从教务系统**直接接入的既成事实**——一接上
+        # 就已经排进日历了，不是"要不要做"的候选。「开始规划」规划的是
+        # **课以外**的活动。把课程混进审批弹窗，等于给学生出一道
+        # "要不要上必修课"的选择题，那不成立。
+        # 课程仍在 `course_plan` 字段里（选课与学位规划页读的是它），
+        # 只是不再冒充一条需要学生逐条批准的计划。
+        #
+        # 过滤放在**装配出口**而不是两个生产者内部：A5 与演示夹具都会造
+        # 课程条目，改一处漏一处；这里是它们唯一的汇合点。
         declined = deps.declined.get(student_id, set())
+        if built is not None:
+            non_course = tuple(i for i in built.plan_items
+                               if i.kind is not PlanItemKind.COURSE)
+            if len(non_course) != len(built.plan_items):
+                kept = {i.plan_item_id for i in non_course}
+                built = built.model_copy(update={
+                    "plan_items": non_course,
+                    "milestones": tuple(
+                        m.model_copy(update={
+                            "plan_item_ids": tuple(p for p in m.plan_item_ids
+                                                   if p in kept)})
+                        for m in built.milestones),
+                })
         if built is not None and declined:
             keep = tuple(i for i in built.plan_items if i.subject_id not in declined)
             if len(keep) != len(built.plan_items):
@@ -3124,6 +3154,13 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         # 冲突在**草案**里就得可见：审批弹窗是学生唯一一次通盘看这版计划的机会，
         # 等采纳之后才告诉他"其中两个撞在一起"，那这个批准就是骗来的。
         built = _with_conflicts(built, student_id)
+        return _assemble_draft(student_id, intensity, built, memory_notes)
+
+    def _assemble_draft(student_id: str, intensity: str,
+                        built: PathwayVersion,
+                        memory_notes: tuple[str, ...]) -> PathwayDraft:
+        """草案组装。**同步端点与后台作业共用**——两处各写一份 diff 计算，
+        迟早在"第一次规划报出移除"这种地方分家。"""
         current = deps.pathways.get(student_id)
         # diff 的基线永远是**已采纳版本**。反过来减会让第一次规划报出一堆
         # "移除"，弹窗就成了劝学生批准一份在删他东西的计划——契约层的
@@ -3159,6 +3196,98 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             rationale_memory=memory_notes[:3],
         )
         deps.pathway_drafts[draft.draft_id] = draft
+        return draft
+
+
+    @implements("POST", "/students/{student_id}/pathway/draft/start",
+                response_model=PathwayDraftJob)
+    def start_pathway_draft(student_id: str,
+                            intensity: str = Query("balanced"),
+                            ) -> PathwayDraftJob:
+        """发起排程，**立刻返回**，真活在后台线程里做（2026-08-11 用户要求 D）。
+
+        这样切页、关页都不打断——请求只是"按下开始"，做事的是服务器。
+        同一个学生已有在跑的作业时**不再起第二个**：连点两下不该排两版。
+        """
+        _known_student(student_id)
+        running = deps.draft_jobs.get(student_id)
+        if running is not None and running.state is PathwayDraftJobState.RUNNING:
+            return running
+
+        now = datetime.now(timezone.utc)
+        job = PathwayDraftJob(student_id=student_id,
+                              state=PathwayDraftJobState.RUNNING,
+                              percent=5, phase="collect", started_at=now)
+        deps.draft_jobs[student_id] = job
+
+        def _run() -> None:
+            def step(percent: int, phase: str) -> None:
+                # 每一档都对应一件真做完的事，不做插值动画：
+                # 假装匀速的进度条在慢的时候会卡在 99% 骗人。
+                deps.draft_jobs[student_id] = deps.draft_jobs[student_id].model_copy(
+                    update={"percent": percent, "phase": phase})
+            try:
+                step(25, "compare")
+                built, memory_notes = _build_pathway_candidate(student_id, intensity)
+                step(70, "decompose")
+                if built is None:
+                    deps.draft_jobs[student_id] = job.model_copy(update={
+                        "state": PathwayDraftJobState.FAILED, "percent": 100,
+                        "phase": "failed", "finished_at": datetime.now(timezone.utc),
+                        "detail": "no_pathway_version"})
+                    return
+                built = _with_conflicts(built, student_id)
+                step(90, "verify")
+                draft = _assemble_draft(student_id, intensity, built, memory_notes)
+                deps.pathway_drafts[draft.draft_id] = draft
+                deps.draft_jobs[student_id] = job.model_copy(update={
+                    "state": PathwayDraftJobState.DONE, "percent": 100,
+                    "phase": "done", "draft_id": draft.draft_id,
+                    "finished_at": datetime.now(timezone.utc)})
+            except Exception as exc:            # 后台线程不许把异常吞掉
+                logging.getLogger("campuspath").exception("排程作业失败")
+                deps.draft_jobs[student_id] = job.model_copy(update={
+                    "state": PathwayDraftJobState.FAILED, "percent": 100,
+                    "phase": "failed", "finished_at": datetime.now(timezone.utc),
+                    "detail": str(exc)[:200]})
+
+        threading.Thread(target=_run, daemon=True,
+                         name=f"draft-{student_id}").start()
+        return job
+
+    @implements("GET", "/students/{student_id}/pathway/draft/status",
+                response_model=PathwayDraftJob)
+    def pathway_draft_status(student_id: str) -> PathwayDraftJob:
+        """排到哪了。**回来就问这一句**——没在跑就回 idle，跑完了带 draft_id。
+
+        跑完但学生还没决定的草案，`draft_id` 一直留着：他切走一小时回来，
+        照样能看到那份等他批准的方案。
+        """
+        _known_student(student_id)
+        job = deps.draft_jobs.get(student_id)
+        if job is None:
+            return PathwayDraftJob(student_id=student_id,
+                                   state=PathwayDraftJobState.IDLE, percent=0)
+        if job.state is PathwayDraftJobState.DONE and job.draft_id:
+            decided = deps.pathway_drafts.get(job.draft_id)
+            # 已经决定过的草案不该再弹一次窗
+            if decided is not None and (decided.adopted_at or decided.discarded_at):
+                return PathwayDraftJob(student_id=student_id,
+                                       state=PathwayDraftJobState.IDLE, percent=0)
+        return job
+
+    @implements("GET", "/students/{student_id}/pathway/draft/{draft_id}",
+                response_model=PathwayDraft)
+    def read_pathway_draft(student_id: str, draft_id: str) -> PathwayDraft:
+        """按 id 取回那份待批准的草案。
+
+        `status` 只给 `draft_id`——**故意不把整份草案塞进状态轮询里**：
+        那会让每 1.5 秒一次的轮询搬运几十条计划条目。要弹窗时取一次就够。
+        """
+        _known_student(student_id)
+        draft = deps.pathway_drafts.get(draft_id)
+        if draft is None or draft.student_id != student_id:
+            raise HTTPException(404, {"error": "unknown_draft", "detail": draft_id})
         return draft
 
     @implements("POST",

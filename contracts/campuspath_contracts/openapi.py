@@ -228,6 +228,22 @@ _STUDENT: tuple[Endpoint, ...] = (
         "PathwayDraft", errors=((422, "unknown_intensity"), (404, "no_goal")),
     ),
     Endpoint(
+        "POST", "/v1/students/{student_id}/pathway/draft/start",
+        "发起排程作业并**立刻返回**：真活在后台做，切页/关页都不打断"
+        "（2026-08-11 用户要求 D）。同一学生已有在跑的作业时不再起第二个",
+        "PathwayDraftJob", errors=((404, "unknown_student"),),
+    ),
+    Endpoint(
+        "GET", "/v1/students/{student_id}/pathway/draft/status",
+        "排到哪了。回到页面时问这一句：没在跑回 idle，跑完了带 draft_id 弹审批窗",
+        "PathwayDraftJob",
+    ),
+    Endpoint(
+        "GET", "/v1/students/{student_id}/pathway/draft/{draft_id}",
+        "按 id 取回待批准的草案（状态轮询只给 id，不搬运整份计划）",
+        "PathwayDraft", errors=((404, "unknown_draft"),),
+    ),
+    Endpoint(
         "POST", "/v1/students/{student_id}/pathway/draft/{draft_id}/decision",
         "学生对草案的裁决：adopt 才写入已采纳版本，discard 丢弃；两者都只能做一次",
         "PathwayDraft",

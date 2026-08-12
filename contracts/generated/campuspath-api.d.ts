@@ -1208,6 +1208,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/students/{student_id}/pathway/draft/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 发起排程作业并**立刻返回**：真活在后台做，切页/关页都不打断（2026-08-11 用户要求 D）。同一学生已有在跑的作业时不再起第二个 */
+        post: operations["post_v1_students_student_id_pathway_draft_start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/pathway/draft/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 排到哪了。回到页面时问这一句：没在跑回 idle，跑完了带 draft_id 弹审批窗 */
+        get: operations["get_v1_students_student_id_pathway_draft_status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/students/{student_id}/pathway/draft/{draft_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 按 id 取回待批准的草案（状态轮询只给 id，不搬运整份计划） */
+        get: operations["get_v1_students_student_id_pathway_draft_draft_id"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/students/{student_id}/pathway/draft/{draft_id}/decision": {
         parameters: {
             query?: never;
@@ -5316,6 +5367,61 @@ export interface components {
             /** Rescheduled Count */
             rescheduled_count: number;
         };
+        /**
+         * PathwayDraftJob
+         * @description 排一版方案这件事的**进度**（2026-08-11 用户要求 D）。
+         *
+         *     用户原话：「这个规划过程有点久……要在界面显示这个规划的进度」，
+         *     以及「即使用户切换或者关闭页面，也不会打断系统后台在做规划这件事情，
+         *     等用户切换回来这个规划页面的时候再弹窗」。
+         *
+         *     所以排程从"一次请求同步等着"改成**服务端的一件事**：请求只负责发起，
+         *     进度与结果都存在服务端。页面关掉、切走、换设备回来，问一次状态即可——
+         *     因为**做这件事的是服务器，不是那个页面**。
+         *
+         *     `percent` 是**阶段推进**而不是插值动画：每一档都对应一件真做完的事
+         *     （取数 / 比对 / 生成 / 校验）。假装匀速前进的进度条在慢的时候会
+         *     停在 99% 骗人，那比没有进度条更糟。
+         */
+        PathwayDraftJob: {
+            /**
+             * Detail
+             * @description 失败时的原因，成功时为 None
+             * @default null
+             */
+            detail: string | null;
+            /**
+             * Draft Id
+             * @description state=done 时指向那份待批准的草案
+             * @default null
+             */
+            draft_id: string | null;
+            /**
+             * Finished At
+             * @default null
+             */
+            finished_at: string | null;
+            /** Percent */
+            percent: number;
+            /**
+             * Phase
+             * @default
+             */
+            phase: string;
+            /**
+             * Started At
+             * @default null
+             */
+            started_at: string | null;
+            state: components["schemas"]["PathwayDraftJobState"];
+            /** Student Id */
+            student_id: string;
+        };
+        /**
+         * PathwayDraftJobState
+         * @enum {string}
+         */
+        PathwayDraftJobState: "idle" | "running" | "done" | "failed";
         /**
          * PathwayVersion
          * @description 多时间尺度路径（D1 要求三个视图数据同源，因此三者都从这里派生）。
@@ -10558,6 +10664,99 @@ export interface operations {
                         detail?: string;
                         /** @constant */
                         error: "unknown_intensity";
+                    };
+                };
+            };
+        };
+    };
+    post_v1_students_student_id_pathway_draft_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathwayDraftJob"];
+                };
+            };
+            /** @description unknown_student */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "unknown_student";
+                    };
+                };
+            };
+        };
+    };
+    get_v1_students_student_id_pathway_draft_status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathwayDraftJob"];
+                };
+            };
+        };
+    };
+    get_v1_students_student_id_pathway_draft_draft_id: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                student_id: string;
+                draft_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PathwayDraft"];
+                };
+            };
+            /** @description unknown_draft */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        detail?: string;
+                        /** @constant */
+                        error: "unknown_draft";
                     };
                 };
             };
