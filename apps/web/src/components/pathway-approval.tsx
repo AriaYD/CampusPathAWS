@@ -29,7 +29,8 @@ export type PathwayPlan = {
   neverPlanned: boolean;
   startPlanning: () => Promise<void>;
   decide: (decision: "adopt" | "discard",
-           acknowledgeConflicts?: boolean) => Promise<void>;
+           acknowledgeConflicts?: boolean,
+           keepPlanItemIds?: string[]) => Promise<void>;
   dismissDraft: () => void;
 };
 
@@ -50,12 +51,13 @@ export function usePathwayPlan(studentId: string, intensity?: string): PathwayPl
   }
 
   async function decide(decision: "adopt" | "discard",
-                        acknowledgeConflicts = false) {
+                        acknowledgeConflicts = false,
+                        keepPlanItemIds?: string[]) {
     if (!draft) return;
     setState("deciding");
     try {
       await api.decidePathwayDraft(studentId, draft.draft_id, decision,
-                                   acknowledgeConflicts);
+                                   acknowledgeConflicts, keepPlanItemIds);
       setDraft(null);
       setState("idle");
       // 采纳后已采纳版本才存在——重读，让三个时间视图同时更新
@@ -89,8 +91,17 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
   // 「我知道有冲突」的勾选。**每来一份新草案都要重新勾**——
   // 上一版看过不等于这一版看过。
   const [ack, setAck] = useState(false);
-  const clashCount = (plan.draft?.pathway.plan_items ?? [])
-    .filter((i) => (i.conflicts ?? []).length > 0).length;
+  // 逐条取舍（2026-08-11 用户报障 A）。**默认全选**：这一版是系统排给你的，
+  // 默认接受、逐条退出，比默认拒绝、逐条挑选更贴近"给你一版方案"的语义。
+  // 存"被取消的那些"而不是"被选中的那些"——新草案来了直接清空即可，
+  // 不必再去和新条目列表对账。
+  const [dropped, setDropped] = useState<Set<string>>(new Set());
+  const items = plan.draft?.pathway.plan_items ?? [];
+  const keptIds = items.filter((i) => !dropped.has(i.plan_item_id))
+                       .map((i) => i.plan_item_id);
+  // 冲突只数**还留着的**：把撞车那条取消掉，就不该再拦着你批准
+  const clashCount = items.filter(
+    (i) => !dropped.has(i.plan_item_id) && (i.conflicts ?? []).length > 0).length;
 
   return (
     <>
@@ -200,7 +211,22 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
             <ul className="mb-4 flex max-h-[40vh] flex-col gap-2 overflow-y-auto">
               {d.pathway.plan_items.slice(0, 40).map((item) => (
                 <li key={item.plan_item_id} data-draft-item={item.plan_item_id}
-                    className="rounded-md border border-line bg-bg-sunk p-2.5">
+                    data-draft-kept={!dropped.has(item.plan_item_id)}
+                    className="rounded-md border border-line p-2.5"
+                    style={{ background: dropped.has(item.plan_item_id)
+                      ? "transparent" : "var(--bg-sunk)",
+                      opacity: dropped.has(item.plan_item_id) ? 0.55 : 1 }}>
+                  <label className="flex items-start gap-2">
+                    <input type="checkbox"
+                           data-draft-pick={item.plan_item_id}
+                           checked={!dropped.has(item.plan_item_id)}
+                           onChange={() => setDropped((prev) => {
+                             const next = new Set(prev);
+                             if (next.has(item.plan_item_id)) next.delete(item.plan_item_id);
+                             else next.add(item.plan_item_id);
+                             return next;
+                           })} />
+                    <span className="min-w-0 flex-1">
                   <span className="t-meta text-fg">{localized(item.title, locale)}</span>
                   <span className="t-micro ms-2 text-fg-faint">
                     {item.date_range.start}
@@ -225,9 +251,17 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
                       ))}
                     </ul>
                   )}
+                    </span>
+                  </label>
                 </li>
               ))}
             </ul>
+            {/* 取消掉的条目 = 拒绝，会进拒绝名单，下一版不再推荐它
+                （用户报障 B）。这句要说出来——静默记住比不记住更吓人。 */}
+            <p className="t-micro mb-3 text-fg-faint" data-drop-note>
+              {t("pathway.draft.dropNote")
+                .replace("{n}", String(dropped.size))}
+            </p>
 
             {clashCount > 0 && (
               <label className="mb-3 flex items-start gap-2 rounded-md p-2.5"
@@ -247,8 +281,8 @@ export function PathwayApprovalGate({ plan }: { plan: PathwayPlan }) {
                 data-adopt-draft
                 // 有冲突就必须先勾——**不拦"要不要去"，只拦"你看见了吗"**。
                 // 服务端同样会拦（409），因为前端拦不住直连 API 的人。
-                disabled={busy || (clashCount > 0 && !ack)}
-                onClick={() => plan.decide("adopt", ack)}
+                disabled={busy || (clashCount > 0 && !ack) || keptIds.length === 0}
+                onClick={() => plan.decide("adopt", ack, keptIds)}
                 className="pressable btn btn-primary t-body flex-1 disabled:opacity-60"
               >
                 {t("pathway.draft.adopt")}

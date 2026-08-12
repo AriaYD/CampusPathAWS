@@ -115,6 +115,7 @@
     "PackSourceLink",
     "PackSupportItem",
     "PathwayDraft",
+    "PathwayDraftDecision",
     "PathwayDraftDiff",
     "PathwayVersion",
     "PlanItem",

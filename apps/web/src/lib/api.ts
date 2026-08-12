@@ -416,7 +416,8 @@ export const api = {
     ),
   decidePathwayDraft: (id: string, draftId: string,
                        decision: "adopt" | "discard",
-                       acknowledgeConflicts = false) =>
+                       acknowledgeConflicts = false,
+                       keepPlanItemIds?: string[]) =>
     request<Schemas["PathwayDraft"]>(
       `${s(id)}/pathway/draft/${encodeURIComponent(draftId)}`
       + `/decision?decision=${decision}`
@@ -424,7 +425,12 @@ export const api = {
       // 这个参数代表的是**学生看过冲突后仍然按下批准**，
       // 所以它只能由那个按钮传 true，不许在这里写死。
       + (acknowledgeConflicts ? "&acknowledge_conflicts=true" : ""),
-      { method: "POST" },
+      // 逐条取舍。**不传 = 全留**——省略与"全选"在语义上必须是同一件事，
+      // 否则少传一次就等于悄悄清空了学生的计划
+      keepPlanItemIds
+        ? { method: "POST",
+            body: JSON.stringify({ keep_plan_item_ids: keepPlanItemIds }) }
+        : { method: "POST" },
     ),
   recordExposures: (id: string, batch: Schemas["ExposureBatch"]) =>
     request<Schemas["ExposureReceipt"]>(`${s(id)}/exposures`, {

@@ -135,6 +135,7 @@ from campuspath_contracts.pathway import (
     ExposureBatch,
     ExposureReceipt,
     PathwayDraft,
+    PathwayDraftDecision,
     PathwayDraftDiff,
     PlanItem,
     PlanItemKind,
@@ -3081,6 +3082,28 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             if fixture is not None:
                 enforce_validation_binding(fixture, deps.validations)
                 built = fixture
+
+        # ── 拒绝名单在这里被**消费**（2026-08-11 用户报障 B）──────────────
+        # `deps.declined` 此前只写不读：`decline_plan_item` 往里塞 subject，
+        # 注释写着「A5 重新生成与演示夹具都要跳过」，但全仓库没有一处读它——
+        # 于是学生删掉的活动下一版又原样回来。**注释与代码不一致时，
+        # 代码才是事实**；现在补上那句注释一直在承诺的行为。
+        #
+        # 放在这里而不是放进 A5 的提示词里：这是确定性过滤，不该指望模型
+        # 记住"别再推这个"；夹具那条路同样要过这一关。
+        declined = deps.declined.get(student_id, set())
+        if built is not None and declined:
+            keep = tuple(i for i in built.plan_items if i.subject_id not in declined)
+            if len(keep) != len(built.plan_items):
+                kept_ids = {i.plan_item_id for i in keep}
+                built = built.model_copy(update={
+                    "plan_items": keep,
+                    "milestones": tuple(
+                        m.model_copy(update={
+                            "plan_item_ids": tuple(p for p in m.plan_item_ids
+                                                   if p in kept_ids)})
+                        for m in built.milestones),
+                })
         return built, memory_notes
 
     @implements("POST", "/students/{student_id}/pathway/draft",
@@ -3144,6 +3167,7 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     def decide_pathway_draft(student_id: str, draft_id: str,
                              decision: str = Query(...),
                              acknowledge_conflicts: bool = Query(False),
+                             picks: PathwayDraftDecision | None = None,
                              ) -> PathwayDraft:
         """学生的批准是**唯一**能让规划落盘的动作。
 
@@ -3171,7 +3195,36 @@ def create_app(deps: Deps | None = None) -> FastAPI:
                                       "detail": decision})
         now = datetime.now(timezone.utc)
         if decision == "adopt":
-            clashing = [i for i in draft.pathway.plan_items if i.conflicts]
+            # ── 逐条取舍（2026-08-11 用户报障 A）─────────────────────────
+            # 学生可能只想要其中几条。没被选中的**不是"这次先不排"，
+            # 而是"我不要它"**——所以要进拒绝名单，下一版不再推荐（报障 B）。
+            adopted = draft.pathway
+            keep = picks.keep_plan_item_ids if picks else None
+            if keep is not None:
+                if not keep:
+                    raise HTTPException(422, {
+                        "error": "nothing_kept",
+                        "detail": "一条都没选却按了采纳——那是「再想想」，"
+                                  "不是采纳。空计划落盘会让学生以为自己批准了什么。"})
+                keep_set = set(keep)
+                dropped = [i for i in draft.pathway.plan_items
+                           if i.plan_item_id not in keep_set]
+                kept_items = tuple(i for i in draft.pathway.plan_items
+                                   if i.plan_item_id in keep_set)
+                kept_ids = {i.plan_item_id for i in kept_items}
+                # 里程碑不能再引用被剔掉的条目——PathwayVersion 的 validator
+                # 会当场拒收，那正是它存在的意义
+                milestones = tuple(
+                    m.model_copy(update={
+                        "plan_item_ids": tuple(p for p in m.plan_item_ids
+                                               if p in kept_ids)})
+                    for m in draft.pathway.milestones)
+                adopted = draft.pathway.model_copy(update={
+                    "plan_items": kept_items, "milestones": milestones})
+                for item in dropped:
+                    if item.kind is PlanItemKind.OPPORTUNITY:
+                        deps.declined.setdefault(student_id, set()).add(item.subject_id)
+            clashing = [i for i in adopted.plan_items if i.conflicts]
             if clashing and not acknowledge_conflicts:
                 raise HTTPException(409, {
                     "error": "schedule_conflicts_unacknowledged",
@@ -3184,12 +3237,12 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             # 已采纳版本才过 B8 闸门的最终确认——草案阶段已经查过一遍，
             # 这里是落盘前的最后一道，宁可重复也不给未背书的条目开口子。
             try:
-                enforce_validation_binding(draft.pathway, deps.validations)
+                enforce_validation_binding(adopted, deps.validations)
             except UnbackedOutputError as exc:
                 raise HTTPException(
                     422, {"error": "unbacked_validation_id", "detail": str(exc)}
                 ) from exc
-            deps.pathways[student_id] = draft.pathway
+            deps.pathways[student_id] = adopted
             decided = draft.model_copy(update={"adopted_at": now})
         else:
             decided = draft.model_copy(update={"discarded_at": now})

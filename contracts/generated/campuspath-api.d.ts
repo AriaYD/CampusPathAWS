@@ -5276,6 +5276,25 @@ export interface components {
             student_id: string;
         };
         /**
+         * PathwayDraftDecision
+         * @description 学生对草案的逐条取舍（2026-08-11 用户报障 A）。
+         *
+         *     用户原话：「每一条条目都要可以点击批准或者拒绝，而不是只给我一个
+         *     批量写入批准的按钮，因为用户可能只想通过其中的几个规划」。
+         *
+         *     * 不传 `keep_plan_item_ids` = 全留（既有调用方与"全部批准"按钮行为不变）；
+         *     * 传空列表 = **一条都不要**，那是"再想想"而不是"采纳"，服务端 422 拒绝——
+         *       静默写入一份空计划会让学生以为自己批准了什么。
+         */
+        PathwayDraftDecision: {
+            /**
+             * Keep Plan Item Ids
+             * @description 要采纳的条目；None = 全留。没列出的条目视为拒绝并进拒绝名单
+             * @default null
+             */
+            keep_plan_item_ids: string[] | null;
+        };
+        /**
          * PathwayDraftDiff
          * @description 草案相对**当前已采纳版本**的差异。审批弹窗要回答的是"会变什么"。
          *

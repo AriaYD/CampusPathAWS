@@ -395,6 +395,11 @@ export default function WellbeingPage() {
 
 
 /** R5-E：升级判定卡 + ISI / PSS-10 自评。计分与分流全在服务端（零 LLM）。 */
+/** PSS-10 反向计分题号（1 起）。**与服务端 `_PSS10_REVERSED` 同一组**——
+ *  两处都写死是有意的：这是量表定义，不是配置；但改了一处不改另一处
+ *  会让界面标错题，所以这行注释是给下一个人看的。 */
+const PSS_REVERSED = new Set([4, 5, 7, 8]);
+
 function AssessmentCard({ studentId }: { studentId: string }) {
   const { t, locale } = useI18n();
   const escalation = useResource(
@@ -425,10 +430,24 @@ function AssessmentCard({ studentId }: { studentId: string }) {
 
   const scaleRow = (
     label: string, value: number, onPick: (v: number) => void, tag: string,
+    reversed = false,
   ) => (
     <div key={tag} className="flex flex-wrap items-center justify-between gap-2 py-1.5"
-         data-scale-item={tag}>
-      <span className="t-meta max-w-[46ch] text-fg">{label}</span>
+         data-scale-item={tag} data-scale-reversed={reversed || undefined}>
+      <span className="t-meta max-w-[46ch] text-fg">
+        {label}
+        {/* PSS-10 的第 4/5/7/8 题是**正向表述**，按量表标准反向计分。
+            不标出来，学生全选 0 会得到 16 分并被建议联系 tutor，看起来像
+            算错了（2026-08-11 用户手机实测当场报障）。量表没错，是界面
+            从没说过这四题读法相反——**说清楚，而不是把量表改错**。 */}
+        {reversed && (
+          <span className="t-micro ms-1.5 rounded-sm px-1.5 py-0.5"
+                data-scale-reversed-tag
+                style={{ background: "var(--accent-soft)", color: "var(--accent-deep)" }}>
+            {t("wellbeing.pss.reversed")}
+          </span>
+        )}
+      </span>
       <span className="flex gap-1">
         {[0, 1, 2, 3, 4].map((v) => (
           <button
@@ -494,11 +513,17 @@ function AssessmentCard({ studentId }: { studentId: string }) {
                      `isi-${i + 1}`))}
           <div className="t-body mt-4 font-medium text-fg">PSS-10</div>
           <p className="t-micro mb-1 text-fg-faint">{t("wellbeing.assess.pssScale")}</p>
+          <p className="t-micro mb-2 max-w-[70ch] rounded-md p-2 text-fg-muted"
+             data-pss-reverse-note
+             style={{ background: "var(--accent-soft)" }}>
+            {t("wellbeing.pss.reverseNote")}
+          </p>
           {Array.from({ length: 10 }, (_, i) =>
             scaleRow(t(`wellbeing.pss.q${i + 1}` as Parameters<typeof t>[0]),
                      pss[i],
                      (v) => setPss((prev) => prev.map((x, j) => (j === i ? v : x))),
-                     `pss-${i + 1}`))}
+                     `pss-${i + 1}`,
+                     PSS_REVERSED.has(i + 1)))}
           <button
             type="button" data-assessment-submit
             disabled={state === "saving"}

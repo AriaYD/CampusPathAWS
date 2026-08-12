@@ -201,6 +201,22 @@ class PathwayDraftDiff(CampusPathModel):
         return self
 
 
+class PathwayDraftDecision(CampusPathModel):
+    """学生对草案的逐条取舍（2026-08-11 用户报障 A）。
+
+    用户原话：「每一条条目都要可以点击批准或者拒绝，而不是只给我一个
+    批量写入批准的按钮，因为用户可能只想通过其中的几个规划」。
+
+    * 不传 `keep_plan_item_ids` = 全留（既有调用方与"全部批准"按钮行为不变）；
+    * 传空列表 = **一条都不要**，那是"再想想"而不是"采纳"，服务端 422 拒绝——
+      静默写入一份空计划会让学生以为自己批准了什么。
+    """
+
+    keep_plan_item_ids: tuple[Identifier, ...] | None = Field(
+        default=None,
+        description="要采纳的条目；None = 全留。没列出的条目视为拒绝并进拒绝名单")
+
+
 class PathwayDraft(CampusPathModel):
     """一份**尚未落盘**的规划草案（2026-08-10 用户裁定 G）。
 
