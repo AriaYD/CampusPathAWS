@@ -77,7 +77,7 @@ gcloud auth application-default login   # Vertex uses ADC; no API keys anywhere
 
 bash scripts/install-hooks.sh   # pre-commit: secret hygiene + "Vertex only" guard
 make setup                      # uv venv + installs every package in editable mode
-bash scripts/preflight.sh       # billing / secrets / backend checks — must print "可以开工"
+bash scripts/preflight.sh       # billing / secrets / backend checks — must end with the green "ready" line
 make smoke                      # < 10 s: contracts + seed + core services
 make api                        # FastAPI on :8000 (sources .env; model endpoints 503 without ADC)
 cd apps/web && bun install && bun run dev --port 3100
@@ -123,10 +123,10 @@ bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop`
 
 ## 7. Pre-existing work disclosure
 
-This repository was started on **2026-07-29** for a university-internal Google hackathon and was substantially extended during the *All Things Agentic* submission period (2026-08-04 → 2026-08-31). In the spirit of the rules we disclose the split explicitly:
+This code base was started on **2026-07-29** for a university-internal Google hackathon and was substantially extended during the *All Things Agentic* submission period (2026-08-04 → 2026-08-31). In the spirit of the rules we disclose the split explicitly:
 
-- **Pre-existing (before 2026-08-04, commits `afd5f45..b37be24`)**: product spec, contract layer, synthetic seed, the nine deterministic services, the A0–A5 agent roster on Gemini 2.5, the two portals' UI, Cloud Run deployment, evaluation harness.
-- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (Firestore checkpointing of all mutable state, OpenTelemetry → Cloud Trace on every agent step, the live agent registry, ADK on the request path).
+- **Pre-existing (before 2026-08-04)**: product spec, contract layer, synthetic seed, the nine deterministic services, the A0–A5 agent roster on Gemini 2.5, the two portals' UI, Cloud Run deployment, evaluation harness. In this public repository that base is the **single first commit** ("Import pre-existing CampusPath base"); the private working repository keeps its original 234-commit history and can be shown to the judges on request.
+- **Built during the submission period (every commit after the import, each with its original author date)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, **Firestore checkpointing of all mutable state**, **OpenTelemetry → Cloud Trace on every agent step**, the live agent registry, and the English documentation set.
 
 Third-party inputs: HKUST public course catalog (scraped with a 1 s polite interval and disk cache; no student data), public job postings via Google Search grounding, open-source libraries under their licenses. No sponsor funding or support was received.
 
