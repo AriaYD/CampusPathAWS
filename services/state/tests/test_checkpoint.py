@@ -151,36 +151,85 @@ def test_file_checkpoint_survives_partial_write(tmp_path):
     assert backend.load() == ("s", {"a": "1"})
 
 
-def test_firestore_client_kwargs_omit_the_default_database():
-    """显式 database="(default)" 会被客户端 URL 编码成 %28default%29（线上 400）。"""
+class _FakeResponse:
+    def __init__(self, status: int, body: dict):
+        self.status_code = status; self._body = body; self.text = json.dumps(body)
+
+    def json(self):
+        return self._body
+
+
+class _FakeSession:
+    """记录请求；listDocuments 返回上次 commit 写进去的文档。"""
+
+    def __init__(self):
+        self.posts: list[tuple[str, dict]] = []
+        self.gets: list[tuple[str, dict]] = []
+        self.store: dict[str, dict] = {}
+
+    def post(self, url, json, timeout):
+        self.posts.append((url, json))
+        for w in json["writes"]:
+            if "update" in w:
+                self.store[w["update"]["name"]] = w["update"]["fields"]
+            else:
+                self.store.pop(w["delete"], None)
+        return _FakeResponse(200, {})
+
+    def get(self, url, params, timeout):
+        self.gets.append((url, params))
+        docs = [{"name": n, "fields": f} for n, f in self.store.items()]
+        return _FakeResponse(200, {"documents": docs})
+
+
+def _rest(session):
     from campuspath_state.checkpoint import FirestoreCheckpoint
 
-    captured = {}
+    return FirestoreCheckpoint(project="p", collection="ckpt", session=session)
 
-    class FakeClient:
-        def __init__(self, **kwargs):
-            captured.update(kwargs)
 
-        def collection(self, name):
-            return name
+def test_firestore_rest_urls_keep_default_database_literal():
+    """gRPC 客户端在容器里把 (default) 编成 %28default%29 → 400；REST 路径里必须是字面量。"""
+    session = _FakeSession()
+    _rest(session).save("s1", {"a": "1"})
+    url, body = session.posts[0]
+    assert url == "https://firestore.googleapis.com/v1/projects/p/databases/(default)/documents:commit"
+    assert body["writes"][0]["update"]["name"] == "projects/p/databases/(default)/documents/ckpt/a"
+    assert body["writes"][-1]["update"]["name"].endswith("/ckpt/_meta")
 
-    import sys, types
-    fake = types.ModuleType("google.cloud.firestore"); fake.Client = FakeClient
-    saved = sys.modules.get("google.cloud.firestore")
-    sys.modules["google.cloud.firestore"] = fake
-    try:
-        import google.cloud
-        original = getattr(google.cloud, "firestore", None)
-        google.cloud.firestore = fake
-        FirestoreCheckpoint(project="p")._col()
-        assert captured == {"project": "p"}
-        captured.clear()
-        FirestoreCheckpoint(project="p", database="named")._col()
-        assert captured == {"project": "p", "database": "named"}
-    finally:
-        if saved is not None:
-            sys.modules["google.cloud.firestore"] = saved
-        else:
-            sys.modules.pop("google.cloud.firestore", None)
-        if original is not None:
-            google.cloud.firestore = original
+
+def test_firestore_rest_roundtrip_with_chunks(monkeypatch):
+    import campuspath_state.checkpoint as ck
+
+    monkeypatch.setattr(ck, "CHUNK_LIMIT", 8)
+    session = _FakeSession()
+    backend = _rest(session)
+    big = "é" * 20
+    backend.save("s1", {"big": big, "small": "x"})
+    fresh = _rest(session)                    # 新进程：没有内存布局，只能靠 _meta
+    assert fresh.load() == ("s1", {"big": big, "small": "x"})
+    assert any(n.endswith("/ckpt/big__0") for n in session.store)
+
+
+def test_firestore_rest_changed_only_writes_a_subset_and_prunes_old_chunks(monkeypatch):
+    import campuspath_state.checkpoint as ck
+
+    monkeypatch.setattr(ck, "CHUNK_LIMIT", 8)
+    session = _FakeSession()
+    backend = _rest(session)
+    backend.save("s1", {"big": "é" * 20, "small": "x"})
+    backend.save("s1", {"big": "y", "small": "x"}, changed={"big"})     # big 从 5 块缩成 1 个文档
+    _, body = session.posts[-1]
+    names = [w.get("update", {}).get("name") or w.get("delete") for w in body["writes"]]
+    assert not any(n.endswith("/ckpt/small") for n in names), "未变字段不该重写"
+    assert any(w.get("delete", "").endswith("/ckpt/big__1") for w in body["writes"]), "多余旧块要删"
+    assert _rest(session).load() == ("s1", {"big": "y", "small": "x"})
+
+
+def test_firestore_rest_reports_http_errors_loudly():
+    class Failing(_FakeSession):
+        def post(self, url, json, timeout):
+            return _FakeResponse(400, {"error": "Invalid database id %28default%29"})
+
+    with pytest.raises(RuntimeError, match="400"):
+        _rest(Failing()).save("s", {"a": "1"})

@@ -26,8 +26,9 @@
 > 逐字段摘要**变了的字段才写**，一次 Firestore batch 提交；启动时 `restore_from`
 > 用一条流式查询整体回读，**版本戳**（契约 + Seed 版本）不匹配即拒绝恢复、走 seed 冷启动。
 > 后端三实现同协议：`MemoryCheckpoint`（测试）/ `FileCheckpoint`（本地，临时文件 + 原子替换）/
-> `FirestoreCheckpoint`（线上，Cloud Run 服务账号 ADC；`_meta` 文档存布局，
-> 超 900 KB 的字段切块）。**解码只认白名单**：类型引用串查 `Codec._types`，不做
+> `FirestoreCheckpoint`（线上，Cloud Run 服务账号 ADC，**走 REST** `documents:commit` /
+> `listDocuments`——gRPC 客户端在容器里把路由头的 `(default)` 编成 `%28default%29` → 400，
+> 本机同版本正常，钉版本无效；`_meta` 文档存布局，超 900 KB 的字段切块）。**解码只认白名单**：类型引用串查 `Codec._types`，不做
 > 动态 import——检查点是外部输入，不能让数据指定"请实例化哪个类"（零 LLM 第四层扫描
 > 当场抓到的 `importlib.import_module`，改成白名单后才绿）。`validations` 注册表也在
 > 清单里：回来的 PlanItem 仍要过 B8，凭据不在就全被拒。**它解决的是持久性，不是多实例

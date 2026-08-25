@@ -3,10 +3,10 @@
 三个实现同一个协议：
 * :class:`MemoryCheckpoint` —— 测试；
 * :class:`FileCheckpoint` —— 本地开发（临时文件 + 原子替换，写一半崩掉不毁上一份）；
-* :class:`FirestoreCheckpoint` —— 线上（Cloud Run 服务账号 ADC）。
+* :class:`FirestoreCheckpoint` —— 线上（Cloud Run 服务账号 ADC，**REST**）。
   Firestore 单文档 1 MiB 上限，所以每个字段独立成文档，超限的字段切块。
 
-**零 LLM**：本模块只 import ``google.cloud.firestore``（延迟），不碰任何模型 SDK。
+**零 LLM**：本模块只 import ``google.auth``（延迟），不碰任何模型 SDK。
 """
 
 from __future__ import annotations
@@ -34,8 +34,9 @@ class Checkpoint(Protocol):
     def describe(self) -> str: ...
 
 
-def chunk_text(text: str, *, limit: int = CHUNK_LIMIT) -> list[str]:
-    """按 UTF-8 字节数切块，不切开多字节字符。"""
+def chunk_text(text: str, *, limit: int | None = None) -> list[str]:
+    """按 UTF-8 字节数切块，不切开多字节字符。``limit`` 缺省读模块常量（调用时求值，测试可改）。"""
+    limit = CHUNK_LIMIT if limit is None else limit
     data = text.encode("utf-8")
     if len(data) <= limit:
         return [text]
@@ -90,80 +91,120 @@ class FileCheckpoint:
 
 
 class FirestoreCheckpoint:
-    """``<collection>/_meta`` 存版本戳与字段布局；``<collection>/<field>`` 存文本，
-    超限字段存为 ``<field>#<n>`` 若干文档。
+    """Firestore **REST** 后端（`documents:commit` / `listDocuments`）。
 
-    **少写**：``changed`` 给了就只写那些字段（外加 ``_meta``），一次 batch 提交；
-    12 名学生的全部状态约 1 MB / 56 字段，一次典型操作只动 2–5 个字段。
-    **少读**：``load`` 用一条查询流式取整个集合，而不是逐文档 get。
-    先写字段再写 ``_meta``（同一 batch 原子提交），读侧以 ``_meta`` 的布局为准。
+    为什么不用 ``google-cloud-firestore`` 的 gRPC 客户端：同一版本在本机正常、在 Cloud Run
+    容器里把路由头的 ``(default)`` 编成 ``%28default%29`` → 400（rev 00020–00022 实测，
+    钉 api-core 版本也没用）。REST 路径里的括号没有歧义，依赖只剩 google-auth + requests
+    （二者本来就随 google-genai 装着）。
+
+    布局：``<collection>/_meta`` 存版本戳与「字段 → 块数」；``<collection>/<field>`` 存文本，
+    超限字段存为 ``<field>__<n>``。**少写**：``changed`` 给了就只写那些字段（外加 ``_meta``），
+    一次 commit（≤ 500 写）原子提交；**少读**：``listDocuments`` 分页取整个集合。
     """
 
     META = "_meta"
+    SCOPE = "https://www.googleapis.com/auth/datastore"
+    MAX_WRITES = 450          # Firestore 单次 commit 上限 500，留余量
 
     def __init__(self, *, project: str | None = None, database: str = "(default)",
-                 collection: str = "campuspath_checkpoint") -> None:
+                 collection: str = "campuspath_checkpoint", session: Any | None = None) -> None:
         self.project = project
-        self.database = database
+        self.database = database or "(default)"
         self.collection = collection
-        self._client: Any | None = None
-        #: 上次已知布局（字段 → 块数）。changed 模式下未动的字段沿用它。
+        self._session = session
         self._layout: dict[str, int] | None = None
 
-    def _col(self) -> Any:
-        if self._client is None:
-            from google.cloud import firestore  # noqa: PLC0415  # 延迟：本地/测试不需要
+    # ── 连接 ────────────────────────────────────────────────────────
 
-            # 线上踩坑（2026-08-25，Cloud Run rev 00020 启动即崩）：显式传 database="(default)"
-            # 会被新版客户端 URL 编码成 %28default%29 → 400 Invalid database id。
-            # 默认库就**不传**这个参数，只有命名库才传。
-            kwargs: dict[str, Any] = {"project": self.project}
-            if self.database and self.database != "(default)":
-                kwargs["database"] = self.database
-            self._client = firestore.Client(**kwargs)
-        return self._client.collection(self.collection)
+    def _http(self) -> Any:
+        if self._session is None:
+            import google.auth  # noqa: PLC0415  # 延迟：本地/测试不需要
+            from google.auth.transport.requests import AuthorizedSession  # noqa: PLC0415
+
+            credentials, detected = google.auth.default(scopes=[self.SCOPE])
+            if not self.project:
+                self.project = detected
+            self._session = AuthorizedSession(credentials)
+        return self._session
+
+    @property
+    def _parent(self) -> str:
+        return f"projects/{self.project}/databases/{self.database}/documents"
+
+    def _url(self, suffix: str) -> str:
+        return f"https://firestore.googleapis.com/v1/{self._parent}{suffix}"
+
+    def _doc_name(self, doc_id: str) -> str:
+        return f"{self._parent}/{self.collection}/{doc_id}"
+
+    # ── 写 ──────────────────────────────────────────────────────────
 
     def save(self, stamp: str, fields: Fields, *, changed: set[str] | None = None) -> None:
-        col = self._col()
+        http = self._http()
         if changed is None or self._layout is None:
             to_write = dict(fields)
             layout: dict[str, int] = {}
         else:
             to_write = {k: v for k, v in fields.items() if k in changed}
             layout = {k: n for k, n in self._layout.items() if k in fields}
-        batch = self._client.batch()
-        ops = 0
+        writes: list[dict[str, Any]] = []
         for name, text in to_write.items():
             chunks = chunk_text(text)
             previous = layout.get(name, 0)
             layout[name] = len(chunks)
             if len(chunks) == 1:
-                batch.set(col.document(name), {"text": text}); ops += 1
+                writes.append(self._update(name, {"text": text}))
             else:
                 for index, chunk in enumerate(chunks):
-                    batch.set(col.document(f"{name}#{index}"), {"text": chunk}); ops += 1
-            # 块数变少时清掉多余的旧块，免得下次布局对不上
-            for index in range(len(chunks), previous):
-                batch.delete(col.document(f"{name}#{index}")); ops += 1
-            if ops >= 400:                      # Firestore 单 batch 上限 500
-                batch.commit(); batch = self._client.batch(); ops = 0
-        batch.set(col.document(self.META), {"stamp": stamp, "layout": layout})
-        batch.commit()
+                    writes.append(self._update(f"{name}__{index}", {"text": chunk}))
+            for index in range(max(len(chunks), 1), previous):
+                writes.append({"delete": self._doc_name(f"{name}__{index}")})
+        writes.append(self._update(self.META, {"stamp": stamp, "layout_json": json.dumps(layout)}))
+        # 分批提交；_meta 在最后一批——读侧以它为准，前面批次失败不会留下"指向不存在字段"的布局
+        for start in range(0, len(writes), self.MAX_WRITES):
+            self._commit(http, writes[start:start + self.MAX_WRITES])
         self._layout = layout
 
+    def _update(self, doc_id: str, values: dict[str, str]) -> dict[str, Any]:
+        return {"update": {"name": self._doc_name(doc_id),
+                           "fields": {k: {"stringValue": v} for k, v in values.items()}}}
+
+    def _commit(self, http: Any, writes: list[dict[str, Any]]) -> None:
+        response = http.post(self._url(":commit"), json={"writes": writes}, timeout=60)
+        if response.status_code >= 300:
+            raise RuntimeError(f"firestore commit {response.status_code}: {response.text[:300]}")
+
+    # ── 读 ──────────────────────────────────────────────────────────
+
     def load(self) -> tuple[str, Fields] | None:
-        col = self._col()
-        docs = {doc.id: (doc.to_dict() or {}) for doc in col.stream()}
+        http = self._http()
+        docs: dict[str, dict[str, str]] = {}
+        token: str | None = None
+        while True:
+            params: dict[str, Any] = {"pageSize": 300}
+            if token:
+                params["pageToken"] = token
+            response = http.get(self._url(f"/{self.collection}"), params=params, timeout=60)
+            if response.status_code >= 300:
+                raise RuntimeError(f"firestore list {response.status_code}: {response.text[:300]}")
+            body = response.json()
+            for doc in body.get("documents", []):
+                doc_id = doc["name"].rsplit("/", 1)[-1]
+                docs[doc_id] = {k: v.get("stringValue", "") for k, v in doc.get("fields", {}).items()}
+            token = body.get("nextPageToken")
+            if not token:
+                break
         meta = docs.get(self.META)
         if meta is None:
             return None
-        layout = dict(meta.get("layout", {}))
+        layout = json.loads(meta.get("layout_json") or "{}")
         fields: Fields = {}
         for name, count in layout.items():
             if count == 1:
                 fields[name] = docs[name]["text"]
             else:
-                fields[name] = unchunk_text([docs[f"{name}#{i}"]["text"] for i in range(count)])
+                fields[name] = unchunk_text([docs[f"{name}__{i}"]["text"] for i in range(count)])
         self._layout = layout
         return meta["stamp"], fields
 

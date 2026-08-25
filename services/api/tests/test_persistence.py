@@ -193,3 +193,17 @@ def test_restore_failure_does_not_kill_the_app(monkeypatch, tmp_path):
     body = client.get("/v1/ops/agents", headers={"X-CampusPath-Role": "career_center_admin"}).json()
     assert body["checkpoint"]["enabled"] is True and body["checkpoint"]["error"].startswith("restore:")
     assert body["checkpoint"]["restore_outcome"] == "failed"
+
+
+def test_mutating_requests_checkpoint_inline(monkeypatch, tmp_path):
+    """Cloud Run 请求间掐 CPU：不能指望后台线程，写请求返回前就得落盘。"""
+    path = tmp_path / "ckpt.json"
+    monkeypatch.setenv(persistence.CHECKPOINT_ENV, f"file:{path}")
+    deps = Deps("full", model=None)
+    client = TestClient(create_app(deps))            # 不进 with：startup 不跑，后台线程不起
+    assert not path.exists()
+    client.get("/v1/students/STU-A/profile", headers=ROLE)
+    assert not path.exists(), "GET 不该触发落盘"
+    _mutate(client)
+    assert path.exists() and deps.checkpoint.saves >= 1
+    assert deps.checkpoint.tick_if_due(min_interval=60) is False   # 刚存过：合并

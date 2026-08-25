@@ -163,6 +163,8 @@ class Persister:
         self.restore_outcome: str | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        #: 请求线程与后台线程都可能 tick：同一时刻只允许一个在编码/写
+        self._tick_lock = threading.Lock()
 
     def tick(self) -> bool:
         fields = snapshot(self.deps)
@@ -178,10 +180,27 @@ class Persister:
         self.saves += 1
         return True
 
+    def tick_if_due(self, *, min_interval: float = 2.0) -> bool:
+        """请求线程里的合并写：距上次成功落盘不足 ``min_interval`` 秒就跳过（后台线程会补）。
+        失败不抛——请求已经成功了，持久化失败记在 ``last_error`` 里如实暴露。"""
+        now = time.time()
+        if self.last_saved_at is not None and now - self.last_saved_at < min_interval:
+            return False
+        with self._tick_lock:
+            try:
+                saved = self.tick()
+                self.last_error = None
+                return saved
+            except Exception as exc:  # noqa: BLE001
+                self.last_error = f"save: {type(exc).__name__}: {exc}"[:300]
+                log.exception("inline checkpoint save failed")
+                return False
+
     def _run(self) -> None:
         while not self._stop.wait(self.interval):
             try:
-                self.tick()
+                with self._tick_lock:
+                    self.tick()
                 self.last_error = None
             except Exception as exc:  # noqa: BLE001 —— 后台线程不许死，下一轮再试
                 self.last_error = f"save: {type(exc).__name__}: {exc}"[:300]
@@ -235,6 +254,16 @@ def install(app: Any, deps: "Deps") -> Persister | None:
         persister.last_error = f"restore: {type(exc).__name__}: {exc}"[:300]
         persister.restore_outcome = "failed"
     deps.checkpoint = persister
+
+    # Cloud Run 在没有请求在途时**掐掉 CPU**，后台线程会饿死到下一个请求才动。
+    # 所以写请求返回前就地 tick 一次（编码 ~10ms + 同区 Firestore batch ~百毫秒），
+    # 后台线程只兜后台任务（草案线程、巡检）产生的变更。2s 内的连续写请求合并成一次。
+    @app.middleware("http")
+    async def _checkpoint_after_write(request, call_next):
+        response = await call_next(request)
+        if request.method in ("POST", "PUT", "PATCH", "DELETE") and response.status_code < 400:
+            persister.tick_if_due(min_interval=2.0)
+        return response
 
     @app.on_event("startup")
     def _start() -> None:
