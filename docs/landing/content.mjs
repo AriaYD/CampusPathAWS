@@ -385,6 +385,11 @@ export const zhHans = {
           "容量全在这一侧，可复现、可审计。",
         "两个平面之间的每一次数据交换都由**数据契约类型**定形。",
       ],
+      figure: {
+        caption:
+          "系统架构（2026-08 版）：左为两个门户，中间是编排层与两个平面，右为 Google Cloud 与数据源；" +
+          "红色边框与虚线是六条红线在图上的落点。可横向滚动查看。",
+      },
       table: {
         head: ["#", "六条架构红线：每条都有对应的自动化测试，测试不过构建就失败"],
         rows: [
@@ -400,9 +405,11 @@ export const zhHans = {
         {
           title: "Google 生态里的位置",
           body:
-            "ADK 负责 Agent、工具、顺序/并行工作流与记忆；两个运行时部署在 Vertex AI Agent Engine；" +
-            "Cloud Run 跑学生 App API、适配器与定时任务；Moodle 沙箱通过自研**只读 MCP** 接入；" +
-            "日历走 Workspace API 的分项授权。",
+            "模型只有一个出口：**Gemini 3.5 Flash via Vertex AI**（GenAI SDK，代际下限在构造时检查）；" +
+            "编排与抽取两个 Agent 另以 ADK 镜像跑在 Vertex AI Agent Engine；Cloud Run 跑学生 App、API 与" +
+            "每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 **Firestore**、冷启动回读；" +
+            "每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 **Cloud Trace**；" +
+            "Moodle 沙箱通过自研**只读 MCP** 接入；密钥在 Secret Manager。",
         },
         {
           title: "模型可以换（架构承诺）",
@@ -891,6 +898,12 @@ export const en = {
           "threshold, eligibility decision and capacity calculation lives here — reproducible and auditable.",
         "Every exchange between the two planes is shaped by a **data contract type**.",
       ],
+      figure: {
+        caption:
+          "System architecture (Aug 2026): the two portals on the left, the orchestration layer and the two planes " +
+          "in the middle, Google Cloud and data sources on the right. Red borders and dashed edges are where the six " +
+          "red lines land. Scroll sideways on small screens.",
+      },
       table: {
         head: ["#", "Six architectural red lines — each has a test, and a failing test fails the build"],
         rows: [
@@ -906,9 +919,12 @@ export const en = {
         {
           title: "Where it sits in Google's stack",
           body:
-            "ADK handles agents, tools, sequential and parallel workflows, and memory; two runtimes deploy to " +
-            "Vertex AI Agent Engine; Cloud Run runs the student app API, adapters and scheduled jobs; the Moodle " +
-            "sandbox connects through a **read-only MCP** we built; the calendar uses per-scope Workspace API grants.",
+            "One model exit: **Gemini 3.5 Flash via Vertex AI** (GenAI SDK, with the generation floor asserted at " +
+            "construction). The orchestration and extraction agents also run as ADK mirrors on Vertex AI Agent Engine; " +
+            "Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); " +
+            "all mutable state is checkpointed to **Firestore** and restored on cold start; every model call, tool " +
+            "call and repair round is an OpenTelemetry span in **Cloud Trace**; the Moodle sandbox connects through a " +
+            "**read-only MCP** we built; secrets live in Secret Manager.",
         },
         {
           title: "The model is replaceable (an architectural commitment)",

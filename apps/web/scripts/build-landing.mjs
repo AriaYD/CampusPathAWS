@@ -111,6 +111,19 @@ const steps = (list) => !list ? "" : `
 const paras = (list) => !list ? "" :
   list.map((p) => `        <p class="lead">${rich(p)}</p>`).join("\n");
 
+/** 架构图（Hackathon 2026-08-25）：`docs/hackathon/architecture.svg` 内联进单文件——
+ *  三份产物都可能离线打开，外链图片在 file:// 下会断。SVG 本身是英文技术图，
+ *  三语只换 figcaption。窄屏横向滚动（min-width 1100px），别把 11px 的图文缩成噪点。 */
+const ARCH_SVG = readFileSync(
+  new URL("../../../docs/hackathon/architecture.svg", import.meta.url), "utf-8")
+  .replace(/^<\?xml[^>]*>\s*/, "")
+  .replace(/<svg /, '<svg role="img" ');
+const figure = (f) => !f ? "" : `
+        <figure class="figure">
+          <div class="figure-scroll">${ARCH_SVG}</div>
+          <figcaption>${rich(f.caption)}</figcaption>
+        </figure>`;
+
 /** 前置条件块。比 `note` 重一档：它不是补充说明，是**读者会追问的那件事**
  *  （"这套东西要接进学校的什么系统才成立"），所以给它边框与标题，别混进脚注。 */
 const callout = (c) => !c ? "" : `
@@ -124,7 +137,7 @@ const section = (code) => (s) => `
         <div class="wrap">
           <p class="kicker">${esc(s.kicker)}</p>
           <h2>${esc(s.title)}</h2>
-${paras(s.body)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${callout(s.callout)}${
+${paras(s.body)}${figure(s.figure)}${table(s.table)}${cards(s.cards)}${steps(s.steps)}${callout(s.callout)}${
   s.note ? `\n        <p class="note">${rich(s.note)}</p>` : ""}
         </div>
       </section>`;
@@ -437,6 +450,16 @@ strong{font-weight:680; color:var(--fg)}
   margin-top:24px; overflow-x:auto; border:1px solid var(--line);
   border-radius:var(--radius); background:var(--bg-card);
 }
+/* 架构图跳出正文栏：1600×960 的图塞进 ~1000px 栏里文字只剩 7px。宽屏按视口铺开
+   （上限 1600），窄屏仍在图内横向滚动——body 永不横向滚动，门禁量的就是这一条。 */
+.figure{
+  margin:26px 0 0; border:1px solid var(--line); border-radius:var(--radius); background:#fff; overflow:hidden;
+  width:min(1600px, calc(100vw - 48px)); position:relative; left:50%; transform:translateX(-50%);
+}
+.figure-scroll{overflow-x:auto; -webkit-overflow-scrolling:touch}
+.figure svg{display:block; width:100%; min-width:1100px; height:auto}
+.figure figcaption{padding:12px 16px; font-size:13.5px; color:var(--fg-muted); border-top:1px solid var(--line); background:var(--bg-sunk)}
+.section:nth-of-type(even) .figure{background:#fff}
 table{border-collapse:collapse; width:100%; min-width:520px; font-size:14px}
 th,td{text-align:start; padding:11px 14px; border-bottom:1px solid var(--line); vertical-align:top}
 th{background:var(--bg-sunk); font-weight:620; font-size:13px; color:var(--fg); white-space:nowrap}
