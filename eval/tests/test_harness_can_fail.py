@@ -17,6 +17,7 @@ import pytest
 
 from campuspath_eval import harness
 from campuspath_eval.harness import (
+    BASELINES,
     BLOCKERS,
     Result,
     Severity,
@@ -35,7 +36,8 @@ def empty_registry(monkeypatch):
 
 def test_unregistered_metrics_are_not_silently_dropped(empty_registry):
     results = run_all()
-    assert len(results) == len(BLOCKERS) + len(TARGETS), (
+    # 声明 = BLOCKER + TARGET + BASELINE（BL1–BL5 是 2026-08 加的对照数字，同样不许静默漏报）
+    assert len(results) == len(BLOCKERS) + len(TARGETS) + len(BASELINES), (
         "指标数量必须等于声明数量——少一项就是报告里有看不见的空白"
     )
     assert all(r.verdict is Verdict.NOT_MEASURED for r in results)
@@ -61,7 +63,7 @@ def test_a_throwing_check_fails_that_metric_only(monkeypatch):
     assert b1.verdict is Verdict.FAIL
     assert "RuntimeError" in b1.detail
     assert b1.failures, "失败样例里必须留下 traceback，否则无法复现"
-    assert len(results) == len(BLOCKERS) + len(TARGETS)
+    assert len(results) == len(BLOCKERS) + len(TARGETS) + len(BASELINES)
 
 
 def test_exit_code_is_graded(monkeypatch):

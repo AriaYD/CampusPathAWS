@@ -57,7 +57,12 @@ def ensure_pathway(client, student_id: str) -> bool:
     if drafted.status_code != 200:
         return False
     draft_id = drafted.json()["draft_id"]
+    # 2026-08-11 起带时段冲突的草案必须**显式确认**才能采纳（服务端 409
+    # `schedule_conflicts_unacknowledged`）。评测器替的是学生"看过冲突后仍采纳"
+    # 那一下点击——不是放宽断言：冲突本身仍由 B1/B2 与 `test_schedule_conflicts_api`
+    # 判定。2026-08-25 P8 复跑抓到：少了这个参数，13 项 BLOCKER 里 B8/T4/T5
+    # 全部因为"没有已采纳规划"而空跑。
     decided = client.post(
         f"/v1/students/{student_id}/pathway/draft/{draft_id}/decision"
-        "?decision=adopt", headers=headers)
+        "?decision=adopt&acknowledge_conflicts=true", headers=headers)
     return decided.status_code == 200
