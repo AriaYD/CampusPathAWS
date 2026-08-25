@@ -6601,6 +6601,11 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     app.state.pending = frozenset(pending)
     #: 契约覆盖的证据。测试用它做双向断言，不去猜框架把路由放哪了。
     app.state.route_index = tuple((m, p) for m, p, _ in route_index)
+    # P3（2026-08-24）：检查点。未设 CAMPUSPATH_CHECKPOINT 即 no-op（测试与本地默认），
+    # 线上 Cloud Run 设 firestore——冷启动回读、后台按需写，见 persistence.py。
+    from . import persistence as _persistence
+
+    _persistence.install(app, deps)
     return app
 
 

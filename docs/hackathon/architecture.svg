@@ -161,9 +161,9 @@
   <text x="1232" y="348" class="h3">Secret Manager · IAM</text>
   <text x="1232" y="364" class="ts">check-in HMAC secret · two runtime service accounts</text>
 
-  <rect x="1222" y="384" width="332" height="44" class="box" stroke="#9fb3d1" stroke-dasharray="4 3"/>
-  <text x="1232" y="402" class="h3">Firestore · Cloud Storage vault</text>
-  <text x="1232" y="418" class="ts">provisioned; the demo API keeps state in-process (roadmap)</text>
+  <rect x="1222" y="384" width="332" height="44" class="box" stroke="#3b6fc9"/>
+  <text x="1232" y="402" class="h3">Firestore · checkpoint store</text>
+  <text x="1232" y="418" class="ts">all mutable API state, changed fields only · restored on cold start</text>
 
   <text x="1222" y="454" class="h2">DATA SOURCES</text>
   <rect x="1222" y="464" width="332" height="60" class="box"/>

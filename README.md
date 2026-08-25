@@ -60,15 +60,16 @@ Two planes, contract-first: the **semantic plane** (A0–A5, the only code allow
 | Cloud Run (asia-east2) | `campuspath-web` (Next.js 16, PWA) and `campuspath-api` (FastAPI) |
 | Cloud Run Jobs + Cloud Scheduler | Daily source sweep |
 | Secret Manager | Check-in HMAC secret and Moodle token |
-| Cloud Storage / Firestore | Provisioned by `infra/bootstrap.sh` (private evidence vault, canonical store). The demo deployment currently keeps state in-process (`max-instances=1`) — see *Findings* |
+| Firestore `(default)` | **Checkpoint store**: every mutable container of the API (56 fields — profiles, proposals, plans, drafts, memory, reflections, exposures, review queue, credentials…) is snapshotted by a background writer (per-field digests, only changed fields written, one batch) and restored on cold start; a contract/seed version stamp guards against restoring stale shapes. Decoding accepts only allow-listed types |
+| Cloud Storage | Private evidence vault, provisioned by `infra/bootstrap.sh` (not yet written to by the demo) |
 
 ## 4. Run it locally (≈ 10 minutes)
 
-Prerequisites: Python 3.12, [`uv`](https://docs.astral.sh/uv/), [`bun`](https://bun.sh), `gcloud` CLI, a Google Cloud project with the Vertex AI API enabled.
+Prerequisites: Python 3.12, [`uv`](https://docs.astral.sh/uv/), [`bun`](https://bun.sh), `gcloud` CLI, bash ≥ 3.2 (macOS stock bash works), a Google Cloud project with the Vertex AI API enabled.
 
 ```bash
 git clone <this repo> campuspath && cd campuspath
-cp .env.example .env            # then set GOOGLE_CLOUD_PROJECT=<your-project>
+cp .env.example .env            # already points at the demo project; set GOOGLE_CLOUD_PROJECT to your own
 gcloud auth application-default login   # Vertex uses ADC; no API keys anywhere
 
 bash scripts/install-hooks.sh   # pre-commit: secret hygiene + "Vertex only" guard
@@ -92,7 +93,7 @@ bash infra/verify.sh                   # negative checks: A4's SA must NOT hold 
 
 # 1. API — Vertex model calls go through the global endpoint
 gcloud run deploy campuspath-api --source . --region asia-east2 \
-  --update-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=<project>,GOOGLE_CLOUD_LOCATION=global \
+  --update-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=<project>,GOOGLE_CLOUD_LOCATION=global,CAMPUSPATH_CHECKPOINT=firestore \
   --max-instances 1
 
 # 2. Web (ships the generated contract types into the image)
@@ -112,7 +113,8 @@ bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop`
 - **Put the rule in the constructor, not the README.** Two things that must never silently regress — "only Vertex, never AI-Studio billing" and "Gemini ≥ 3.5" — are asserted when the model client is constructed, and each has a *known-failing sample* test proving the guard actually fires.
 - **A plan item without a validation credential is not a plan item.** Making the Rules engine the issuer of `validation_id` and making the API reject unbacked items removed a whole class of "plausible but impossible" plans, and gave A5 a concrete repair signal instead of a vague "be careful with prerequisites".
 - **Gemini 3.5 changed the latency profile, not just the quality.** `thinking_budget=0` (the 2.x idiom) costs 20.9 s per call on 3.5-flash; `thinking_level=MINIMAL` costs 0.7 s. Every migration re-measures latency before trusting old parameters.
-- **State in-process is the honest weakness of this demo.** The API runs with `max-instances=1` and rebuilds its seed on cold start; Firestore is provisioned but not yet the backing store. It is the top item on the roadmap below.
+- **Durability first, then horizontal scale.** The API used to rebuild its seed on every cold start; now the whole mutable state is checkpointed to Firestore and restored on boot (survives redeploys and scale-to-zero). It still runs with `max-instances=1` because background jobs and locks are process-local — the checkpoint buys durability, not multi-instance consistency, and the README says so rather than implying otherwise.
+- **A deserializer that imports what the payload names is an attack surface.** Our zero-LLM AST scan flagged `importlib.import_module(name_from_data)` in the checkpoint codec; the fix — an allow-list of contract types, unknown references refused — is also the right security posture for data that lives in a shared database.
 - **Metrics names decide how people read them.** An institution metric first called "discovery rate" read as an algorithm report card; renaming it "reach rate" and keeping the denominator fixed made the same number honest.
 
 ## 7. Pre-existing work disclosure
@@ -120,7 +122,7 @@ bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop`
 This repository was started on **2026-07-29** for a university-internal Google hackathon and was substantially extended during the *All Things Agentic* submission period (2026-08-04 → 2026-08-31). In the spirit of the rules we disclose the split explicitly:
 
 - **Pre-existing (before 2026-08-04, commits `afd5f45..b37be24`)**: product spec, contract layer, synthetic seed, the nine deterministic services, the A0–A5 agent roster on Gemini 2.5, the two portals' UI, Cloud Run deployment, evaluation harness.
-- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (persistence, observability, agent registry, ADK on the request path).
+- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (Firestore checkpointing of all mutable state, observability, agent registry, ADK on the request path).
 
 Third-party inputs: HKUST public course catalog (scraped with a 1 s polite interval and disk cache; no student data), public job postings via Google Search grounding, open-source libraries under their licenses. No sponsor funding or support was received.
 

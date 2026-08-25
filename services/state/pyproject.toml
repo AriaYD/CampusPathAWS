@@ -13,6 +13,8 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
+# 检查点的线上后端（checkpoint.FirestoreCheckpoint 延迟 import）。不是模型 SDK。
+firestore = ["google-cloud-firestore>=2.16"]
 
 [build-system]
 requires = ["hatchling"]

@@ -1,6 +1,22 @@
 # CampusPath 架构文档
 
-> 版本对应：Spec **v4.1.34** · Plan V2 · 契约 **1.41.0** · Seed **1.11.0**（2026-08-24 main 同步）
+> 版本对应：Spec **v4.1.35** · Plan V2 · 契约 **1.41.0** · Seed **1.12.0**（2026-08-24 main 同步）
+>
+> 2026-08-24 状态持久化（Spec v4.1.35，Hackathon P3）：**api 的可变状态不再随冷启动清零**。
+> 新增数据流 **Deps → 检查点 → Firestore**：`campuspath_api.persistence` 维护一份**穷举**
+> 清单（`MANIFEST` 56 个容器 + `SKIPPED` 19 个带理由的例外，测试断言两者覆盖 `Deps` 的
+> 全部属性——新加容器忘了登记会红），后台线程每 10s 用 `campuspath_state.codec`
+> 把清单编码成 JSON（类型信息随数据走：Pydantic/枚举/dataclass/日期/集合/元组键），
+> 逐字段摘要**变了的字段才写**，一次 Firestore batch 提交；启动时 `restore_from`
+> 用一条流式查询整体回读，**版本戳**（契约 + Seed 版本）不匹配即拒绝恢复、走 seed 冷启动。
+> 后端三实现同协议：`MemoryCheckpoint`（测试）/ `FileCheckpoint`（本地，临时文件 + 原子替换）/
+> `FirestoreCheckpoint`（线上，Cloud Run 服务账号 ADC；`_meta` 文档存布局，
+> 超 900 KB 的字段切块）。**解码只认白名单**：类型引用串查 `Codec._types`，不做
+> 动态 import——检查点是外部输入，不能让数据指定"请实例化哪个类"（零 LLM 第四层扫描
+> 当场抓到的 `importlib.import_module`，改成白名单后才绿）。`validations` 注册表也在
+> 清单里：回来的 PlanItem 仍要过 B8，凭据不在就全被拒。**它解决的是持久性，不是多实例
+> 一致性**——后台任务与锁仍是进程态，`max-instances=1` 的理由未变。
+> `CAMPUSPATH_CHECKPOINT` 未设即关闭（测试与本地默认），线上设 `firestore`。
 >
 > 2026-08-24 模型代际迁移（Spec v4.1.34，All Things Agentic Hackathon 硬性要求
 > "Gemini 3.5 or newer"）：语义平面的唯一模型出口从 `gemini-2.5-flash` 改为
@@ -194,7 +210,8 @@ flowchart TB
         VX["Vertex AI · Gemini 3.5 Flash（global 端点）<br/>唯一模型出口，赠金账号；代际门槛 ≥3.5 在构造时检查"]
         MDL["Moodle 沙箱（GCE）<br/>mcp/moodle_mcp 白名单只读 MCP"]
         CATALOG["HKUST 真实公开数据<br/>课程目录 1534 门 · Engage 活动 · 5 专业培养要求"]
-        SEED["Synthetic Seed 1.5.0<br/>12 学生 · 143 机会 · Gold Set"]
+        SEED["Synthetic Seed 1.12.0<br/>12 学生 · 205 机会 · Gold Set"]
+        FS["Firestore (default)<br/>检查点：MANIFEST 56 字段<br/>变了才写 · 冷启动回读 · 版本戳守门"]
     end
 
     SP --> LG --> RBAC
@@ -210,6 +227,8 @@ flowchart TB
     CAP -- "free/busy（一级）/ 标题（二级授权）" --> CON
     CON --> MDL & CATALOG
     EP --> SEED
+    EP -. "persistence.Persister 10s<br/>逐字段摘要 · batch" .-> FS
+    FS -. "restore_from（stamp 匹配才回）" .-> EP
     A4 -. "外部内容作 user-role 数据<br/>永不进 system prompt" .-> CON
 
     style CAP fill:#fff3e0,stroke:#e65100

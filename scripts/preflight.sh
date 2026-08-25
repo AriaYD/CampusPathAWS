@@ -44,7 +44,7 @@ echo "[3/6] 密钥卫生"
 [ -f .env ] && ok ".env 存在" || warn ".env 不存在"
 if [ -f .env ]; then
   PERM=$(stat -f "%OLp" .env 2>/dev/null || stat -c "%a" .env 2>/dev/null)
-  [ "$PERM" = "600" ] && ok ".env 权限 600" || warn ".env 权限为 $PERM，建议 chmod 600 .env"
+  [ "$PERM" = "600" ] && ok ".env 权限 600" || warn ".env 权限为 ${PERM}，建议 chmod 600 .env"
 fi
 if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
   git check-ignore -q .env 2>/dev/null && ok ".env 已被 git 忽略" || bad ".env 未被忽略！"
