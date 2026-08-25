@@ -1,0 +1,239 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
+  <title>CampusPath architecture — two planes, contract-first, Vertex-only</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a4a4a"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#b3412a"/>
+    </marker>
+    <style>
+      .t  { font-size: 13px; fill: #262626; }
+      .ts { font-size: 11px; fill: #4a4a4a; }
+      .tm { font-size: 10.5px; fill: #5a5a5a; font-family: 'SF Mono', Menlo, Consolas, monospace; }
+      .h1 { font-size: 22px; font-weight: 700; fill: #1f1f1f; }
+      .h2 { font-size: 13.5px; font-weight: 700; fill: #1f1f1f; letter-spacing: .02em; }
+      .h3 { font-size: 12.5px; font-weight: 700; fill: #262626; }
+      .box { fill: #ffffff; stroke: #cfcfcf; stroke-width: 1.2; rx: 8; }
+      .zone { fill: #faf7f2; stroke: #e2d9cc; stroke-width: 1.2; rx: 12; }
+      .zone-sem { fill: #fdf4ec; stroke: #e8c9ad; }
+      .zone-det { fill: #eef4f1; stroke: #bfd6c9; }
+      .zone-gcp { fill: #eef3fb; stroke: #b9cbe8; }
+      .edge { stroke: #4a4a4a; stroke-width: 1.4; fill: none; marker-end: url(#arrow); }
+      .edge-dash { stroke: #4a4a4a; stroke-width: 1.4; fill: none; stroke-dasharray: 5 4; marker-end: url(#arrow); }
+      .edge-red { stroke: #b3412a; stroke-width: 1.6; fill: none; marker-end: url(#arrow-red); }
+      .lbl { font-size: 10px; fill: #3d3d3d; }
+      .red { fill: #b3412a; font-weight: 700; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="960" fill="#ffffff"/>
+  <text x="32" y="38" class="h1">CampusPath — architecture</text>
+  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.41.0</text>
+
+  <!-- ============ CLIENTS (x 32–312) ============ -->
+  <rect x="32" y="84" width="280" height="270" class="zone"/>
+  <text x="46" y="106" class="h2">CLIENTS · Cloud Run “campuspath-web”</text>
+  <text x="46" y="122" class="ts">Next.js 16 · installable PWA · en / zh-Hans / zh-Hant</text>
+
+  <rect x="46" y="136" width="252" height="60" class="box"/>
+  <text x="56" y="154" class="h3">Student portal (14 pages)</text>
+  <text x="56" y="170" class="ts">Goal Studio · gap map · plan draft → approval</text>
+  <text x="56" y="184" class="ts">gate · calendar · reflections · memory</text>
+
+  <rect x="46" y="206" width="252" height="60" class="box"/>
+  <text x="56" y="224" class="h3">Institution portal (8 roles)</text>
+  <text x="56" y="240" class="ts">publisher · review · plaza admin · insights ·</text>
+  <text x="56" y="254" class="ts">quality reports · wellbeing &amp; advisor desks</text>
+
+  <rect x="46" y="276" width="252" height="62" class="box"/>
+  <text x="56" y="294" class="h3">Passcode gate + synthetic login</text>
+  <text x="56" y="310" class="ts">HMAC httpOnly cookie · role declared to the</text>
+  <text x="56" y="324" class="ts">API via <tspan class="tm">X-CampusPath-Role</tspan></text>
+
+  <!-- ============ API (x 344–1176) ============ -->
+  <rect x="344" y="84" width="832" height="114" class="zone"/>
+  <text x="358" y="106" class="h2">ORCHESTRATION · Cloud Run “campuspath-api” (FastAPI)</text>
+  <rect x="358" y="118" width="250" height="64" class="box"/>
+  <text x="368" y="136" class="h3">RBAC middleware</text>
+  <text x="368" y="152" class="ts">role table generated from the contracts;</text>
+  <text x="368" y="166" class="ts">violations are logged, never silent</text>
+  <rect x="622" y="118" width="270" height="64" class="box"/>
+  <text x="632" y="136" class="h3">Contract-typed endpoints</text>
+  <text x="632" y="152" class="ts">OpenAPI 1.41.0 · student / institution / ops</text>
+  <text x="632" y="166" class="ts">endpoints · every response is a Pydantic model</text>
+  <rect x="906" y="118" width="256" height="64" class="box" stroke="#b3412a"/>
+  <text x="916" y="136" class="h3">B8 deployment gate</text>
+  <text x="916" y="152" class="ts">a PlanItem without a Rules-issued</text>
+  <text x="916" y="166" class="ts"><tspan class="tm">validation_id</tspan> is rejected with HTTP 422</text>
+
+  <!-- ============ Contracts bar ============ -->
+  <rect x="344" y="212" width="832" height="34" rx="8" fill="#f1efe9" stroke="#d6d0c4"/>
+  <text x="358" y="234" class="h3">contracts/  Pydantic models → JSON Schema · OpenAPI · TypeScript types.  <tspan class="ts" font-weight="400">Data the types do not allow cannot flow between planes.</tspan></text>
+
+  <!-- ============ SEMANTIC PLANE (x 344–724) ============ -->
+  <rect x="344" y="260" width="380" height="428" class="zone zone-sem"/>
+  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Google GenAI SDK)</text>
+  <text x="358" y="298" class="ts">The only code allowed to call a model. “Vertex only” and “Gemini ≥ 3.5”</text>
+  <text x="358" y="311" class="ts">are asserted in the client constructor, not in documentation.</text>
+
+  <rect x="358" y="322" width="352" height="48" class="box"/>
+  <text x="368" y="340" class="h3">A0 Orchestrator</text>
+  <text x="368" y="356" class="ts">deterministic routing table first; the LLM composes only unknown intents</text>
+
+  <rect x="358" y="378" width="352" height="48" class="box"/>
+  <text x="368" y="396" class="h3">A1 Student Context</text>
+  <text x="368" y="412" class="ts">résumé / reflection extraction → always a <tspan font-weight="700">pending</tspan> proposal (B3)</text>
+
+  <rect x="358" y="434" width="352" height="48" class="box"/>
+  <text x="368" y="452" class="h3">A2 Academic</text>
+  <text x="368" y="468" class="ts">facts and candidate courses only — no ranking, no trade-offs</text>
+
+  <rect x="358" y="490" width="352" height="48" class="box"/>
+  <text x="368" y="508" class="h3">A3 Goal-Gap</text>
+  <text x="368" y="524" class="ts">role packs compiled from JD corpora + live Search-grounded research</text>
+
+  <rect x="358" y="546" width="352" height="60" class="box" stroke="#b3412a"/>
+  <text x="368" y="564" class="h3">A4 Opportunity Scout <tspan class="ts">(separate service account)</tspan></text>
+  <text x="368" y="580" class="ts">tool whitelist = {read_source, emit_opportunity_draft} · external text</text>
+  <text x="368" y="594" class="ts">is user-role data, never a system prompt · output is a draft only</text>
+
+  <rect x="358" y="614" width="352" height="64" class="box" stroke="#b3412a"/>
+  <text x="368" y="632" class="h3">A5 Pathway <tspan class="red">— the only agent that makes trade-offs</tspan></text>
+  <text x="368" y="648" class="ts">plan A/B/C variants · repair loop ≤ 3 rounds on Rules violations</text>
+  <text x="368" y="662" class="ts">on failure: validated fixture + one-day negative cache</text>
+  <text x="368" y="676" class="ts">every PlanItem carries a Rules-issued <tspan class="tm">validation_id</tspan></text>
+
+  <!-- ============ DETERMINISTIC PLANE (x 816–1176) ============ -->
+  <rect x="816" y="260" width="360" height="428" class="zone zone-det"/>
+  <text x="830" y="282" class="h2">DETERMINISTIC PLANE · services/ (zero LLM)</text>
+  <text x="830" y="298" class="ts">Owns every judgement: eligibility, capacity, wellbeing, consent.</text>
+  <text x="830" y="311" class="ts">AST-scanned in CI — these packages cannot import a model SDK.</text>
+
+  <rect x="830" y="322" width="332" height="48" class="box" stroke="#b3412a"/>
+  <text x="840" y="340" class="h3">Rules &amp; Constraint Engine</text>
+  <text x="840" y="356" class="ts">prerequisite 3-valued logic · 4-state eligibility · issues validation_id</text>
+
+  <rect x="830" y="378" width="332" height="48" class="box" stroke="#b3412a"/>
+  <text x="840" y="396" class="h3">Capacity &amp; Calendar</text>
+  <text x="840" y="412" class="ts">5 block types · capacity formula · <tspan class="red">calendar tokens stop here</tspan></text>
+
+  <rect x="830" y="434" width="332" height="48" class="box"/>
+  <text x="840" y="452" class="h3">Wellbeing Composer</text>
+  <text x="840" y="468" class="ts">5 threshold signals · fixed bilingual templates · 2-step reminder FSM</text>
+
+  <rect x="830" y="490" width="332" height="48" class="box"/>
+  <text x="840" y="508" class="h3">State &amp; Memory · Action &amp; Consent</text>
+  <text x="840" y="524" class="ts">4-layer advisory memory · preview → receipt → idempotent execute · audit</text>
+
+  <rect x="830" y="546" width="332" height="60" class="box" stroke="#b3412a"/>
+  <text x="840" y="564" class="h3">Aggregation (institution metrics)</text>
+  <text x="840" y="580" class="ts">k-anonymity: cells with n &lt; 5 suppressed · time decay</text>
+  <text x="840" y="594" class="ts"><tspan class="tm">MetricTuple</tspan> has no student_id field at all</text>
+
+  <rect x="830" y="614" width="332" height="64" class="box"/>
+  <text x="840" y="632" class="h3">Monitor &amp; Replan · Publishing · Connector</text>
+  <text x="840" y="648" class="ts">debounced replan scope (long-term items untouched)</text>
+  <text x="840" y="662" class="ts">review queue with scope-violation ledger</text>
+  <text x="840" y="676" class="ts">93-source registry · sha256 change detection · intl. context pack</text>
+
+  <!-- ============ GOOGLE CLOUD (x 1208–1568) ============ -->
+  <rect x="1208" y="84" width="360" height="604" class="zone zone-gcp"/>
+  <text x="1222" y="106" class="h2">GOOGLE CLOUD · one project, one billing account</text>
+
+  <rect x="1222" y="118" width="332" height="70" class="box" stroke="#3b6fc9"/>
+  <text x="1232" y="136" class="h3">Vertex AI · gemini-3.5-flash</text>
+  <text x="1232" y="152" class="ts">global endpoint · thinking_level MINIMAL / LOW</text>
+  <text x="1232" y="166" class="ts">Google Search grounding for live job postings</text>
+  <text x="1232" y="180" class="ts">ADC only — no API keys exist anywhere in the system</text>
+
+  <rect x="1222" y="198" width="332" height="56" class="box" stroke="#3b6fc9"/>
+  <text x="1232" y="216" class="h3">Vertex AI Agent Engine (us-central1)</text>
+  <text x="1232" y="232" class="ts">ADK mirrors of A0 and A4 · CI asserts their routing</text>
+  <text x="1232" y="246" class="ts">table equals the local one · status light in the web UI</text>
+
+  <rect x="1222" y="264" width="332" height="56" class="box" stroke="#3b6fc9"/>
+  <text x="1232" y="282" class="h3">Cloud Scheduler → Cloud Run Job</text>
+  <text x="1232" y="298" class="ts">daily 09:00 HKT sweep of 93 sources → changed official</text>
+  <text x="1232" y="312" class="ts">pages → A4 extraction → plaza, no human in the loop</text>
+
+  <rect x="1222" y="330" width="332" height="44" class="box" stroke="#3b6fc9"/>
+  <text x="1232" y="348" class="h3">Secret Manager · IAM</text>
+  <text x="1232" y="364" class="ts">check-in HMAC secret · two runtime service accounts</text>
+
+  <rect x="1222" y="384" width="332" height="44" class="box" stroke="#9fb3d1" stroke-dasharray="4 3"/>
+  <text x="1232" y="402" class="h3">Firestore · Cloud Storage vault</text>
+  <text x="1232" y="418" class="ts">provisioned; the demo API keeps state in-process (roadmap)</text>
+
+  <text x="1222" y="454" class="h2">DATA SOURCES</text>
+  <rect x="1222" y="464" width="332" height="60" class="box"/>
+  <text x="1232" y="482" class="h3">Real, public</text>
+  <text x="1232" y="498" class="ts">HKUST course catalog (1,534 courses) · 5 degree requirement</text>
+  <text x="1232" y="512" class="ts">sets · 85 live department pages · public job postings</text>
+
+  <rect x="1222" y="534" width="332" height="60" class="box"/>
+  <text x="1232" y="552" class="h3">Synthetic (labelled in the UI)</text>
+  <text x="1232" y="568" class="ts">12 students · 205 opportunities · calendars · reflections</text>
+  <text x="1232" y="582" class="ts">publishers · gold set — seed 1.11.0, reproducible</text>
+
+  <rect x="1222" y="604" width="332" height="60" class="box"/>
+  <text x="1232" y="622" class="h3">Moodle sandbox (GCE) via read-only MCP</text>
+  <text x="1232" y="638" class="ts">whitelisted read tools only · token in Secret Manager</text>
+  <text x="1232" y="652" class="ts">never reaches an LLM context</text>
+
+  <!-- ============ Edges ============ -->
+  <!-- clients -> api -->
+  <path d="M 312 166 L 344 166" class="edge"/>
+  <path d="M 312 236 L 328 236 L 328 166" stroke="#4a4a4a" stroke-width="1.4" fill="none"/>
+  <!-- api -> A0 (left padding lane of the semantic plane) -->
+  <path d="M 352 198 L 352 212" stroke="#4a4a4a" stroke-width="1.4" fill="none"/>
+  <path d="M 352 246 L 352 340 L 358 340" class="edge"/>
+  <!-- A0 -> A1..A5 bus (inside left padding) -->
+  <path d="M 352 340 L 352 646" stroke="#4a4a4a" stroke-width="1.2" fill="none"/>
+  <path d="M 352 402 L 358 402" class="edge"/>
+  <path d="M 352 458 L 358 458" class="edge"/>
+  <path d="M 352 514 L 358 514" class="edge"/>
+  <path d="M 352 576 L 358 576" class="edge"/>
+  <path d="M 352 646 L 358 646" class="edge"/>
+  <!-- api -> deterministic plane (right padding lane) -->
+  <path d="M 1168 198 L 1168 212" stroke="#4a4a4a" stroke-width="1.4" fill="none"/>
+  <path d="M 1168 246 L 1168 346 L 1162 346" class="edge"/>
+  <!-- A5 -> Rules (validation_id) through the gap -->
+  <path d="M 710 646 C 760 646, 760 346, 830 346" class="edge-red"/>
+  <text x="732" y="500" class="lbl" fill="#b3412a">every plan</text>
+  <text x="732" y="512" class="lbl" fill="#b3412a">item must</text>
+  <text x="732" y="524" class="lbl" fill="#b3412a">reference a</text>
+  <text x="732" y="536" class="lbl" fill="#b3412a">validation_id</text>
+  <!-- A1 -> Aggregation (structured only) through the gap -->
+  <path d="M 710 402 C 760 402, 760 576, 830 576" class="edge-dash"/>
+  <text x="732" y="412" class="lbl">only structured</text>
+  <text x="732" y="424" class="lbl">feedback; the</text>
+  <text x="732" y="436" class="lbl">reflection text</text>
+  <text x="732" y="448" class="lbl">cannot pass</text>
+  <text x="732" y="460" class="lbl">the type</text>
+  <!-- scheduler -> api -->
+  <path d="M 1222 292 L 1192 292 L 1192 160 L 1176 160" class="edge-dash"/>
+  <text x="1000" y="192" class="lbl">◀ daily job calls POST /v1/ops/sources/…/refresh</text>
+
+  <!-- lanes below the planes -->
+  <!-- lane 1: model calls -->
+  <path d="M 536 688 L 536 712 L 1584 712 L 1584 153 L 1554 153" class="edge"/>
+  <text x="548" y="708" class="lbl">A1–A5 model calls → Vertex AI only (assert_vertex_only at construction)</text>
+  <!-- lane 2: untrusted text -> A4 -->
+  <path d="M 1222 512 L 1200 512 L 1200 730 L 340 730 L 340 576 L 358 576" class="edge-dash" stroke="#b3412a" marker-end="url(#arrow-red)"/>
+  <text x="548" y="726" class="lbl" fill="#b3412a">untrusted external text → A4 only, as user-role data; never into a system prompt</text>
+  <!-- lane 3: calendar token stop -->
+  <path d="M 1222 640 L 1206 640 L 1206 748 L 806 748 L 806 402 L 830 402" class="edge-dash"/>
+  <text x="548" y="744" class="lbl">calendar free/busy (tier 1) · titles only with a second-tier grant · the token never leaves Capacity &amp; Calendar</text>
+
+  <!-- ============ Invariants ============ -->
+  <rect x="32" y="776" width="1536" height="160" rx="12" fill="#fdf6f4" stroke="#e5c3ba"/>
+  <text x="48" y="800" class="h2" fill="#b3412a">SIX INVARIANTS — enforced by types and CI, not by prompts</text>
+  <text x="48" y="826" class="t">1  A5 is the only agent that makes trade-offs; A1–A4 emit facts and candidates.</text>
+  <text x="48" y="848" class="t">2  The wellbeing chain has zero LLM: thresholds decide, fixed templates speak.</text>
+  <text x="48" y="870" class="t">3  Calendar tokens never enter an LLM context; collection beyond the granted tier is rejected in the type layer.</text>
+  <text x="800" y="826" class="t">4  A4's tool whitelist is exactly two tools; external content is user-role data, never a system prompt.</text>
+  <text x="800" y="848" class="t">5  Every PlanItem carries a Rules-issued validation_id; the API rejects unbacked items (HTTP 422).</text>
+  <text x="800" y="870" class="t">6  A1 → Aggregation carries only structured EventQualityFeedback; reflection text cannot pass the type.</text>
+  <text x="48" y="908" class="ts">Verification: make check (all suites + zero-LLM AST scans + harness self-test) · make eval = 13 BLOCKER metrics at zero violations + 12 TARGET metrics, machine-judged · 23 pages under browser gates (contrast, alignment, structure).</text>
+</svg>

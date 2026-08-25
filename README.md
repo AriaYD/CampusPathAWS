@@ -1,188 +1,141 @@
 # CampusPath
 
-HKUST Google 黑客松参赛项目（命题：Gemini Enterprise for Higher Education）。
+**An agent fleet that turns "who I want to become" into a validated, calendar-aware growth plan — and keeps every step honest.**
 
-一个由 Gemini Enterprise 驱动的动态校园成长路径 Agent 系统：持续整合校内外可信资源与学生真实反馈，把学生想成为的人动态倒推成当下可执行、并随变化实时校准的校园成长路径。
+Built for the *All Things Agentic Hackathon* (Google Cloud × Devpost, Aug 2026) · Category: **Collaborative Partner**
+Stack: **Gemini 3.5 Flash on Vertex AI** · **Google GenAI SDK + ADK** · **Cloud Run** · Cloud Scheduler + Cloud Run Jobs · Vertex AI Agent Engine · Secret Manager
 
-- MVP Study Case：Undergraduate → Direct Employment
-- 架构：6 语义 Agent（A0–A5）/ 9 个确定性服务，双平面 + 契约先行（详见 [ARCHITECTURE.md](ARCHITECTURE.md)）；模型 **Gemini 3.5 Flash via Vertex AI（global 端点，代际门槛 ≥3.5 在构造时检查）**，google-genai + ADK（Agent Engine 镜像）
-- 功能基线：F01–F27（零删减）
-- 交付形态：Web App（学生 / 校方双门户，简/繁/英三语；桌面 + 移动端，PWA 建设中）
+> This is the public submission repository. The Chinese engineering ledgers (spec, plan, progress) are kept in the private working repository and are not part of the submission.
 
-## 文档
-
-| 文档 | 说明 |
+| | |
 |---|---|
-| **[CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md](CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md)** | **产品说明书 — 唯一现行基线**（现 v4.1.28，实现同步批注随版本块滚动） |
-| [CampusPath_Implementation_Plan_V2.md](CampusPath_Implementation_Plan_V2.md) | 实现计划：交付标准 D1–D7、工作包 WP0–WP11、踩坑台账 §10.2、风险降级 |
-| [ARCHITECTURE.md](ARCHITECTURE.md) | 架构文档：双平面组成、系统架构图与关键数据流（mermaid）、六条红线的技术落点 |
-| [CampusPath_Architecture_Review_V4.1.md](CampusPath_Architecture_Review_V4.1.md) | V4.1 各项修改的论证过程记录（含被否决与被撤销的条目及理由），非执行基线 |
-| [PROGRESS.md](PROGRESS.md) | 进度审计：断点、决策时间线、待确认项（只记已验证事实） |
-| [docs/demo-runbook.md](docs/demo-runbook.md) | Demo 运行手册：Spec §19 十七步对照与彩排清单 |
-| [docs/campuspath-visual.html](docs/campuspath-visual.html) | 交互式项目说明网页源码（五分页：项目背景 / 功能清单 / Agent 架构 / Workflow / 技术实现） |
-| [docs/campuspath-landing.html](docs/campuspath-landing.html) | **产品宣传页**（三语，自包含单文件；顶栏常驻「试用」CTA + 页尾 CTA band + 体验口令）。**生成物**：改 `docs/landing/content.mjs` 后跑 `bun run landing`，`bun run landing:check` 守一致性——**禁止手改 HTML**，繁体由 OpenCC 转出不手写 |
-| [contracts/README.md](contracts/README.md) | 契约层：Schema 唯一真相来源，以及它强制了哪些红线 |
-| [seed/DATA_DICTIONARY.md](seed/DATA_DICTIONARY.md) | 合成数据字典 |
-| [infra/README.md](infra/README.md) | GCP 基础设施脚本（bootstrap / verify / moodle / cost） |
+| Live demo | https://campuspath-web-786160486093.asia-east2.run.app (passcode is printed on the public landing page: `/landing`) |
+| API (OpenAPI) | https://campuspath-api-786160486093.asia-east2.run.app/docs |
+| Architecture | [`docs/hackathon/architecture.svg`](docs/hackathon/architecture.svg) · full text in [`ARCHITECTURE.md`](ARCHITECTURE.md) |
+| Demo video | *(link added on submission)* |
+| Data | **All student, calendar, opportunity and publisher data is synthetic.** Course catalog and degree requirements are scraped from HKUST's public catalog. UI shows a `Synthetic / Demo Data` badge. |
 
-V4 历史基线已从仓库删除——**只保留一份基线，就不会引错基线**。要看 V4 原文走 git 历史。
+---
 
-## 项目文件结构
+## 1. The friction
 
-```text
-HKUST_CampusPath/
-├── CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md   # 产品基线（v4.1.28）
-├── CampusPath_Implementation_Plan_V2.md                  # 执行计划
-├── ARCHITECTURE.md                                       # 架构文档（图在此）
-├── PROGRESS.md                                           # 进度审计
-├── CLAUDE.md                                             # 工作硬约束（会话自动加载）
-├── Makefile                                              # check/eval/api/web/contracts/seed…
-│
-├── contracts/                    # 契约层：唯一真相来源（1.40.0）
-│   ├── campuspath_contracts/     #   184 个数据契约类型（Pydantic）+ 声明式 openapi.py + 边界守卫
-│   ├── openapi/campuspath.json   #   生成的 OpenAPI 3.1（95 路径 / 114 操作）
-│   ├── schema/                   #   逐模型 JSON Schema 冻结产物
-│   └── tests/                    #   B1–B13 红线逐条测试 + 变异自检
-│
-├── services/                     # 确定性平面（零 LLM，三层扫描强制）
-│   ├── rules/                    #   先修三值逻辑、四态资格、validation_id 签发（+国际生 Pack 桥）
-│   ├── capacity/                 #   五类时段、容量公式；Calendar Token 止步于此
-│   ├── wellbeing/                #   五信号阈值 + 固定双语模板 + 两次提醒状态机
-│   ├── state/                    #   四层记忆、Profile 三段式写入、锁定/忘记
-│   ├── action/                   #   预览→回执→幂等执行→审计
-│   ├── aggregation/              #   k-匿名抑制、时间衰减（无 student_id）
-│   ├── monitor/                  #   事件去抖 + 受影响范围（长期项不波及）
-│   ├── publishing/               #   投稿状态机、越权拦截留痕
-│   ├── connector/                #   统一适配器接口 + Source Health + 源注册表（93 源，85 真实/8 mock）+ 共享抓取器/变更检测
-│   ├── packs/                    #   国际生 Context Pack（vendored，确定性求值，待政策复核）
-│   ├── api/                      #   FastAPI 装配 + RBAC + B8 闸门（app.py + a5_pathway.py A5 线上生成 + resume_template.py 模板解析）
-│   └── mock-campus/              #   SIS / Degree Audit 等 7 个 mock 端点
-│
-├── agents/campuspath_agents/     # 语义平面：A0–A5 + 工具白名单 + Vertex-only 守卫
-│   ├── pack_data/                #   岗位画像 + 权威证据参考表（compile_employment_pack.py 编译产物）
-│   ├── live_market_research.py   #   现场拆解真流水线（接地搜索→真抓原文→确定性加权）
-│   ├── roster.py                 #   六个 Agent 类 + GOAL_DECOMPOSITION_PACKS
-│   ├── tools.py                  #   ToolBelt 白名单（A4 仅 2 个工具）
-│   ├── vertex.py                 #   唯一模型出口（ADC + assert_vertex_only）
-│   └── workflows.py              #   Plan A/B/C 并行、约束修复循环、多源隔离抽取
-├── agents/cloud/                 # ADK 部署镜像（A0/A4 → Vertex AI Agent Engine，两运行时；镜像一致性 CI 断言）
-│
-├── apps/web/                     # Next.js 16 前端（bun），学生/校方双门户
-│   ├── src/app/                  #   login + 学生 14 页 + 校方 8 页（publisher/console/review/plaza-admin/insights/quality-reports/advisor-desk/wellbeing-desk）
-│   ├── src/app/manifest.ts       #   PWA manifest（standalone + 三档图标含 maskable）
-│   ├── src/app/sw-unregister/    #   Service Worker 紧急卸载页（不带壳、不要会话；另有 `?sw=off`）
-│   ├── src/components/           #   shell（含手机底部标签栏 + 「更多」面板）/ nav（门户过滤+守卫+标签栏槽位）/ nav-icons / ui / add-to-plan / review-queue
-│   ├── scripts/                  #   三道 UI 门禁：check-contrast / check-alignment / run-pages-must（各带 H5 自检；覆盖 23 页 × 两档视口）
-│   ├── scripts/gen-icons.mjs     #   PWA 图标生成（复用 puppeteer-core 渲染 SVG 字标，不引 sharp/canvas）
-│   ├── scripts/lib/browser.mjs   #   门禁共用的 puppeteer 样板 + 视口两档（desktop 1280×900 / mobile 390×844）+ 无横向溢出断言
-│   ├── src/i18n/                 #   en.ts（类型源）+ zh-Hans + zh-Hant（生成物），三语切换持久化
-│   ├── src/lib/api.ts            #   契约类型化 API 客户端
-│   ├── src/lib/gate.ts           #   口令门 HMAC（middleware 与校验路由共用）
-│   ├── src/lib/plan-window.ts    #   规划时间窗口口径（行动中心/课外规划共用）
-│   ├── public/sw.js              #   最小 Service Worker：HTML 一律 network-only 绝不入缓存，只缓存 /_next/static/*
-│   └── public/resume-template.md #   官方 Resume 模板（上传只认它，零 AI 解析）；同目录 demo-resume-*.md 一键注入用
-│
-├── seed/                         # 数据层
-│   ├── campuspath_seed/          #   确定性生成器（SEED 1.9.0）+ Gold Set + 失败样本 + 一致性检查
-│   ├── scrape_hkust_catalog.py   #   真实课程目录抓取（1534 门，磁盘缓存 + 礼貌间隔）
-│   ├── scrape_hkust_events.py    #   Engage 活动抓取（66 条官方源）
-│   ├── scrape_hkust_programs.py  #   5 专业培养要求抓取
-│   └── raw/                      #   冻结的真实数据快照（courses.json / programs.json）
-│
-├── jobs/                         # 每日源巡检脚本（Cloud Run Job 形态见 infra/sources_job.sh）
-├── mcp/moodle_mcp/               # Moodle 只读 MCP：白名单客户端 + stdio 服务器 + 契约适配器
-├── eval/campuspath_eval/         # make eval：13 BLOCKER / 12 TARGET / 5 BASELINE
-├── infra/                        # GCP 脚本（默认 dry-run）：bootstrap/verify/moodle/cost/agent_engine（运行时 status/query/delete）
-├── scripts/                      # preflight（14 项自检）、pre-commit 密钥拦截、install-hooks
-├── docs/                         # demo-runbook、verification/ 浏览器实测截图、visual 网页、landing 宣传页（生成物 + content 源）
-└── .claude/                      # hooks（上下文交接引擎）、skills、handoff
-```
+A university student asks a simple question — *"I want to be a data scientist; what do I do this semester?"* — and gets a fragmented answer: a degree-requirements PDF, a careers-office noticeboard, 90+ department web pages that change weekly, a calendar that is already full, and an advisor with a 3-week queue. Advice that ignores prerequisites, capacity or sleep is worse than no advice: it produces plans that get abandoned in week 3.
 
-## 开工
+CampusPath is the **collaborative partner** in that loop. It does not chat. It **proposes** a concrete plan (courses + activities + preparation actions), shows the evidence for every item, asks the student to approve or decline item by item, projects the approved items into the calendar, watches the environment in the background, and **adapts** from the student's own feedback — reflections, ratings, and refusals.
+
+## 2. What the agents actually do (beyond a chat loop)
+
+| Agent | Role | Hard constraint (enforced in the type layer, not in prompts) |
+|---|---|---|
+| **A0 Orchestrator** | Routes an intent to the agents it needs | Deterministic routing table first; the LLM only composes for unknown intents (trace tells them apart) |
+| **A1 Student Context** | Extracts facts from résumé / reflections | Output is **always a pending proposal**; nothing is written until the student confirms (B3) |
+| **A2 Academic** | Facts and candidate courses | Emits facts only — no ranking, no trade-offs |
+| **A3 Goal-Gap** | Decomposes a target role into requirements, finds the gap | Uses compiled role packs (from real JD corpora) + live Google-Search-grounded research when no pack matches |
+| **A4 Opportunity Scout** | Extracts opportunity drafts from **untrusted** external pages | Tool whitelist of exactly two tools; external text is user-role data and never enters a system prompt; output can only be a *draft* (a human reviewer publishes). Runs under a **separate service account** with zero student-data permissions |
+| **A5 Pathway** | The **only** agent allowed to make trade-offs | Every `PlanItem` must carry a `validation_id` issued by the zero-LLM Rules engine, or the API rejects it (B8). Repair loop ≤ 3 rounds; on failure it falls back to a validated fixture and negative-caches the goal for the day |
+
+Nine **deterministic services** (zero LLM, AST-scanned in CI) own everything that must be reproducible: prerequisite logic and eligibility, calendar capacity, wellbeing thresholds and templates, consent/receipts, k-anonymous aggregation for the institution, event monitoring/replan scope, publishing review, and source connectors. **Calendar tokens never reach any LLM context**; the institution dashboard cannot re-identify a student (cells with n < 5 are suppressed); private reflections cannot physically flow to the institution (the boundary is a Pydantic type, not a policy).
+
+**Asynchronous / background execution**
+
+- **Cloud Scheduler → Cloud Run Job** (`campuspath-sources-refresh`, daily 09:00 HKT): sweeps 93 registered sources (85 real HKUST pages), sha256 change detection, routes changed official pages through A4 extraction to the opportunity plaza — no human in the loop for whitelisted official sources.
+- **Background draft builder**: plan drafts are built in a worker thread with progress reporting; the student is asked to approve when it lands.
+- **Live market research task**: unknown target roles trigger a background job that searches live job postings (Google Search grounding on Vertex), extracts requirements, and refuses to invent anything it cannot read (`NO_REQUIREMENTS`).
+- **Feedback loop**: reflections produce structured, anonymous `EventQualityFeedback` (a sixth ranking dimension) and a personal fit tag; "not attending" adds to a decline list that A5 and the fixture path both respect; memory is *advisory only* and forgettable.
+
+## 3. Architecture
+
+![CampusPath architecture](docs/hackathon/architecture.svg)
+
+Two planes, contract-first: the **semantic plane** (A0–A5, the only code allowed to call a model, Vertex-only) and the **deterministic plane** (nine services, zero LLM). Every exchange between them is a Pydantic model in [`contracts/`](contracts/README.md) (the single source of truth: JSON Schema + OpenAPI + generated TypeScript types). Data the types don't allow physically cannot flow.
+
+**Google Cloud in use at runtime**
+
+| Service | Role |
+|---|---|
+| Vertex AI — `gemini-3.5-flash` (global endpoint) | The only model exit. A generation floor (≥ 3.5) is asserted in the client constructor; running with an older model is a construction error, not a warning |
+| Google GenAI SDK | Request-path agents (A0–A5) |
+| Google ADK | Agent Engine mirrors of A0 and A4 (`agents/cloud/`), with a CI test asserting the routing table is identical to the local one |
+| Vertex AI Agent Engine (us-central1) | Managed runtimes for the two ADK agents; the web app shows a live runtime/billing status light |
+| Cloud Run (asia-east2) | `campuspath-web` (Next.js 16, PWA) and `campuspath-api` (FastAPI) |
+| Cloud Run Jobs + Cloud Scheduler | Daily source sweep |
+| Secret Manager | Check-in HMAC secret and Moodle token |
+| Cloud Storage / Firestore | Provisioned by `infra/bootstrap.sh` (private evidence vault, canonical store). The demo deployment currently keeps state in-process (`max-instances=1`) — see *Findings* |
+
+## 4. Run it locally (≈ 10 minutes)
+
+Prerequisites: Python 3.12, [`uv`](https://docs.astral.sh/uv/), [`bun`](https://bun.sh), `gcloud` CLI, a Google Cloud project with the Vertex AI API enabled.
 
 ```bash
-bash scripts/install-hooks.sh   # 首次或换机
-make setup                      # 创建 .venv 并安装工作区
-make check                      # preflight + 契约/Seed 一致性 + 全量测试 + llm-free
+git clone <this repo> campuspath && cd campuspath
+cp .env.example .env            # then set GOOGLE_CLOUD_PROJECT=<your-project>
+gcloud auth application-default login   # Vertex uses ADC; no API keys anywhere
+
+bash scripts/install-hooks.sh   # pre-commit: secret hygiene + "Vertex only" guard
+make setup                      # uv venv + installs every package in editable mode
+bash scripts/preflight.sh       # billing / secrets / backend checks — must print "可以开工"
+make smoke                      # < 10 s: contracts + seed + core services
+make api                        # FastAPI on :8000 (sources .env; model endpoints 503 without ADC)
+cd apps/web && bun install && bun run dev --port 3100
 ```
 
-日常最常用：`make smoke`（< 1 秒）· `make eval`（机器判定）· `make api`(8000) + `make web`(3100)。
-详细进度与断点见 [PROGRESS.md](PROGRESS.md)。
+Open http://127.0.0.1:3100 → **Login** (synthetic personas: students `STU-A` … `STU-L`, plus institution roles). Language switch (EN / 简 / 繁) is in the top bar. Without ADC the app still runs end-to-end on deterministic fixtures; only model-backed endpoints return 503.
 
-## V4.1 相对 V4 的变更
+Full verification: `make check` (all suites + zero-LLM scans + harness self-test) and `make eval` (13 BLOCKER + 12 TARGET metrics, machine-judged; the last run is in [`eval/results/report.md`](eval/results/report.md)).
 
-**F01–F27 零功能删减。** 变更只涉及「由谁实现」和「用什么方式实现」，完整差异见说明书 §25。
+## 5. Deploy to Google Cloud
 
-六处架构收紧：
+```bash
+# 0. one-time infrastructure (idempotent; prints a dry-run without --apply)
+bash infra/bootstrap.sh --apply        # Firestore, GCS vault, two service accounts, secrets, Artifact Registry
+bash infra/verify.sh                   # negative checks: A4's SA must NOT hold student-data roles
 
-1. **C1** A2 剥离容量计算 → `Capacity & Calendar Service`（确定性），Calendar Token 不再进入任何 LLM 上下文
-2. **C2** Wellbeing 五信号判定与提醒文案全链脱离 LLM（Rules 阈值 + 固定模板）
-3. **C3** A2 只出事实与候选，A5 成为系统中唯一做 trade-off 的 Agent
-4. **C4** A4 不可信内容三条隔离契约（内容非指令 / 工具白名单 / Schema 闸门）
-5. **C5** A1 与 Aggregation Service 之间建立数据类型边界，私人原文物理上无路径到达校方
-6. **C6** A0 两段式路由：确定性路由表 + LLM 编排兜底
+# 1. API — Vertex model calls go through the global endpoint
+gcloud run deploy campuspath-api --source . --region asia-east2 \
+  --update-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=<project>,GOOGLE_CLOUD_LOCATION=global \
+  --max-instances 1
 
-三处引入 ADK Workflow Agent（Agent 内部构件，部署单元与治理对象数量不变）：A5 的 Plan A/B/C 并行生成、A5 的约束修复循环、A4 的多源隔离抽取。
+# 2. Web (ships the generated contract types into the image)
+cd apps/web && rm -rf .contracts-generated && cp -r ../../contracts/generated .contracts-generated
+gcloud run deploy campuspath-web --source . --region asia-east2 \
+  --update-env-vars CAMPUSPATH_API_ORIGIN=<api url>,APP_ORIGIN=<web url>,AUTH_SECRET=<random>,CAMPUSPATH_DEMO_PASSCODE=<passcode>
 
-四项定位补强：双边价值陈述、三项资源利用率指标、Goal Studio 主目标+候选目标、GrowthTrajectory 成长曲线。
+# 3. Daily source sweep (Cloud Run Job + Cloud Scheduler)
+bash infra/sources_job.sh create --apply
 
-## 线上环境（2026-08-03 · Cloud Run · asia-east2 · 赠金项目）
+# 4. Agent Engine runtimes for the two ADK agents (billed hourly — delete when idle)
+bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop` to delete both runtimes
+```
 
-- **Web**：https://campuspath-web-786160486093.asia-east2.run.app （rev 00022-8qq）
-  （**访问口令门**，2026-08-02 取代 Google 邮箱白名单：口令只存 Cloud Run 环境变量
-  `CAMPUSPATH_DEMO_PASSCODE`（本地 .env 同名），服务端校验 + HMAC httpOnly cookie，
-  页面与 `/api/*` 反代都在门内；本地开发不设该变量门自动不存在）
-- **宣传页**：`/landing`（随 web 一起部署，`apps/web/public/landing.html`）。
-  **它在门外**——middleware 的 `PUBLIC_PATHS` 显式放行，因为这一页的作用就是
-  把人领到门口；被门挡住等于没有。
-  ⚠️ **2026-08-10 用户裁定：体验口令直接印在这一页的两处 CTA 旁**
-  （`docs/landing/content.mjs` 的 `PASSCODE`）。这与此前"口令零出现在界面"的
-  口径**相反**——代价是：拿到这一页地址的人就等于拿到了门禁。要收回这个决定，
-  改 `content.mjs` 后 `bun run landing` 重新生成三份产物即可。
-  改宣传页内容 → 改 `docs/landing/content.mjs` → `bun run landing` →
-  **必须重新部署 web 才会生效**（它是构建期打进镜像的静态文件）
-  - **导航 = 分页面**（2026-08-11）：七个导航项各切一个视图，不是同页锚点滚动。
-    十个章节全部留在 DOM 里、只改 `hidden`——所以没有 JS 时它仍是一张完整长页，
-    Ctrl+F 与打印也照旧全的。章节没归宿会在**构建期报错**（`VIEW_GROUPS`）
-  - **一份内容两种链接**：`docs/` 与 Artifact 那两份可能离线打开，CTA 用绝对地址 +
-    新标签页；`apps/web/public/landing.html` 与 app 同域部署，CTA 用站内 `/login`
-    同标签页（换自定义域名时不用重新生成）
-- **PWA**：学生端可「添加到主屏」——manifest / `sw.js` / 图标都在**口令门外**
-  （middleware 的 `PUBLIC_PATHS`），否则它们会被 302 成 HTML，安装提示直接消失。
-  Service Worker **只在生产注册**（本地要验证：`localStorage.setItem("campuspath.sw","on")`）；
-  出事时的卸载后门是 `/sw-unregister` 或任意页面加 `?sw=off`
-- **API**：https://campuspath-api-786160486093.asia-east2.run.app （rev 00014-kv6；公网实例不含测试邮箱，联系人回落哑地址；
-  `CHECKIN_SECRET` 挂 Secret Manager `campuspath-checkin-secret`；**max-instances=1**——巡检/签到/后台任务全是实例内存态，多实例会互相看不见）
-- **每日源巡检**：Cloud Run Job `campuspath-sources-refresh` + Cloud Scheduler `campuspath-sources-daily`（09:00 HKT；赠金 2026-09-27 到期前 `bash infra/sources_job.sh delete --apply` 清理）
-- **Agent 运行时 ×2**：Vertex AI Agent Engine（us-central1），`bash infra/agent_engine.sh status|query|delete`；
-  顶栏**状态灯**实时显示（绿=运行中计费——云端探测走 Vertex REST 回退，2026-08-03 起线上可见）；**控制按钮已撤除（2026-08-04 用户裁定：站点用户不得启停运行时）**，启停只走 infra/agent_engine.sh
-- 缩容到零，闲置近乎零成本；Agent Engine 按小时计费（约 HK$50–100/天量级，实测以账单为准），用完 delete。
-- 重新发布：仓库根 `gcloud run deploy campuspath-api --source . --region asia-east2 --update-env-vars GOOGLE_CLOUD_LOCATION=global`（**2026-08-24 起模型走 `global` 端点**，`gemini-3.5-flash` 在 us-central1 是 404）（Dockerfile 现含 `jobs/`，Job 镜像同源需一并 `gcloud run jobs deploy`）；`apps/web` 下先 `rm -rf .contracts-generated && cp -r ../../contracts/generated .contracts-generated`（**必须先 rm**——目录已存在时 cp -r 会拷成嵌套子目录，云构建吃到旧类型）再 `gcloud run deploy campuspath-web --source .`。
-  **契约变更的发布次序按变更方向定**（1.32.0 审查裁定）：
-  ① 新增**响应**字段/枚举值（api 说新话）→ 先发 web 后发 api（旧前端读新值会渲染误导性 UI；新前端对旧 api 有 `?? []` 守卫）；
-  ② 新增**请求体**字段/枚举值（前端说新话，如 ProposedChange.entity_type 扩容）→ **先发 api 后发 web**（旧 api 收到新枚举直接 422）。
-  两类都有时分两步发，中间各自验证。
+## 6. Findings & learnings
 
-## 状态（2026-07-31）
+- **Put the rule in the constructor, not the README.** Two things that must never silently regress — "only Vertex, never AI-Studio billing" and "Gemini ≥ 3.5" — are asserted when the model client is constructed, and each has a *known-failing sample* test proving the guard actually fires.
+- **A plan item without a validation credential is not a plan item.** Making the Rules engine the issuer of `validation_id` and making the API reject unbacked items removed a whole class of "plausible but impossible" plans, and gave A5 a concrete repair signal instead of a vague "be careful with prerequisites".
+- **Gemini 3.5 changed the latency profile, not just the quality.** `thinking_budget=0` (the 2.x idiom) costs 20.9 s per call on 3.5-flash; `thinking_level=MINIMAL` costs 0.7 s. Every migration re-measures latency before trusting old parameters.
+- **State in-process is the honest weakness of this demo.** The API runs with `max-instances=1` and rebuilds its seed on cold start; Firestore is provisioned but not yet the backing store. It is the top item on the roadmap below.
+- **Metrics names decide how people read them.** An institution metric first called "discovery rate" read as an algorithm report card; renaming it "reach rate" and keeping the denominator fixed made the same number honest.
 
-- **WP0–WP10 全部完成**：契约冻结（1.10.0）、合成数据（Seed 1.5.0）、9 个确定性服务、A0–A5 接线、
-  学生/校方双门户前端（浏览器双语实测）、Moodle 沙箱（GCE + MCP 只读链）、评测 Harness。
-- **eval：13/13 BLOCKER · 11/12 TARGET（T11 75% 如实红）· BL1–BL5 全产出**，判定类指标双跑逐字节一致。
-- 四轮用户功能优化（U1–U8、二轮 A–O、三轮 A–Q、四轮 A–M）全部落地并同步进 Spec（v4.1.4）与 Plan。
-- **clay 重构（2026-08-01 已并入 main 并上线）**：全站 UI 重构（Claymorphism × Claude 暖色，
-  设计令牌 v2 + 三道 UI 门禁）+ 十余项用户裁定的功能升级（契约 1.19.0→1.22.0：Advisor 一小时时段与注册 CRUD、
-  校方审核页/广场总览与批准后生命周期管理、学生报名/加入日历状态持久化等）。
-- 余下：WP11 演示彩排与录屏；backlog 与待用户确认项见 [PROGRESS.md](PROGRESS.md) 收口段。
-- 逐日时间线不在本文件维护——见 [PROGRESS.md](PROGRESS.md) 的「已完成」表。
+## 7. Pre-existing work disclosure
 
-## pack-sources-intl 批（2026-08-02 已验收并入 main 并上线，契约 1.22.0→1.28.0）
+This repository was started on **2026-07-29** for a university-internal Google hackathon and was substantially extended during the *All Things Agentic* submission period (2026-08-04 → 2026-08-31). In the spirit of the rules we disclose the split explicitly:
 
-用户 A/B/C 三提案 + 增补 A–H + D/E/F 批全部落地：官方源注册表与真实抓取回路
-（92 源、变更检测、官方白名单直发广场、政策更新提醒卡、每日云端巡检）；International Student
-Context Pack 安装（vendored 确定性求值、Rules 签发凭据、档案页唯一勾选入口、拆解「国际生准备」列、
-`.intl-note` 注记、证件到期提醒——**待政策复核状态如实标注**）；求职拆解市场证据化（两岗位 JD 语料
-→ core 权重加粗、权威榜单 36 条可点链接、未命中岗位的「现场 AI 拆解」后台任务+进度条）；
-四维匿名评分与逐场统计（60 天冻结归档）+ 签到二维码全链（HMAC token）+ 质量报告页（admin-only，
-实时生成带进度）；日历睡眠块与睡眠统计；顶栏 Agent 运行时开关；
-「我现在大几」学期选择器；planner「本学期已选课程」折叠面板（与日历课表块同源）。
-独立审查 20 条意见全部处置（采纳 17）。合并 commit `c6f2963`。
+- **Pre-existing (before 2026-08-04, commits `afd5f45..b37be24`)**: product spec, contract layer, synthetic seed, the nine deterministic services, the A0–A5 agent roster on Gemini 2.5, the two portals' UI, Cloud Run deployment, evaluation harness.
+- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (persistence, observability, agent registry, ADK on the request path).
+
+Third-party inputs: HKUST public course catalog (scraped with a 1 s polite interval and disk cache; no student data), public job postings via Google Search grounding, open-source libraries under their licenses. No sponsor funding or support was received.
+
+## 8. Repository map
+
+```text
+contracts/   Pydantic contracts → JSON Schema / OpenAPI / TS types (single source of truth)
+agents/      A0–A5 (GenAI SDK, Vertex-only) · agents/cloud: ADK mirrors for Agent Engine
+services/    api (FastAPI orchestration) + 9 zero-LLM services (rules, capacity, wellbeing, state, action, aggregation, monitor, publishing, connector, packs, mock-campus)
+apps/web/    Next.js 16 student + institution portals, PWA, i18n (en / zh-Hans / zh-Hant)
+seed/        Synthetic data generator + HKUST catalog scraper
+eval/        13 BLOCKER + 12 TARGET acceptance metrics (`make eval`)
+jobs/        Cloud Run Job: daily source refresh
+infra/       GCP bootstrap / verify / cost / Agent Engine / Scheduler scripts (dry-run by default)
+docs/        Design tokens, runbooks, verification screenshots, hackathon materials
+```
+
+---
