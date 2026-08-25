@@ -224,7 +224,7 @@ ${(VIEW_GROUPS[navId] ?? [navId]).filter((id) => byId[id])
 
   return `
     <div class="pane" data-lang-pane="${code}" lang="${d.htmlLang}"${
-      code === "zh-Hans" ? "" : " hidden"}>
+      code === "en" ? "" : " hidden"}>
 ${views}
 
       <section class="cta-band">
@@ -271,7 +271,7 @@ const navFor = (code, d) => d.nav.map(([id, label], i) =>
 
 /** 整页。`mode` 决定 CTA 走绝对地址新标签页（standalone）还是站内相对路径（site）。 */
 const renderPage = (mode) => `<!doctype html>
-<html lang="zh-Hans" data-landing>
+<html lang="en" data-landing>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -586,7 +586,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <span class="brand-sub" data-brand-sub>${esc(zhHans.brandSub)}</span>
       </span>
     </a>
-    <div class="navlinks" data-navlinks>${navFor("zh-Hans", zhHans)}</div>
+    <div class="navlinks" data-navlinks>${navFor("en", en)}</div>
     <div class="topbar-end">
       <select class="langsel" data-lang-select aria-label="Language">
         <option value="zh-Hans">简体中文</option>
@@ -617,7 +617,7 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d, mode)).join("\n")}
   var links = document.querySelector("[data-navlinks]");
   var ctaLabel = document.querySelector("[data-cta-label]");
   var sub = document.querySelector("[data-brand-sub]");
-  var current = { code: "zh-Hans", view: NAV["zh-Hans"].nav[0][0] };
+  var current = { code: "en", view: NAV["en"].nav[0][0] };
 
   /** 显示某个分页面：只在**当前语言**的面板里切，其余语言整块本来就 hidden。
    *  语言切换时按同一个 view id 复位，读者不会因为换语言被丢回第一页。 */
@@ -637,7 +637,7 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d, mode)).join("\n")}
   }
 
   function apply(code) {
-    if (!NAV[code]) code = "zh-Hans";
+    if (!NAV[code]) code = "en";
     current.code = code;
     document.querySelectorAll("[data-lang-pane]").forEach(function (p) {
       p.hidden = p.getAttribute("data-lang-pane") !== code;
@@ -683,13 +683,9 @@ ${Object.entries(DICTS).map(([code, d]) => pane(code, d, mode)).join("\n")}
 
   var stored = null;
   try { stored = localStorage.getItem(KEY); } catch (e) {}
-  // 没存过就跟随浏览器语言：繁体地区给繁体，非中文给英文
-  if (!stored) {
-    var l = (navigator.language || "").toLowerCase();
-    stored = l.indexOf("zh") === 0
-      ? (/hant|tw|hk|mo/.test(l) ? "zh-Hant" : "zh-Hans")
-      : (l.indexOf("zh") === -1 && l ? "en" : "zh-Hans");
-  }
+  // 2026-08-25 用户裁定：**默认英文**（评委在海外），不再跟随浏览器语言；
+  // 选过的语言仍持久化。初始 DOM 也是英文面板，无 JS 时同样成立。
+  if (!stored || !NAV[stored]) stored = "en";
   apply(stored);
   // 进来时如果 URL 带 hash，直接开到那一页（分享链接能落到具体一页）
   var fromHash = viewOfHash(location.hash);

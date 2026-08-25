@@ -1,235 +1,286 @@
-# CampusPath 架构文档
+English edition of ARCHITECTURE.md, translated for the All Things Agentic Hackathon submission (Aug 2026). The Chinese original remains the maintained source in the private working repository.
 
-> 版本对应：Spec **v4.1.36** · Plan V2 · 契约 **1.42.0** · Seed **1.12.0**（2026-08-24 main 同步）
+# CampusPath Architecture Document
+
+> Version alignment: Spec **v4.1.36** · Plan V2 · Contract **1.42.0** · Seed **1.12.0** (synced to `main` 2026-08-24)
 >
-> 2026-08-24 可观测性 + Agent 注册表（Spec v4.1.36，契约 1.41.0→1.42.0，Hackathon P4）：
-> **① trace**——`campuspath_agents.telemetry.span()` 只依赖 opentelemetry-api（没配导出器即 no-op）；
-> 打点在四处：`VertexModel.generate/generate_grounded`（`gen_ai.*`：请求模型、响应 `model_version`、
-> 输入/输出/思考 token、purpose、thinking_level）、`ToolBelt.call`（含被白名单拦下的调用，
-> `campuspath.tool.accepted=false` 也留痕）、`run_repair_loop`（每轮一条子 span：上一轮违规数、
-> 本轮违规数；循环 span 记 `outcome=valid|exhausted`）、`OrchestratorAgent.route`
-> （`kind=deterministic_route`, `gen_ai.request.model=none`——"没调模型"也看得见）。
-> 属性只收标量且截断 200 字符，**prompt 原文永不进 trace**。api 层 `campuspath_api.telemetry`
-> 决定去向：`CAMPUSPATH_TRACE=gcp` → Cloud Trace（BatchSpanProcessor，不阻塞请求）/ `console` /
-> `memory`；每个 HTTP 请求一条根 span，模型/工具/修复循环挂在下面——Cloud Trace 里一次
-> 「起草规划」是一棵树。**② 注册表** `GET /v1/ops/agents`（`AgentRegistry`，仅机构角色）：
-> 六个 Agent 的运行时归属、工具白名单、禁止清单、写域**从 `contracts.agents` 治理表派生**
-> （测试逐项对拍，不手写）+ `ModelBackendStatus`（默认模型、最近响应的 `model_version`、
-> 代际门槛、location、vertex_only）+ `CheckpointStatus`（后端、保存次数、回读结果、最近错误）
-> + `TraceExportStatus`（导出器、已导出数、最近 25 条 span）。
+> 2026-08-24 Observability + Agent registry (Spec v4.1.36, contract 1.41.0→1.42.0, Hackathon P4):
+> **① Tracing** — `campuspath_agents.telemetry.span()` depends only on opentelemetry-api (no-op when no exporter is configured);
+> instrumentation is added in four places: `VertexModel.generate/generate_grounded`
+> (`gen_ai.*`: request model, response `model_version`, input/output/thinking tokens, purpose, thinking_level),
+> `ToolBelt.call` (including calls blocked by the allow-list — `campuspath.tool.accepted=false` is also recorded),
+> `run_repair_loop` (one child span per round: prior-round violation count, current-round violation count;
+> the loop span records `outcome=valid|exhausted`), and `OrchestratorAgent.route`
+> (`kind=deterministic_route`, `gen_ai.request.model=none` — "no model was called" is now visible too).
+> Attributes are scalar-only and truncated to 200 characters; **raw prompt text never enters a trace**.
+> The API layer's `campuspath_api.telemetry` decides the destination: `CAMPUSPATH_TRACE=gcp` → Cloud Trace
+> (BatchSpanProcessor, non-blocking) / `console` / `memory`; each HTTP request produces one root span,
+> with model/tool/repair-loop spans nested under it — in Cloud Trace, a single "draft a plan" call is one tree.
+> **② Registry** `GET /v1/ops/agents` (`AgentRegistry`, institution role only): each of the six agents' runtime
+> ownership, tool allow-list, deny-list, and write domain **is derived from the `contracts.agents` governance
+> table** (tests reconcile it item-by-item, never hand-written) + `ModelBackendStatus` (default model, most
+> recent response's `model_version`, generation floor, location, vertex_only) + `CheckpointStatus` (backend,
+> save count, restore result, last error) + `TraceExportStatus` (exporter, spans exported, most recent 25 spans).
 >
-> 2026-08-24 状态持久化（Spec v4.1.35，Hackathon P3）：**api 的可变状态不再随冷启动清零**。
-> 新增数据流 **Deps → 检查点 → Firestore**：`campuspath_api.persistence` 维护一份**穷举**
-> 清单（`MANIFEST` 56 个容器 + `SKIPPED` 19 个带理由的例外，测试断言两者覆盖 `Deps` 的
-> 全部属性——新加容器忘了登记会红），后台线程每 10s 用 `campuspath_state.codec`
-> 把清单编码成 JSON（类型信息随数据走：Pydantic/枚举/dataclass/日期/集合/元组键），
-> 逐字段摘要**变了的字段才写**，一次 Firestore batch 提交；启动时 `restore_from`
-> 用一条流式查询整体回读，**版本戳**（契约 + Seed 版本）不匹配即拒绝恢复、走 seed 冷启动。
-> 后端三实现同协议：`MemoryCheckpoint`（测试）/ `FileCheckpoint`（本地，临时文件 + 原子替换）/
-> `FirestoreCheckpoint`（线上，Cloud Run 服务账号 ADC，**走 REST** `documents:commit` /
-> `listDocuments`——gRPC 客户端在容器里把路由头的 `(default)` 编成 `%28default%29` → 400，
-> 本机同版本正常，钉版本无效；`_meta` 文档存布局，超 900 KB 的字段切块）。**解码只认白名单**：类型引用串查 `Codec._types`，不做
-> 动态 import——检查点是外部输入，不能让数据指定"请实例化哪个类"（零 LLM 第四层扫描
-> 当场抓到的 `importlib.import_module`，改成白名单后才绿）。`validations` 注册表也在
-> 清单里：回来的 PlanItem 仍要过 B8，凭据不在就全被拒。**它解决的是持久性，不是多实例
-> 一致性**——后台任务与锁仍是进程态，`max-instances=1` 的理由未变。
-> `CAMPUSPATH_CHECKPOINT` 未设即关闭（测试与本地默认），线上设 `firestore`。
+> 2026-08-24 State persistence (Spec v4.1.35, Hackathon P3): **the API's mutable state no longer resets to
+> zero on cold start.** New data flow **Deps → checkpoint → Firestore**: `campuspath_api.persistence`
+> maintains an **exhaustive** manifest (`MANIFEST` with 56 containers + `SKIPPED` with 19 justified
+> exceptions; tests assert the two together cover every attribute of `Deps` — forgetting to register a new
+> container turns the test red). A background thread runs every 10s, uses `campuspath_state.codec` to encode
+> the manifest to JSON (type information travels with the data: Pydantic models, enums, dataclasses, dates,
+> sets, tuple keys), writes a field-level diff summary (**only changed fields are written**), and commits it
+> in one Firestore batch; on startup, `restore_from` performs one streaming query to read everything back —
+> a **version stamp** (contract + Seed version) mismatch causes the restore to be rejected and falls back to
+> a seed cold start. Three implementations share one protocol: `MemoryCheckpoint` (tests) / `FileCheckpoint`
+> (local, temp file + atomic replace) / `FirestoreCheckpoint` (production, Cloud Run service-account ADC,
+> **goes over REST** via `documents:commit` / `listDocuments` — the gRPC client, inside the container, encodes
+> the routing header's `(default)` as `%28default%29` → 400; identical versions work fine locally, pinning the
+> version does not fix it; the `_meta` document stores layout, and fields over 900 KB are chunked). **Decoding
+> only trusts an allow-list**: type references are looked up in `Codec._types`, never resolved via dynamic
+> import — a checkpoint is external input, and data must never be allowed to specify "which class to
+> instantiate" (the zero-LLM fourth-layer scan caught a live `importlib.import_module` call; it only went
+> green after being switched to an allow-list). The `validations` registry is also in the manifest: a
+> restored PlanItem must still pass B8, and if its credential is missing it is rejected outright. **This
+> solves durability, not multi-instance consistency** — background jobs and locks remain process-local, so
+> the rationale for `max-instances=1` is unchanged. `CAMPUSPATH_CHECKPOINT` unset means disabled (the default
+> for tests and local dev); production sets it to `firestore`.
 >
-> 2026-08-24 模型代际迁移（Spec v4.1.34，All Things Agentic Hackathon 硬性要求
-> "Gemini 3.5 or newer"）：语义平面的唯一模型出口从 `gemini-2.5-flash` 改为
-> **`gemini-3.5-flash`**，并在 `campuspath_agents.model` 加**代际门槛**
-> （`MIN_GEMINI_GENERATION=(3,5)`，构造 `VertexModel` 即检查，与 B12 同一做法：
-> 门槛放进构造函数而不是文档）。两个 Agent Engine 镜像同步改为 3.5 并在
-> `client_kwargs` 里**钉死 `location="global"`**——实测 3.5-flash 只在 Vertex 的
-> global 端点可用，us-central1 404，而 Agent Engine 运行时本身仍落在 us-central1
-> （`GOOGLE_CLOUD_LOCATION` 现为 `global`，Agent Engine 探测路径在 `app.py` 里单独写死区域）。
-> thinking 参数从 2.x 的 `thinking_budget=0` 改为 3.x 的 `thinking_level=MINIMAL`
-> （接地检索用 LOW）：实测 3.5-flash 上 `thinking_budget=0` 一次调用 20.9s、MINIMAL 0.7s。
-> `VertexModel.last_model_version` 记录响应报告的 `model_version`，线上核对"真的在跑 3.5"
-> 靠它，不靠猜。
+> 2026-08-24 Model generation migration (Spec v4.1.34, All Things Agentic Hackathon hard requirement
+> "Gemini 3.5 or newer"): the semantic plane's single model exit point moved from `gemini-2.5-flash` to
+> **`gemini-3.5-flash`**, and `campuspath_agents.model` gained a **generation floor**
+> (`MIN_GEMINI_GENERATION=(3,5)`, checked at `VertexModel` construction time — same pattern as B12:
+> the floor lives in the constructor, not in documentation). Both Agent Engine images were updated to 3.5
+> in lockstep and **pin `location="global"`** in `client_kwargs` — in practice, 3.5-flash is only available
+> on Vertex's `global` endpoint, `us-central1` returns 404, while the Agent Engine runtime itself still sits
+> in `us-central1` (`GOOGLE_CLOUD_LOCATION` is now `global`; the Agent Engine probe path hardcodes its own
+> region separately in `app.py`). The thinking parameter moved from 2.x's `thinking_budget=0` to 3.x's
+> `thinking_level=MINIMAL` (grounded retrieval uses LOW): measured on 3.5-flash, `thinking_budget=0` took
+> 20.9s for one call vs. 0.7s for MINIMAL. `VertexModel.last_model_version` records the `model_version`
+> reported by the response — production verification that "3.5 is really running" relies on this field,
+> not on assumption.
 >
-> 2026-08-10 第八轮 P4（Spec v4.1.31，契约 1.39.0→1.40.0，Seed 1.10.0→1.11.0）：
-> **校方指标从随机数变成真实推导**。新增两条数据流：
-> **① 曝光 → 元组 → 聚合 → `/insights`**：前端 `lib/exposure.ts` 用
-> IntersectionObserver（阈值 0.5 + 停留 300ms）记录「真的进过视口」→
-> `POST /students/{id}/exposures`（按 subject×入口×深度×当天去重）→
-> `campuspath_state.exposure.ExposureStore`（**带 student_id，永不出域**）→
-> `campuspath_state.metrics.derive_metric_tuple`（**这个函数就是那条边界**：
-> 进去带 student_id，出来的 `MetricTuple` 连那个字段都没有）→
-> `campuspath_aggregation` 抑制与排行榜 → `/v1/insights/*`。
-> **② Gap 变更 → `gaps_closed`**：`gap_map()` 每次调用与上一份快照差分
-> （「关闭」= requirement 从缺口列表里**消失**，因为 gap_map 对已满足的是跳过的）
-> → `GapChangeEvent`（关闭必须挂证据）→ `GrowthTrajectory.gaps_closed`
-> 不再硬编码 0。
-> 分层硬约束：`campuspath_state` **不得 import** `campuspath_agents` / `campuspath_rules`，
-> 资格与缺口由 API 编排层算好作为纯数据递入（AST 断言钉住）。
-> 合成与派生带 `provenance` **绝不静默合并**，聚合行报 `derived_cell_n`/`synthetic_cell_n`。
+> 2026-08-10 Round 8 P4 (Spec v4.1.31, contract 1.39.0→1.40.0, Seed 1.10.0→1.11.0):
+> **institution-side metrics moved from random numbers to real derivation.** Two new data flows:
+> **① Exposure → tuple → aggregation → `/insights`**: the frontend's `lib/exposure.ts` uses an
+> IntersectionObserver (threshold 0.5 + 300ms dwell) to record "actually entered the viewport" →
+> `POST /students/{id}/exposures` (deduplicated by subject × entry point × depth × day) →
+> `campuspath_state.exposure.ExposureStore` (**carries student_id, never leaves the domain**) →
+> `campuspath_state.metrics.derive_metric_tuple` (**this function is the boundary itself**: it takes
+> student_id in, and the `MetricTuple` that comes out does not even have that field) →
+> `campuspath_aggregation` suppression and leaderboards → `/v1/insights/*`.
+> **② Gap changes → `gaps_closed`**: `gap_map()` diffs against the previous snapshot on every call
+> ("closed" = the requirement **disappears** from the gap list, because `gap_map` skips requirements
+> that are already satisfied) → `GapChangeEvent` (a closure must carry evidence) →
+> `GrowthTrajectory.gaps_closed` is no longer hardcoded to 0.
+> Layering invariant: `campuspath_state` **must not import** `campuspath_agents` / `campuspath_rules`;
+> eligibility and gaps are computed by the API orchestration layer and passed down as plain data
+> (enforced by an AST assertion). Synthetic and derived rows carry `provenance` and are **never silently
+> merged**; aggregation rows report `derived_cell_n`/`synthetic_cell_n`.
 >
-> 2026-08-10 第八轮 P3（Spec v4.1.30，契约 1.38.0→1.39.0）：两条数据流的**控制权**改了。
-> **① 档案上传 → 直写 + 可撤销**：`POST /students/{id}/resume` → `resume_template.py`
-> 确定性解析（零模型）→ `_materialise_changes(origin=student_upload)` **直接物化**进
-> experiences / interests / profile_extras，同时落一条 `confirmed` 提案 + 一条
-> `ProfileChangeEvent(actor=student)` + 一份 `AppliedChange` 台账 →
-> `POST /profile/changes/{id}/undo` 逐条逆物化（只盖 `undone_at`，不删行）。
-> B3 边界在类型层：`ResumeUploadResult` validator 拒收非 `student_upload` 来源，
-> **A1 抽取/推断走不进这条通道**，仍只能落 pending 提案由学生逐条裁决。
-> **② 规划 → 草案 → 批准 → 落盘**：`GET /pathway` 不再当场生成（此前读一下就写盘），
-> 改为只读已采纳版本；`POST /pathway/draft` 走 A5（matches + 记忆 advisory + carry-over）
-> 排一版存进 `deps.pathway_drafts`，`POST /pathway/draft/{id}/decision?decision=adopt`
-> 过 B8 闸门后才写 `deps.pathways`。无模型时的 `build_demo_pathway` 回落**同样**
-> 受这道闸门约束。前端 `usePathwayPlan` + `PathwayApprovalGate` 两页共用一条批准流。
+> 2026-08-10 Round 8 P3 (Spec v4.1.30, contract 1.38.0→1.39.0): **control** changed for two data flows.
+> **① Profile upload → direct write + reversible**: `POST /students/{id}/resume` → `resume_template.py`
+> deterministic parsing (zero model) → `_materialise_changes(origin=student_upload)` **writes directly**
+> into experiences / interests / profile_extras, while also logging a `confirmed` proposal, a
+> `ProfileChangeEvent(actor=student)`, and an `AppliedChange` ledger entry →
+> `POST /profile/changes/{id}/undo` reverses each entry individually (only stamps `undone_at`, never
+> deletes the row). The B3 boundary is enforced at the type level: the `ResumeUploadResult` validator
+> rejects any source other than `student_upload`, so **A1 extraction/inference cannot use this channel**
+> and must still land as pending proposals for the student to decide row by row.
+> **② Planning → draft → approval → commit**: `GET /pathway` no longer generates on the fly (previously
+> a read could trigger a write); it now only reads the adopted version. `POST /pathway/draft` runs A5
+> (matches + memory advisory + carry-over), lays out a version, and stores it in `deps.pathway_drafts`;
+> `POST /pathway/draft/{id}/decision?decision=adopt` writes to `deps.pathways` only after passing the B8
+> gate. The model-free `build_demo_pathway` fallback is bound by the **same** gate. The frontend's
+> `usePathwayPlan` + `PathwayApprovalGate` share one approval flow across both pages.
 >
-> 2026-08-10 第八轮 P2（Spec v4.1.29，契约 1.36.0→1.38.0）：过期判定从"启动期算一次、
-> 只看 deadline"改为**读时单一出处** `_is_expired`（截止 or 办完，取并集，时钟 = `deps.today`），
-> 广场目录与 `_compute_matches` 共用——**过期条目不进任何推荐**；
-> 新增 `CurationBadge` 只出徽章不出分数（自动派生 ≥4.0 且已验证 ≥5；
-> 人工理由由契约 Literal 收窄）。Seed 1.9.0→1.10.0：反馈优先落在在架活动上。
+> 2026-08-10 Round 8 P2 (Spec v4.1.29, contract 1.36.0→1.38.0): expiry determination moved from
+> "computed once at startup, deadline only" to **a single source of truth at read time**, `_is_expired`
+> (deadline OR completed, union of both, clock = `deps.today`), shared by the plaza catalog and
+> `_compute_matches` — **expired entries never enter any recommendation**; added `CurationBadge`, which
+> exposes only a badge, never a score (auto-derived at ≥4.0 rating with ≥5 verifications; manual
+> rationale is narrowed by a contract `Literal`). Seed 1.9.0→1.10.0: feedback now lands preferentially
+> on live activities.
 >
-> 2026-08-04 北极星指标 VGA 落地（Spec v4.1.23，契约 1.34.0）：新增数据流
-> **反思闭环 → VGA**——反思活动（OPP）→ 铸 EV-REFL 证据 + 同步铸
-> `ActionEvent(verified_growth=True, evidence_ids=(EV,))`（幂等，契约校验器
-> 强制挂证据）→ `GET /vga-summary` 纯派生逐月分桶（0 如实 200）→
-> 成长动态跟踪页北极星卡（金黄星星+本月数+累计+逐月柱+行动清单）。
-> 点击/收藏/报名事件 `verified_growth` 恒 false（§17.1「不奖励忙碌」）。
+> 2026-08-04 North Star metric VGA shipped (Spec v4.1.23, contract 1.34.0): new data flow
+> **reflection loop → VGA** — a reflection activity (OPP) → mints EV-REFL evidence and, in the same
+> transaction, mints `ActionEvent(verified_growth=True, evidence_ids=(EV,))` (idempotent, enforced by a
+> contract validator requiring attached evidence) → `GET /vga-summary` is a pure derivation, bucketed
+> by month (0 is reported honestly with a 200) → the North Star card on the Growth Trajectory page
+> (gold star + this month's count + cumulative + monthly bars + action list). Click/save/register
+> events always have `verified_growth=false` (§17.1 "do not reward busyness").
 >
-> 2026-08-03 自述学期撤除批（Spec v4.1.20，契约 1.33.0）：学生自述「我现在
-> 大几」通道全删——契约层 `ProfileSelfEdit.current_term` / `StudentProfile.current_term`
-> / CurrentTerm Literal 移除（extra=forbid 结构性拒收），目标工作室选择器与
-> 选修课页学期下拉撤除；选修课学期视图改由教务侧派生（year × 教务码季别 →
-> 如 Y2_FALL），「全部要求（按组）」常驻。学期/年级的唯一权威 = 教务侧
-> （演示 = seed manifest + 校方 year；真实接入 = SIS）。
+> 2026-08-03 Self-declared term removal batch (Spec v4.1.20, contract 1.33.0): the channel for students
+> to self-declare "what year I'm in now" was removed entirely — at the contract level,
+> `ProfileSelfEdit.current_term` / `StudentProfile.current_term` / the `CurrentTerm` Literal were
+> removed (structurally rejected via `extra=forbid`); the target-studio selector and the electives-page
+> term dropdown were removed. The electives-page term view is now derived from the registrar side
+> (year × registrar-code season → e.g. `Y2_FALL`); "All Requirements (by group)" is always present.
+> The sole authority for term/year is now the registrar side (demo = seed manifest + institution-supplied
+> year; real integration = SIS).
 >
-> 2026-08-03 双报障修复批（Spec v4.1.19）：**① A5 课程学期码单一权威源**——
-> `CoursePlanItem.term` 一律取 seed manifest 教务码（`deps.current_term`，缺失按日期
-> 推导）；`StudentProfile.current_term` 是 "y1s2" 年级码、同名不同义，误用曾致
-> `GET /pathway` 500；`build_a5_pathway` 调用点补异常护栏（任何异常回落夹具并进
-> 当日失败负缓存，读端点不许 500）。**② 近两周口径单一出处**——
-> `apps/web/src/lib/plan-window.ts`（课外条目 + 最早活动锚点 + 14 天窗口 +
-> storedIntensity 强度同源），行动中心与课外活动规划两页共用，不再各筛各的。
-> **③ 前端会话缓存**——`useResource` 增 `cacheKey`（模块级 Map，
-> stale-while-revalidate：命中即渲染、后台静默核新、错误不吞），For You 三资源接入。
+> 2026-08-03 Double-incident fix batch (Spec v4.1.19): **① A5 course term code has a single authoritative
+> source** — `CoursePlanItem.term` always takes the registrar code from the seed manifest
+> (`deps.current_term`, derived from the date if missing); `StudentProfile.current_term` is a "y1s2"
+> grade-level code with the same name but a different meaning, and confusing the two once caused
+> `GET /pathway` to 500 (`build_a5_pathway`'s call site now has an exception guard: any exception falls
+> back to a fixture and is entered into that day's failure cache — read endpoints must never 500).
+> **② near-two-weeks window has a single source of truth** — `apps/web/src/lib/plan-window.ts`
+> (extracurricular items + earliest-activity anchor + 14-day window + `storedIntensity` sharing the
+> same source), shared by the Action Center and the Extracurricular Planning page instead of each
+> filtering independently. **③ Frontend session cache** — `useResource` gained `cacheKey` (a module-level
+> Map, stale-while-revalidate: render on hit, silently revalidate in the background, never swallow
+> errors); For You's three resources adopted it.
 >
-> 2026-08-03 新增四条数据流：**① 口令门**（取代 Google 邮箱白名单：middleware 校验
-> HMAC httpOnly cookie，口令只存 `CAMPUSPATH_DEMO_PASSCODE` 环境变量，`/api/auth/passcode`
-> 服务端恒时比对签发；页面 HTML 统一 `no-store`——旧门的 307 曾遮蔽 Next 预渲染的
-> s-maxage=1 年，撤门即白屏的教训）；**② Agent Runtime 状态灯**（顶栏绿灯=计费中：
-> `GET /ops/agent-runtime` 脚本探测失败时走 Vertex REST 回退【容器 ADC 直查
-> ReasoningEngine 列表】，缓存 stale-while-revalidate 单飞后台刷新）；**③ 三档强度**
-> （`GET /pathway?intensity=` → A5 全量分档：课程 2/3/4 门、活动池 8/10/12、
-> 近两周条目 ≤3/5/7、近两周预算 20/30/45h；trigger 指纹带档位）；**④「不参加」**
-> （`DELETE /pathway/items/{id}`：版本剔除+DECLINE 审计事件+日历真实块收走+
-> 拒绝名单防复活【A5 与演示夹具双路过滤】）。另：目标变更失效清单补全
-> （research 按发起时目标名判 stale、set_goal 清 matches/选修当日缓存）；
-> Resume 上传改模板确定性解析（`resume_template.py`，零模型，B3 提议流程不变）。
+> 2026-08-03 Four new data flows: **① Passcode gate** (replacing the Google-email allow-list: middleware
+> validates an HMAC httpOnly cookie; the passcode lives only in the `CAMPUSPATH_DEMO_PASSCODE` env var,
+> and `/api/auth/passcode` issues it with a constant-time server-side comparison; page HTML is uniformly
+> `no-store` — the old gate's 307 once masked Next's prerendered `s-maxage=1 year`, and removing the gate
+> caused a white-screen incident); **② Agent Runtime status light** (a green top-bar light = billing is
+> active: `GET /ops/agent-runtime` falls back to the Vertex REST API when the probe script fails
+> [in-container ADC queries the ReasoningEngine list directly], cached with stale-while-revalidate and a
+> single-flight background refresh); **③ three intensity tiers**
+> (`GET /pathway?intensity=` → A5 tiers everything: courses 2/3/4, activity pool 8/10/12, near-two-weeks
+> items ≤3/5/7, near-two-weeks budget 20/30/45h; the trigger fingerprint includes the tier);
+> **④ "not participating"** (`DELETE /pathway/items/{id}`: version removal + a DECLINE audit event +
+> the calendar's real block removed + a decline list preventing resurrection [filtered by both A5 and the
+> demo fixture]). Also: the goal-change invalidation list was completed (research is marked stale by the
+> goal name at the time it was launched; `set_goal` clears matches/electives day caches); Resume upload
+> switched to deterministic template parsing (`resume_template.py`, zero model, the B3 proposal flow
+> unchanged).
 >
-> 2026-08-02 审计修复批新增数据流：**Resume 模板解析链**（上传 → `resume_template.py`
-> 确定性逐节解析【零模型】→ pending 提议 → 确认后物化：经历带真实 type、education/
-> language/honor 入 extras、certificate 入 EvidenceRecord）；**A5 线上生成链**
-> （GET /pathway → matches 六维分 + 记忆 advisory → `a5_pathway.build_a5_pathway`
-> 【PathwayAgent 修复循环 + 课程三变体】→ trigger=a5:<目标指纹>，失败回落夹具）；
-> **反思回流链**（匿名质量聚合 → 第六维；学生自己的 fit_tag → 个人偏好修正）；
-> **日历写入恢复链**（已批准提案 ∩ 无 AB-plan 块 → 行动中心持久补写区）。
+> 2026-08-02 Audit fix batch, new data flows: **Resume template parsing chain** (upload →
+> `resume_template.py` deterministic section-by-section parsing [zero model] → pending proposal →
+> materialized on confirmation: experiences carry a real type; education/language/honor go into extras;
+> certificate goes into an EvidenceRecord); **A5 live generation chain** (GET /pathway → six-dimension
+> matches + memory advisory → `a5_pathway.build_a5_pathway` [PathwayAgent repair loop + three course
+> variants] → trigger=a5:<goal fingerprint>, falling back to a fixture on failure); **reflection feedback
+> loop** (anonymous quality aggregation → sixth dimension; the student's own fit_tag → personal preference
+> correction); **calendar-write recovery chain** (approved proposal ∩ no AB-plan block → Action Center
+> persistent backfill area).
 >
-> 2026-08-02 验收反馈批新增数据流：**规划→日历投影**（calendar 页读 pathway 的机会类
-> 条目 + catalog 起止时间 → 虚线「规划中」伪块，批准写入后由真实块取代）；**⚠️ 冲突
-> 持久链**（schedule-proposal 服务端算冲突 → 非阻断可批准 → absorb 与 calendar 写入
-> 都打 ⚠️ 前缀）；**SourcesSweepJob**（一键巡检后台线程，与逐源 refresh 共用
-> `_do_refresh_source`）；**official_answers.json**（packs 内问答对照表，
-> `match_official_answer` 确定性词面匹配 → 计划项 assumptions 带官方链接；
-> 广场政策卡为二级回退）；**candidate_goal_share**（推荐配比：matches 前缀成比例
-> 交织 + 选修加权与保底名额）。
+> 2026-08-02 Acceptance-feedback batch, new data flows: **planning → calendar projection** (the calendar
+> page reads pathway's opportunity-type items + catalog start/end times → a dashed "planned" pseudo-block,
+> replaced by a real block once approved and written); **⚠️ conflict persistence chain**
+> (schedule-proposal computes conflicts server-side → non-blocking, still approvable → both the absorb
+> step and the calendar write carry a ⚠️ prefix); **SourcesSweepJob** (a one-click sweep background
+> thread sharing `_do_refresh_source` with per-source refresh); **official_answers.json** (a Q&A
+> lookup table inside packs; `match_official_answer` does deterministic literal matching → plan-item
+> assumptions carry an official link; the plaza policy card is a secondary fallback);
+> **candidate_goal_share** (recommendation mix: matches are interleaved proportionally by prefix +
+> elective weighting and reserved slots).
 >
-> 2026-08-02 国际生链路修复批（审计 `docs/intl-chain-audit-2026-08-02.md` → 五处断链接通）：
-> Pack 求值信封的两条**新消费流**——`/matches` 在评分后逐机会派生 `MatchResult.intl_notes`
-> （机会三态字段 + 信封提前量对齐该机会开始日期，零 LLM）；`GET /pathway` 读时把信封的
-> 准备动作/待补信息/约束派生为 `PlanItem(kind=action)`（凭据经 `issue_prep_item_validation`
-> 由 Rules 真实签发、B8 主体对齐；**读时注入不落缓存**，与拆解列 `_augment_with_intl` 同模式）。
-> 政策卡按 registry `policy_audience` 落 policy / intl_policy 双分类；运行时探测失败如实 `unknown`。
+> 2026-08-02 International-student pipeline fix batch (audit `docs/intl-chain-audit-2026-08-02.md` →
+> five broken links reconnected): two new **consumer flows** off the Pack evaluation envelope —
+> `/matches` derives `MatchResult.intl_notes` per opportunity after scoring (a three-state opportunity
+> field + envelope lead time aligned to that opportunity's start date, zero LLM); `GET /pathway` reads
+> the envelope's prep actions/missing info/constraints and derives `PlanItem(kind=action)` at read time
+> (credential genuinely issued by Rules via `issue_prep_item_validation`, aligned to the B8 subject;
+> **injected at read time, never cached**, the same pattern as decomposition's `_augment_with_intl`
+> column). Policy cards are classified into policy / intl_policy via the registry's `policy_audience`;
+> a failed runtime probe honestly reports `unknown`.
 >
-> 2026-08-02 新增三块（A/B/C 三提案）：
-> **① 源采集回路**——`services/connector/` 增源注册表（92 源，84 真实/8 mock 以
-> `is_real_fetch` 如实区分）+ 共享抓取器（stdlib，缓存+礼貌间隔）+ sha256 变更检测；
-> `GET/POST /v1/ops/sources*` 端点；HKUST 官方域名白名单源变更条目经 A4 抽取后
-> **直发 Published**（第三方投稿仍走人工审核），政策源变更产出 intl_policy 提醒卡；
-> 每日巡检 `jobs/sources_refresh.py`（Cloud Run Job 形态 `infra/sources_job.sh`，并 main 后部署）。
-> **② services/packs/**——vendored 国际生 Context Pack 求值器（零 LLM，llm-free 扫描
-> 名单第 11 个成员）；`campuspath_rules.context_pack` 桥签发真 validation_id（B8 三层
-> 查验成立，Pack 自铸 VAL-* 仅留痕）；档案页唯一勾选入口，A3 拆解/For You/行动中心
-> 按 profile 全局读取。**③ 岗位画像数据层**——`agents/campuspath_agents/pack_data/`
-> （employment_roles.json + evidence_catalog.json，由 `seed/compile_employment_pack.py`
-> 从 JD 语料确定性编译，单一出处）；A3 按 target_name 关键词命中画像（零模型）；
-> 未命中走「现场 AI 拆解」服务端后台任务（三段式确定性进度，产出 origin=ai_live
-> 类型层区分，每日限 2 次）。
+> 2026-08-02 Three new blocks (proposals A/B/C):
+> **① Source-ingestion loop** — `services/connector/` gained a source registry (92 sources, 84 real /
+> 8 mock, honestly distinguished by `is_real_fetch`) + a shared fetcher (stdlib, cached + polite
+> intervals) + sha256 change detection; `GET/POST /v1/ops/sources*` endpoints; a change to a source on
+> HKUST's official-domain allow-list is extracted via A4 and goes **straight to Published**
+> (third-party submissions still go through manual review); a change to a policy source produces an
+> intl_policy reminder card; daily sweep via `jobs/sources_refresh.py` (a Cloud Run Job at
+> `infra/sources_job.sh`, deployed alongside `main`).
+> **② services/packs/** — a vendored International Student Context Pack evaluator (zero LLM, the 11th
+> member of the llm-free scan list); the `campuspath_rules.context_pack` bridge issues a real
+> `validation_id` (passes B8's three-layer check; a Pack's self-minted VAL-* is record-only); the
+> profile page is the single opt-in entry point, and A3 decomposition / For You / Action Center all read
+> from the global profile setting.
+> **③ Job-role profile data layer** — `agents/campuspath_agents/pack_data/` (employment_roles.json +
+> evidence_catalog.json, deterministically compiled from JD corpora by
+> `seed/compile_employment_pack.py`, a single source of truth); A3 matches profiles by keyword against
+> `target_name` (zero model); an unmatched target falls back to "live AI decomposition" as a server-side
+> background job (three-stage deterministic progress, output tagged `origin=ai_live` at the type level,
+> capped at twice a day).
 >
-> UI 设计系统 v2（Claymorphism × Claude 暖色）：令牌与门禁见
-> `docs/CampusPath_Design_Tokens_v2.0_Clay_2026-08-01.md`；Advisor 预约一小时时段制 + 注册 CRUD（B9）；已发布机会的管理端生命周期端点 PUT/DELETE /v1/catalog/opportunities/{id}（B10：编辑/下架，下架幂等留档）；投稿人状态自查 GET /v1/publisher/submissions（B13：退回修改对投稿人可见、同 id 重投）。
+> UI design system v2 (Claymorphism × Claude warm palette): tokens and gates documented in
+> `docs/CampusPath_Design_Tokens_v2.0_Clay_2026-08-01.md`; Advisor booking now uses one-hour slots +
+> registration CRUD (B9); published-opportunity management-side lifecycle endpoints
+> PUT/DELETE /v1/catalog/opportunities/{id} (B10: edit/unpublish, unpublish is idempotent and leaves a
+> record); submitter status self-check GET /v1/publisher/submissions (B13: a returned-for-revision state
+> is visible to the submitter, and resubmission reuses the same id).
 >
-> 心理干预三层机制（R8-3，全链零 LLM）：触发（14 天警告 / 28 天·自报疲惫·超载+拒延≥5 → ISI+PSS-10）
-> → 第一层自动联系自填 tutor（量表提交即知情动作）→ 第二层咨询室预约（时段唯一来源 =
-> wellbeing-desk 设置的工作时段，预约带姓名/专业/年级/班级/联系方式，专业年级服务端回填）
-> → 第三层紧急红按钮（每学期 2 次，第 3 次停用一学期，停用响应仍附热线）。
+> Three-tier wellbeing intervention mechanism (R8-3, zero LLM across the whole chain): trigger (14-day
+> warning / 28-day · self-reported fatigue · overload + decline-rate ≥5 → ISI + PSS-10) → tier 1
+> automatic contact with a self-filled tutor (submitting the scale itself is the informed action) →
+> tier 2 counseling-office booking (the sole source of time slots is what the wellbeing desk configures
+> as working hours; a booking carries name/major/year/class/contact info, with major and year
+> auto-filled server-side) → tier 3 emergency red button (twice per semester; a third use disables it
+> for the semester, and the disabled-state response still includes the hotline).
 >
-> 本文回答"系统由什么组成、请求怎么流、边界卡在哪"。产品定义以
-> `CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md` 为准；本文与代码不一致时以代码为准并须回改本文。
-> **维护规则**：任何功能/架构改动落地后，本文相关小节与图必须同步更新（见 CLAUDE.md「文档维护」）。
+> This document answers "what the system is made of, how a request flows, and where the boundaries sit."
+> The product definition of record is `CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md`; where this
+> document and the code disagree, the code wins and this document must be corrected to match.
+> **Maintenance rule**: whenever a feature/architecture change ships, the relevant section and diagram in
+> this document must be updated in the same change (see CLAUDE.md, "Documentation Maintenance").
 
 ---
 
-## 1. 一句话架构
+## 1. One-Sentence Architecture
 
-**双平面 + 契约先行**：6 个语义 Agent（A0–A5，唯一允许调模型的层，只走 Vertex AI）
-与 9 个确定性服务（零 LLM，规则与阈值）各司其职；两平面之间的每一次数据交换都由
-`contracts/` 里的 Pydantic 模型定形——**类型不允许的数据，物理上流不过去**。
+**Two planes + contract-first**: 6 semantic agents (A0–A5, the only layer allowed to call a model, and
+only via Vertex AI) and 9 deterministic services (zero LLM, rules and thresholds) each own their own
+concerns; every data exchange between the two planes is shaped by a Pydantic model in `contracts/` —
+**data the type system disallows physically cannot flow through**.
 
-- 判定（资格、容量、健康信号）→ 确定性服务，可复现、可审计；
-- 语义（理由文案、抽取、排序解释、trade-off）→ Agent，且 **A5 是唯一做 trade-off 的**；
-- 前端拆两个门户（学生 / 校方），服务端 RBAC 的角色表直接从契约生成。
+- Determination (eligibility, capacity, wellbeing signals) → deterministic services, reproducible and
+  auditable;
+- Semantics (rationale copy, extraction, ranking explanations, trade-offs) → agents, and **A5 is the
+  only one that makes trade-offs**;
+- The frontend splits into two portals (student / institution); the server-side RBAC role table is
+  generated directly from the contract.
 
-## 2. 系统架构总图
+## 2. System Architecture Overview
 
 ```mermaid
 flowchart TB
-    subgraph Clients["前端（Next.js 16，双语 i18n，两门户互不可见）"]
-        SP["学生门户<br/>14 页（profile/goals/gaps/planner/for-you/square/<br/>timeline+actions/calendar+wellbeing/reflections/memory…）"]
-        IP["校方门户（一岗一台，R7-A）<br/>publisher · console · review · plaza-admin ·<br/>insights · quality-reports · wellbeing-desk · advisor-desk"]
-        PWA["可安装 PWA<br/>manifest + appleWebApp + sw.js<br/>（HTML 永不入缓存）"]
-        LG["/login 合成登录<br/>campuspath.session + 三规则守卫"]
+    subgraph Clients["Frontend (Next.js 16, bilingual i18n, the two portals cannot see each other)"]
+        SP["Student Portal<br/>14 pages (profile/goals/gaps/planner/for-you/square/<br/>timeline+actions/calendar+wellbeing/reflections/memory…)"]
+        IP["Institution Portal (one role per workstation, R7-A)<br/>publisher · console · review · plaza-admin ·<br/>insights · quality-reports · wellbeing-desk · advisor-desk"]
+        PWA["Installable PWA<br/>manifest + appleWebApp + sw.js<br/>(HTML never cached)"]
+        LG["/login synthetic login<br/>campuspath.session + three-rule guard"]
     end
 
-    subgraph API["services/api — FastAPI 装配层"]
-        RBAC["RBAC 中间件<br/>角色表由契约生成"]
-        EP["契约 1.10.0<br/>（学生/校方/系统全端点）"]
-        GATE["B8 部署闸门<br/>PlanItem 无 validation_id ⇒ 422"]
+    subgraph API["services/api — FastAPI assembly layer"]
+        RBAC["RBAC middleware<br/>role table generated from the contract"]
+        EP["Contract 1.10.0<br/>(all student/institution/system endpoints)"]
+        GATE["B8 deployment gate<br/>PlanItem without validation_id ⇒ 422"]
     end
 
-    subgraph AgentPlane["语义平面 agents/ — 只走 Vertex AI（B12 双重强制）"]
-        A0["A0 Orchestrator<br/>确定性路由表 + LLM 兜底"]
-        A1["A1 Student Context<br/>Resume/反思抽取 → 恒 pending 提案"]
-        A2["A2 Academic<br/>只出事实与候选"]
-        A3["A3 Goal-Gap<br/>拆解 Pack + 分叉点"]
-        A4["A4 Opportunity<br/>工具白名单仅 2 个"]
-        A5["A5 Pathway<br/>唯一 trade-off；每 PlanItem 必带 validation_id"]
+    subgraph AgentPlane["Semantic plane agents/ — Vertex AI only (B12 double enforcement)"]
+        A0["A0 Orchestrator<br/>deterministic routing table + LLM fallback"]
+        A1["A1 Student Context<br/>Resume/reflection extraction → always a pending proposal"]
+        A2["A2 Academic<br/>facts and candidates only"]
+        A3["A3 Goal-Gap<br/>decomposition Packs + fork points"]
+        A4["A4 Opportunity<br/>tool allow-list of exactly 2"]
+        A5["A5 Pathway<br/>the sole trade-off maker; every PlanItem carries a validation_id"]
     end
 
-    subgraph DetPlane["确定性平面 services/ — 9 模块零 LLM（三层扫描强制）"]
-        RUL["Rules & Constraint<br/>先修三值逻辑 · 四态资格 · 签发 validation_id"]
-        CAP["Capacity & Calendar<br/>五类时段 · §16.6 容量公式<br/>★ Calendar Token 止步于此"]
-        WB["Wellbeing Composer<br/>五信号阈值 + 固定双语模板<br/>两次提醒状态机"]
-        STA["State & Memory<br/>四层记忆 · Profile 三段式写入 · 锁定/忘记"]
-        ACT["Action & Consent<br/>预览→回执→幂等执行→审计<br/>回执服务端签发"]
-        AGG["Aggregation<br/>k-匿名抑制 · 时间衰减 · 无 student_id"]
-        MON["Event Monitor & Replan<br/>去抖 · AffectedScope（长期项不波及）"]
-        PUB["Publishing / Review / Audit<br/>越权拦截留痕 ScopeViolation"]
-        CON["Connector & Catalog<br/>三适配器接口 · Source Health"]
+    subgraph DetPlane["Deterministic plane services/ — 9 modules, zero LLM (enforced by a three-layer scan)"]
+        RUL["Rules & Constraint<br/>three-valued prerequisite logic · four-state eligibility · issues validation_id"]
+        CAP["Capacity & Calendar<br/>five slot types · §16.6 capacity formula<br/>★ Calendar Token stops here"]
+        WB["Wellbeing Composer<br/>five-signal thresholds + fixed bilingual templates<br/>two-reminder state machine"]
+        STA["State & Memory<br/>four-layer memory · three-stage profile writes · lock/forget"]
+        ACT["Action & Consent<br/>preview→receipt→idempotent execution→audit<br/>receipts issued server-side"]
+        AGG["Aggregation<br/>k-anonymity suppression · time decay · no student_id"]
+        MON["Event Monitor & Replan<br/>debouncing · AffectedScope (long-term items unaffected)"]
+        PUB["Publishing / Review / Audit<br/>overreach blocked and logged as ScopeViolation"]
+        CON["Connector & Catalog<br/>three-adapter interface · Source Health"]
     end
 
-    subgraph Data["数据与外部源"]
-        VX["Vertex AI · Gemini 3.5 Flash（global 端点）<br/>唯一模型出口，赠金账号；代际门槛 ≥3.5 在构造时检查"]
-        MDL["Moodle 沙箱（GCE）<br/>mcp/moodle_mcp 白名单只读 MCP"]
-        CATALOG["HKUST 真实公开数据<br/>课程目录 1534 门 · Engage 活动 · 5 专业培养要求"]
-        SEED["Synthetic Seed 1.12.0<br/>12 学生 · 205 机会 · Gold Set"]
-        FS["Firestore (default)<br/>检查点：MANIFEST 56 字段<br/>变了才写 · 冷启动回读 · 版本戳守门"]
-        CT["Cloud Trace（OpenTelemetry）<br/>gen_ai.* 模型 span · 工具 span<br/>修复循环逐轮 · A0 路由"]
+    subgraph Data["Data and external sources"]
+        VX["Vertex AI · Gemini 3.5 Flash (global endpoint)<br/>the sole model exit point, on the grant-credit billing account; generation floor ≥3.5 checked at construction"]
+        MDL["Moodle sandbox (GCE)<br/>mcp/moodle_mcp read-only allow-listed MCP"]
+        CATALOG["HKUST real public data<br/>1534 courses in the catalog · Engage activities · 5 program requirement sets"]
+        SEED["Synthetic Seed 1.12.0<br/>12 students · 205 opportunities · Gold Set"]
+        FS["Firestore (default)<br/>checkpoint: MANIFEST, 56 fields<br/>writes only what changed · restored on cold start · gated by version stamp"]
+        CT["Cloud Trace (OpenTelemetry)<br/>gen_ai.* model spans · tool spans<br/>repair loop per round · A0 routing"]
     end
 
     SP --> LG --> RBAC
@@ -237,18 +288,18 @@ flowchart TB
     RBAC --> EP --> GATE
     EP --> A0
     A0 --> A1 & A2 & A3 & A4 & A5
-    A1 -. "仅 EventQualityFeedback<br/>（类型层强制，原文过不去）" .-> AGG
+    A1 -. "EventQualityFeedback only<br/>(enforced at the type level, raw text cannot pass)" .-> AGG
     A2 --> RUL
-    A5 -- "每项必引用" --> RUL
+    A5 -- "every item must cite" --> RUL
     EP --> RUL & CAP & WB & STA & ACT & AGG & MON & PUB & CON
     A1 & A2 & A3 & A4 & A5 --> VX
-    CAP -- "free/busy（一级）/ 标题（二级授权）" --> CON
+    CAP -- "free/busy (tier 1) / titles (tier 2, authorized)" --> CON
     CON --> MDL & CATALOG
     EP --> SEED
-    EP -. "persistence.Persister 10s<br/>逐字段摘要 · batch" .-> FS
-    FS -. "restore_from（stamp 匹配才回）" .-> EP
-    A1 & A2 & A3 & A4 & A5 -. "span（属性只收标量，无 prompt 原文）" .-> CT
-    A4 -. "外部内容作 user-role 数据<br/>永不进 system prompt" .-> CON
+    EP -. "persistence.Persister every 10s<br/>field-level diff · batch" .-> FS
+    FS -. "restore_from (only restores on stamp match)" .-> EP
+    A1 & A2 & A3 & A4 & A5 -. "span (scalar attributes only, no raw prompt text)" .-> CT
+    A4 -. "external content is user-role data<br/>never enters the system prompt" .-> CON
 
     style CAP fill:#fff3e0,stroke:#e65100
     style WB fill:#fff3e0,stroke:#e65100
@@ -257,144 +308,165 @@ flowchart TB
     style VX fill:#e8f5e9,stroke:#2e7d32
 ```
 
-橙色 = 架构六条里"零 LLM"红线的三个实体模块；蓝色 = 唯一 trade-off Agent；
-虚线 = 被类型层强制收窄的数据通道。
+Orange = the three concrete modules behind the "zero LLM" invariant in the architecture's six rules;
+blue = the sole trade-off agent; dashed lines = data channels forcibly narrowed by the type system.
 
-## 3. 关键请求流
+## 3. Key Request Flows
 
-### 3.1 推荐（For You，F11）——每日一次 AI + 限次刷新
+### 3.1 Recommendations (For You, F11) — once-daily AI generation, rate-limited refresh
 
 ```mermaid
 sequenceDiagram
-    participant S as 学生端 /for-you
-    participant API as API（RBAC）
-    participant C as match_cache（按日期键）
+    participant S as Student /for-you
+    participant API as API (RBAC)
+    participant C as match_cache (keyed by date)
     participant A5 as A5 Pathway
     participant R as Rules Engine
     participant V as Vertex AI
 
     S->>API: GET /matches
-    API->>C: 查当日缓存
-    alt 当日已算过
-        C-->>S: 4–12ms 返回（分数与理由不变）
-    else 跨天首访 / POST /matches/refresh（每日限 3 次，超限 429）
-        API->>R: 资格四态判定（零模型）
-        R-->>API: 凭据 + validation_id
-        API->>A5: 排序（确定性）+ 理由文案
-        A5->>V: 仅理由生成（无后端时用自报"规则生成"的兜底理由）
-        API->>C: 写入当日缓存
-        C-->>S: 结果（冷 ~22s / 热 P50 ~2.3s）
+    API->>C: check today's cache
+    alt already computed today
+        C-->>S: returns in 4–12ms (scores and rationale unchanged)
+    else first visit of a new day / POST /matches/refresh (limited to 3/day, 429 beyond that)
+        API->>R: four-state eligibility determination (zero model)
+        R-->>API: credential + validation_id
+        API->>A5: ranking (deterministic) + rationale copy
+        A5->>V: rationale generation only (falls back to a self-reported "rule-generated" rationale if no backend)
+        API->>C: write today's cache
+        C-->>S: result (cold ~22s / warm P50 ~2.3s)
     end
 ```
 
-### 3.2 从建议到写日历（F06/F16）——同意链
+### 3.2 From Suggestion to Calendar Write (F06/F16) — the consent chain
 
 ```mermaid
 sequenceDiagram
-    participant S as 学生
-    participant A1 as A1（抽取）
+    participant S as Student
+    participant A1 as A1 (extraction)
     participant ST as State & Memory
     participant AC as Action & Consent
     participant CAP as Capacity & Calendar
 
-    S->>A1: 反思文本 / Resume（private_text 不进模型）
-    A1->>ST: 恒 pending 提案（冲突项标 update 带旧值）
-    S->>ST: 逐项 接受 / 拒绝
-    S->>AC: 批准排程提议
-    AC-->>S: 服务端签发回执 RCPT-{proposal_id}
-    S->>CAP: 携回执写入 CampusPath Plan 日历
-    Note over CAP: 验证回执签发者/归属/时段在预览内<br/>伪造或越界 ⇒ 403；无 calendar_write 同意 ⇒ 403 如实显示
+    S->>A1: reflection text / Resume (private_text never enters the model)
+    A1->>ST: always a pending proposal (conflicting items marked update, carrying the old value)
+    S->>ST: accept / reject each item
+    S->>AC: approve the scheduling proposal
+    AC-->>S: server-issued receipt RCPT-{proposal_id}
+    S->>CAP: write to the CampusPath Plan calendar using the receipt
+    Note over CAP: verifies the receipt's issuer/ownership/that the slot is within the preview<br/>forged or out-of-scope ⇒ 403; without calendar_write consent ⇒ 403 shown honestly
 ```
 
-## 4. 架构六条 → 技术落点
+## 4. Six Architectural Invariants → Where They Are Enforced in Code
 
-| # | 红线（Spec §8.9） | 强制机制（代码位置） |
+| # | Invariant (Spec §8.9) | Enforcement mechanism (code location) |
 |---|---|---|
-| 1 | A5 是唯一 trade-off Agent | `agents/campuspath_agents/roster.py`：A1–A4 输出类型无排序字段；评测 B 项断言 |
-| 2 | Wellbeing 全链零 LLM | `services/wellbeing/`：阈值判定 + 六槽位双语模板；三层零 LLM 扫描（运行时 sys.modules / 依赖树 / 源码 import） |
-| 3 | Calendar Token 不进 LLM 上下文 | Token 止步 `services/capacity/`；两级授权放行的是标题**文本**非凭据，`AvailabilityBlock._title_requires_grant` 类型层强制（B5） |
-| 4 | A4 工具白名单只有 2 个 | `agents/campuspath_agents/tools.py` ToolBelt 双重强制；外部内容走 `ModelRequest` 的 data 字段，与 system 物理分离 |
-| 5 | PlanItem 必带 validation_id | Rules 签发（形状 + Registry 两层查验）；API B8 闸门缺失即 422 |
-| 6 | A1 → Aggregation 只传结构化反馈 | `EventQualityFeedback` 无 student_id 字段；Aggregation 公开函数签名不含 student_id（结构性断言） |
+| 1 | A5 is the sole trade-off agent | `agents/campuspath_agents/roster.py`: A1–A4 output types have no ranking field; asserted by the eval suite's B-series checks |
+| 2 | Wellbeing is zero-LLM end to end | `services/wellbeing/`: threshold determination + six-slot bilingual templates; enforced by a three-layer zero-LLM scan (runtime sys.modules / dependency tree / source-code import scan) |
+| 3 | Calendar Token never enters an LLM context | The token stops at `services/capacity/`; the two authorization tiers release only **text** titles, never the credential, enforced at the type level by `AvailabilityBlock._title_requires_grant` (B5) |
+| 4 | A4's tool allow-list has only 2 entries | `agents/campuspath_agents/tools.py`'s ToolBelt double-enforces this; external content travels in `ModelRequest`'s data field, physically separated from the system prompt |
+| 5 | Every PlanItem carries a validation_id | Issued by Rules (shape check + Registry check, two layers); the API's B8 gate returns 422 if it's missing |
+| 6 | A1 → Aggregation passes only structured feedback | `EventQualityFeedback` has no student_id field; Aggregation's public function signatures contain no student_id (a structural assertion) |
 
-## 5. 分层清单
+## 5. Layer Inventory
 
-### 契约层（`contracts/`，唯一真相来源）
-声明式 OpenAPI（`openapi.py`，不从 FastAPI 反推）。**184 个数据契约类型 / 95 路径 114 操作**（2026-08-10 实测），
-版本 **1.40.0**。对外一律称「数据契约类型」——"模型"在 AI 产品语境里会被读成大语言模型。
-改动三件套：`openapi.py` 声明 → `make contracts && make types` → API 实现。
-前端 TS 类型同源生成，`make contracts-check` 守产物一致性。
+### Contract layer (`contracts/`, the single source of truth)
+Declarative OpenAPI (`openapi.py`, not reverse-derived from FastAPI). **184 data contract types / 95 paths,
+114 operations** (measured 2026-08-10), version **1.40.0**. Externally these are always called "data
+contract types" — "model" in an AI-product context gets read as "large language model." Changes go
+through a three-step process: declare in `openapi.py` → `make contracts && make types` → API
+implementation. Frontend TS types are generated from the same source; `make contracts-check` guards
+artifact consistency.
 
-### 确定性平面（`services/`，9 模块 + 2 装配）
-上图 9 模块各自独立成包、独立测试、各过三层零 LLM 扫描（`make llm-free`）。
-另有 `services/api/`（FastAPI 装配 + RBAC + B8 闸门）与 `services/mock-campus/`（SIS/Degree Audit 等 7 个 mock 端点）。
+### Deterministic plane (`services/`, 9 modules + 2 assembly layers)
+The 9 modules shown above are each independently packaged, independently tested, and each passes the
+three-layer zero-LLM scan (`make llm-free`). There is also `services/api/` (FastAPI assembly + RBAC +
+B8 gate) and `services/mock-campus/` (7 mock endpoints for SIS/Degree Audit, etc.).
 
-### 语义平面（`agents/`）
-| Agent | 类 | 职责 |
+### Semantic plane (`agents/`)
+| Agent | Class | Responsibility |
 |---|---|---|
-| A0 | `OrchestratorAgent` | 两段式路由：确定性路由表 + LLM 编排兜底 |
-| A1 | `StudentContextAgent` | Resume/反思抽取；产出恒为 pending 提案；私有原文不进模型 |
-| A2 | `AcademicAgent` | 学业事实与候选（不排序）；Moodle 适配器挂入工具带在 backlog |
-| A3 | `GoalGapAgent` | 目标拆解（`GOAL_DECOMPOSITION_PACKS` 三人群 Pack：求职/创业/读研）+ 双目标分叉点 |
-| A4 | `OpportunityAgent` | 不可信外部内容标准化，白名单 `read_source` + `emit_opportunity_draft` |
-| A5 | `PathwayAgent` | 唯一 trade-off：排序、Plan A/B/C、约束修复循环、low-load 试算 |
+| A0 | `OrchestratorAgent` | Two-stage routing: deterministic routing table + LLM orchestration fallback |
+| A1 | `StudentContextAgent` | Resume/reflection extraction; output is always a pending proposal; private raw text never enters the model |
+| A2 | `AcademicAgent` | Academic facts and candidates (unranked); Moodle adapter hook is wired in, backlogged |
+| A3 | `GoalGapAgent` | Goal decomposition (`GOAL_DECOMPOSITION_PACKS`, three-cohort packs: job search / entrepreneurship / grad school) + dual-goal fork points |
+| A4 | `OpportunityAgent` | Normalizes untrusted external content; allow-list of `read_source` + `emit_opportunity_draft` |
+| A5 | `PathwayAgent` | Sole trade-off maker: ranking, Plan A/B/C, constraint repair loop, low-load trial runs |
 
-模型访问统一走 `vertex.py`（ADC，`assert_vertex_only()` 运行时自检 + 静态扫描双保险）。
-测试用 `ScriptedModel`（未预设 purpose 抛异常）——Agent 正确性不依赖能否调通模型。
+Model access uniformly goes through `vertex.py` (ADC, `assert_vertex_only()` — a runtime self-check plus
+a static-scan double safeguard). Tests use `ScriptedModel` (raises if a purpose wasn't pre-registered) —
+agent correctness does not depend on being able to actually reach the model.
 
-**上线深度（R7-D，2026-08-01 起六个类全部在线）**：A1（Resume/反思）、A3（拆解/分叉）、
-A2（候选构建 `_course_candidates_for`）、A0（/matches 与选修推荐的确定性路由，
-痕迹见 `GET /v1/students/{id}/agent-trace`）、A4（`POST /v1/ops/sources/ingest` 摄入链，
-原文只作数据块）；A5 职责（唯一排序者）在 /matches 成立。
+**Production depth (R7-D, all six classes live since 2026-08-01)**: A1 (Resume/reflection), A3
+(decomposition/fork), A2 (candidate construction `_course_candidates_for`), A0 (deterministic routing for
+/matches and elective recommendations, traceable via `GET /v1/students/{id}/agent-trace`), A4
+(`POST /v1/ops/sources/ingest` ingestion chain, raw text used only as a data block); A5's role (sole
+ranker) is exercised in /matches.
 
-**云端部署形态（ADK → Vertex AI Agent Engine，us-central1）**：两个运行时
-`agents/cloud/orchestrator_agent`（A0 镜像，路由表与 roster 逐项一致由
-`test_cloud_mirror.py` 强制）与 `agents/cloud/opportunity_scout_agent`（A4 镜像，
-工具签名无发布通道）。管理入口 `bash infra/agent_engine.sh status|query|delete`——
-运行时按小时计费，**演示完必须 delete**。
+**Cloud deployment form (ADK → Vertex AI Agent Engine, us-central1)**: two runtimes,
+`agents/cloud/orchestrator_agent` (A0's mirror, its routing table kept item-for-item consistent with the
+roster by `test_cloud_mirror.py`) and `agents/cloud/opportunity_scout_agent` (A4's mirror, tool signature
+has no publish channel). Managed via `bash infra/agent_engine.sh status|query|delete` — the runtime is
+billed hourly, so **it must be deleted after every demo**.
 
-### 数据层（`seed/` + `mcp/`）
-- **真实公开数据**：HKUST 课程目录（58 学科 1534 门，先修表达式原文保留）、Engage 活动 66 条、5 专业培养要求（`seed/raw/hkust_programs/programs.json`，37 组）；
-- **合成数据**（Seed 1.5.0，字节级可复现）：12 学生（3 深度 Persona）、143 机会（八大主办方类）、Gold Set 四态各 15、16 类失败样本；页面标注 Synthetic / Demo Data；
-- **Moodle 沙箱**：GCE `campuspath-moodle`（asia-east2-a，夜间 23:00–09:00 HKT 停机），`mcp/moodle_mcp/` = wsfunction 白名单只读客户端 + stdio JSON-RPC MCP 服务器 + 契约映射适配器；token 只在 Secret Manager。
+### Data layer (`seed/` + `mcp/`)
+- **Real public data**: the HKUST course catalog (58 subjects, 1534 courses, prerequisite expressions
+  kept verbatim), 66 Engage activities, 5 program requirement sets
+  (`seed/raw/hkust_programs/programs.json`, 37 groups);
+- **Synthetic data** (Seed 1.5.0, byte-level reproducible): 12 students (3 deep personas), 143
+  opportunities (eight publisher categories), Gold Set with 15 per state across four states, 16 failure
+  sample classes; pages are labeled Synthetic / Demo Data;
+- **Moodle sandbox**: GCE instance `campuspath-moodle` (asia-east2-a, nightly shutdown 23:00–09:00 HKT);
+  `mcp/moodle_mcp/` = an allow-listed read-only `wsfunction` client + a stdio JSON-RPC MCP server + a
+  contract-mapping adapter; the token lives only in Secret Manager.
 
-### 前端（`apps/web/`，Next.js 16 + bun）
-两门户共用一个 app，由 `providers.tsx` 的会话模型与 `nav.ts` 的门户过滤 + 三规则守卫隔离
-（未登录→/login；跨门户→弹回本门户首页；已登录访问 login→弹回）。真正的权限边界在服务端 RBAC。
-文案全部走 `src/i18n/`（en.ts 为类型源），简/繁/英三语可切换持久化——
-繁体词典由 OpenCC 自简体生成入库（`i18n:hant` + `i18n:hant:check` 守一致性），
-契约 `LocalizedText` 不加字段：繁体态下服务端动态文案运行时确定性转换。
+### Frontend (`apps/web/`, Next.js 16 + bun)
+Both portals share one app, isolated by `providers.tsx`'s session model and `nav.ts`'s portal filter
+plus a three-rule guard (not logged in → /login; wrong portal → bounced back to that portal's home;
+already logged in and hitting /login → bounced back). The real permission boundary is server-side RBAC.
+All copy goes through `src/i18n/` (`en.ts` is the type source); Simplified/Traditional/English are all
+switchable and persisted — the Traditional Chinese dictionary is generated from Simplified via OpenCC
+(`i18n:hant` + `i18n:hant:check` guards consistency); the contract's `LocalizedText` adds no field —
+dynamic server-side copy is deterministically converted at runtime in Traditional mode.
 
-**移动端与 PWA（2026-08-11 P6）**：学生端 14 页移动优先，校方端 8 页保证可用；
-壳层在 <1024px 换成底部标签栏（6 格，短名走 `mobileLabelKey`），
-`Drawer` 换底部工作表、`/calendar` 换日视图/议程——**换的是形态不是尺寸**。
-可安装 PWA 由三件构成：`app/manifest.ts`（standalone + maskable 图标）、
-`layout.tsx` 的 `appleWebApp`（iOS 不读 manifest）、`public/sw.js`。
-SW 的边界写死在它自己的第一条规矩上：**HTML 一律 network-only、绝不入缓存**
-（缓存 HTML 会把一次白屏事故变成用户清不掉的永久版本），只缓存内容哈希过的
-`/_next/static/*`；不做 API 离线缓存（后端是内存态+演示时钟，旧数据比没数据更糟）。
-`/sw-unregister` 与 `?sw=off` 是卸载后门——SW 是全前端唯一能把用户永久锁在旧版本上的东西。
-manifest / sw.js / 图标必须在口令门**外**（`middleware.ts` 的 `PUBLIC_PATHS`），
-否则被 302 成 HTML，安装提示直接消失。
+**Mobile and PWA (2026-08-11 P6)**: the student side's 14 pages are mobile-first; the institution
+side's 8 pages are guaranteed usable. The shell switches to a bottom tab bar below 1024px (6 slots,
+short labels via `mobileLabelKey`); `Drawer` becomes a bottom sheet; `/calendar` becomes a day/agenda
+view — **what changes is the form factor, not just the size**. The installable PWA is built from three
+pieces: `app/manifest.ts` (standalone + maskable icons), `layout.tsx`'s `appleWebApp` (iOS doesn't read
+the manifest), and `public/sw.js`. The service worker's boundary is written as its own first rule:
+**HTML is always network-only and never cached** (caching HTML would turn a single white-screen
+incident into a permanent version the user can't clear), and only content-hashed `/_next/static/*` is
+cached; there is no API offline cache (the backend is in-memory with a demo clock — stale data is worse
+than no data). `/sw-unregister` and `?sw=off` are the uninstall back door — the service worker is the
+one piece of the whole frontend that can permanently lock a user onto an old version. The manifest,
+sw.js, and icons must sit **outside** the passcode gate (`middleware.ts`'s `PUBLIC_PATHS`), otherwise
+they get 302'd to HTML and the install prompt simply disappears.
 
-### 评测（`eval/`，`make eval`）
-13 BLOCKER（红线，违反即失败）· 12 TARGET（量化指标，当前 11/12，T11 75% 如实红）·
-5 BASELINE（对照基线，全确定性）。判定类指标要求双跑逐字节一致；Gold Label 与引擎故意分开实现。
+### Evaluation (`eval/`, `make eval`)
+13 BLOCKER (invariants — any violation fails the suite) · 12 TARGET (quantitative metrics, currently
+11/12, with T11 honestly reported red at 75%) · 5 BASELINE (control baselines, fully deterministic).
+Judgment-type metrics require byte-identical results across repeated runs; the Gold Label set and the
+scoring engine are deliberately implemented separately.
 
-## 6. 横切机制
+## 6. Cross-Cutting Mechanisms
 
-- **门禁链**：`scripts/preflight.sh`（14 项，含计费账号=赠金账号断言）→ pre-commit 密钥/AI-Studio 拦截 → `make check`（preflight + 契约/Seed 一致性 + 全量测试 + llm-free + harness 自检）。
-- **Harness Engineering**：检查器必须用已知会失败的样例证明它真的会失败（H5）；报实测值不报预期值。踩坑台账唯一出处 Plan §10.2。
-- **上下文交接**：`.claude/hooks/handoff.py`（70% 提醒 / 80% 自动压缩 / 压缩后自动注入 `HANDOFF.md`）。
+- **Gate chain**: `scripts/preflight.sh` (14 checks, including an assertion that the billing account is
+  the grant-credit account) → pre-commit secret/AI-Studio blocking → `make check` (preflight + contract/
+  Seed consistency + full test suite + llm-free + harness self-check).
+- **Harness Engineering**: a checker must prove it actually fails using a sample known to fail (H5);
+  report measured values, not expected ones. The single source of truth for known pitfalls is Plan §10.2.
+- **Context handoff**: `.claude/hooks/handoff.py` (70% reminder / 80% auto-compaction / auto-injects
+  `HANDOFF.md` after compaction).
 
-## 7. 文档地图
+## 7. Document Map
 
-| 文档 | 角色 |
+| Document | Role |
 |---|---|
-| `CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md` | 产品基线（现 v4.1.7，功能 F01–F27 零删减） |
-| `CampusPath_Implementation_Plan_V2.md` | 执行计划：D1–D7 验收、WP0–WP11、踩坑台账 §10.2 |
-| **本文** | 架构：组成、数据流、边界落点（随实现同步更新） |
-| `README.md` | 入口：项目简介 + 文件结构 + 开工命令 |
-| `PROGRESS.md` | 进度审计：只记已验证事实，附验证方式与 commit |
-| `docs/demo-runbook.md` | Spec §19 十七步演示对照与彩排清单 |
-| `contracts/README.md` / `seed/DATA_DICTIONARY.md` / `infra/README.md` | 各层细则 |
+| `CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md` | Product baseline (currently v4.1.7, features F01–F27, zero deletions) |
+| `CampusPath_Implementation_Plan_V2.md` | Execution plan: D1–D7 acceptance, WP0–WP11, pitfall ledger §10.2 |
+| **This document** | Architecture: composition, data flow, boundary enforcement (updated in step with implementation) |
+| `README.md` | Entry point: project overview + file structure + getting-started commands |
+| `PROGRESS.md` | Progress audit: records only verified facts, with verification method and commit |
+| `docs/demo-runbook.md` | Spec §19's seventeen-step demo checklist and rehearsal guide |
+| `contracts/README.md` / `seed/DATA_DICTIONARY.md` / `infra/README.md` | Per-layer details |

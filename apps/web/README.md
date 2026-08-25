@@ -1,74 +1,80 @@
-# CampusPath 学生 Web App（WP7）
+English edition of apps/web/README.md, translated for the All Things Agentic Hackathon submission (Aug 2026).
 
-D1 的 14 个页面。Next.js 16 + Tailwind 4 + motion，bun 管理。
-数据全部来自 `/v1`，前端**零硬编码业务数据**。
+# CampusPath Student Web App (WP7)
 
-## 跑起来
+D1's 14 pages. Next.js 16 + Tailwind 4 + motion, managed with bun.
+All data comes from `/v1` — the frontend has **zero hardcoded business data**.
+
+## Running it
 
 ```bash
-make api                       # 仓库根目录：FastAPI 起在 :8000
+make api                       # from the repo root: FastAPI starts on :8000
 cd apps/web && bun install && bun run dev --port 3100
 ```
 
-浏览器开 `http://127.0.0.1:3100`。前端通过 `next.config.ts` 的 rewrite
-把 `/api/*` 代理到 `:8000`，因此**同源、不需要 CORS**——API 侧不必为了
-一个演示前端放开跨域，少一处需要有人记得收回去的放宽。
+Open `http://127.0.0.1:3100` in a browser. The frontend proxies `/api/*` to `:8000` via a rewrite in
+`next.config.ts`, so it's **same-origin and needs no CORS** — the API side doesn't have to open up cross-origin
+access just for a demo frontend, which is one less relaxation someone would have to remember to revoke.
 
-## 设计方向：「温柔陶土 × 可核验」（v2，2026-08-01 重构）
+## Design direction: "Soft Clay × Verifiable" (v2, refactored 2026-08-01)
 
-Claymorphism（温和档）× Claude 暖色：燕麦奶油底（`--color-oat-*`）、
-白卡浮雕（柔外影 + 内高光）、陶土橙强调（`--color-terra-*`）。设计依据
-`ui-ux-pro-max` skill；令牌全表见
-`docs/CampusPath_Design_Tokens_v2.0_Clay_2026-08-01.md`。
+Claymorphism (soft variant) × Claude's warm palette: oat-cream base (`--color-oat-*`),
+embossed white cards (soft outer shadow + inner highlight), terracotta-orange accent (`--color-terra-*`).
+Design follows the `ui-ux-pro-max` skill; the full token table is in
+`docs/CampusPath_Design_Tokens_v2.0_Clay_2026-08-01.md`.
 
-三道门禁随批次强制（`apps/web/scripts/`）：`check-contrast.mjs`
-（80 组合 × 双主题 WCAG 实算）、`check-alignment.mjs`（跨页骨架逐像素
-比对——切页不许跳动）、`run-pages-must.mjs`（data-* 结构回归）。
+Three gates are enforced with each batch (`apps/web/scripts/`): `check-contrast.mjs`
+(80 combinations × both themes, real WCAG computation), `check-alignment.mjs` (pixel-level comparison of the
+skeleton across pages — page transitions must not jump), `run-pages-must.mjs` (`data-*` structural regression).
 
-砂岩赭（`--color-ochre-*`）仍是 UNKNOWN 的专属语汇，只花在两个**签名元素**上：
+Sandstone ochre (`--color-ochre-*`) remains the exclusive vocabulary of UNKNOWN, spent only on two
+**signature elements**:
 
-| 签名元素 | 在哪 | 为什么是它 |
+| Signature element | Where | Why it's this |
 |---|---|---|
-| **三值指示器** `TriState` | `components/ui.tsx` | UNKNOWN 用**斜纹**，既不是绿也不是红。整个产品建立在"解析不出来 ≠ 你不合格"上，配色必须承认第三种状态 |
-| **凭据票根** `CredentialChip` | 同上 | 任何来自 Rules 的结论都挂一张带真实 `validation_id` 的票根。看得见的审计链，比一句"我们很严谨"有用 |
+| **Tri-state indicator** `TriState` | `components/ui.tsx` | UNKNOWN uses a **hatched pattern**, neither green nor red. The whole product is built on "couldn't be parsed ≠ you're not eligible," and the color system has to acknowledge the third state |
+| **Credential chip** `CredentialChip` | same as above | Any conclusion coming from Rules carries a chip with a real `validation_id`. A visible audit trail is worth more than a claim of "we're being rigorous" |
 
-交互物理按 `ui-ux-pro-max` 的 UX 规则：默认 spring `bounce 0`、
-`duration 0.3–0.4`，按下即反馈（<100ms）不等 `click`，按压 scale 0.97
-配 260ms 轻过冲回弹；`prefers-reduced-motion` / `reduced-transparency` /
-`contrast: more` 三个信号各自有降级路径。
+Interaction physics follow the `ui-ux-pro-max` UX rules: default spring `bounce 0`,
+`duration 0.3–0.4`; feedback on press (<100ms) rather than waiting for `click`; press scale 0.97
+with a 260ms light overshoot on release; `prefers-reduced-motion` / `reduced-transparency` / `contrast: more`
+each have their own degradation path.
 
-## 双语
+## Bilingual support
 
-`src/i18n/en.ts` 是词典的**类型源**；`zh-Hans.ts` 声明为
-`Record<keyof Dict, string>`，所以**少一个键、拼错一个键都过不了 `tsc`**。
-i18n 完整性因此是类型层事实，不是纪律。
+`src/i18n/en.ts` is the dictionary's **type source**; `zh-Hans.ts` is declared as
+`Record<keyof Dict, string>`, so **a missing key or a misspelled key fails `tsc`**.
+i18n completeness is therefore a type-level fact, not a matter of discipline.
 
-选择持久化在 `localStorage`，并同步写 `<html lang>`；`layout.tsx` 里有一段
-内联脚本在 hydration 前就把 lang / theme 打上，避免首帧闪烁。
+The language choice is persisted in `localStorage` and also synced to `<html lang>`; `layout.tsx` has an
+inline script that sets lang/theme before hydration to avoid a first-paint flash.
 
-⚠️ **已知缺口**：Rules / Wellbeing 服务产出的判定理由目前是单语中文
-prose，塞进 `LocalizedText` 时两侧填了同一个字符串，所以英文态下
-「为什么没推荐」抽屉里的理由仍显示中文。见任务 U7。
+⚠️ **Known gap**: the reasoning text produced by the Rules / Wellbeing services is currently monolingual
+Chinese prose; when it's placed into `LocalizedText`, both sides get filled with the same string, so in English
+mode the "why wasn't this recommended" drawer's reasoning still shows Chinese. See task U7.
 
-## 浏览器实测
+## Browser verification
 
-`verify/pages.mjs` 是 D1「页面完整性」的机器化清单。断言一律基于
-`data-*` 属性，**不基于文案**——用文案做断言，切到另一种语言就全线失败，
-双语实测会变成摆设。
+`verify/pages.mjs` is the machine-checkable checklist for D1's "page completeness." Assertions are always based on
+`data-*` attributes, **never on copy text** — assertions based on wording would fail across the board the moment
+the language switches, and bilingual testing would become theater.
 
-清单里最后一项是一个**故意查不到的选择器**：它必须红，否则说明这套断言
-根本没在断言什么（Plan §10 H5）。
+The last item on the checklist is a **deliberately unmatchable selector**: it must fail, otherwise it proves the
+whole assertion suite isn't actually asserting anything (Plan §10 H5).
 
-截图存 `docs/verification/wp7/`。
+Screenshots are stored under `docs/verification/wp7/`.
 
-## 实测踩到的三个坑
+## Three issues found through hands-on testing
 
-1. **Next 16 的 root layout 不能手写 `<head>`**（`node_modules/next/dist/docs/…/layout.md:141`）。
-   后果不是报错，是**整页静默不 hydrate**：SSR 的 HTML 照常显示，看起来
-   完全正常，但 effect 不跑、`onClick` 无效，控制台一条红字都没有。
-2. **dev server 默认只认 `localhost`**，用 `127.0.0.1` 访问时 `/_next/*`
-   被当成跨源拦掉，症状与上一条一模一样。已在 `allowedDevOrigins` 里放开。
-3. **组件不透传 `...rest` 会静默吃掉 `data-*`**，于是实测断言查不到东西，
-   而"页面坏了"和"属性被组件吃了"分不开。`Card` 已改为透传。
+1. **Next 16's root layout cannot hand-write `<head>`** (`node_modules/next/dist/docs/…/layout.md:141`).
+   The failure mode isn't an error — it's that **the whole page silently fails to hydrate**: the SSR HTML renders
+   as normal and looks completely fine, but effects don't run, `onClick` doesn't work, and there isn't a single red
+   line in the console.
+2. **The dev server only recognizes `localhost` by default** — accessing it via `127.0.0.1` gets `/_next/*`
+   blocked as cross-origin, with symptoms identical to the issue above. Fixed by adding it to `allowedDevOrigins`.
+3. **A component that doesn't forward `...rest` silently swallows `data-*`** attributes, so the test assertions
+   find nothing, and you can't tell "the page is broken" apart from "the attribute got eaten by a component."
+   `Card` has been changed to forward its rest props.
 
-三条都是"亲手点一下"发现的，读代码、跑 `tsc`、跑 `bun run build` 全都是绿的。
+All three were found by actually clicking through the app by hand — reading the code, running `tsc`, and running
+`bun run build` were all green.

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hans" data-landing>
+<html lang="en" data-landing>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
@@ -314,7 +314,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <span class="brand-sub" data-brand-sub>校园成长路径</span>
       </span>
     </a>
-    <div class="navlinks" data-navlinks><a href="#zh-Hans-what" data-view-link="zh-Hans-what" aria-current="page">做什么</a><a href="#zh-Hans-pain" data-view-link="zh-Hans-pain">痛点</a><a href="#zh-Hans-who" data-view-link="zh-Hans-who">给谁用</a><a href="#zh-Hans-value" data-view-link="zh-Hans-value">能得到什么</a><a href="#zh-Hans-memory" data-view-link="zh-Hans-memory">记忆</a><a href="#zh-Hans-how" data-view-link="zh-Hans-how">怎么用</a><a href="#zh-Hans-tech" data-view-link="zh-Hans-tech">技术</a></div>
+    <div class="navlinks" data-navlinks><a href="#en-what" data-view-link="en-what" aria-current="page">What we do</a><a href="#en-pain" data-view-link="en-pain">Pain points</a><a href="#en-who" data-view-link="en-who">Who it's for</a><a href="#en-value" data-view-link="en-value">What you get</a><a href="#en-memory" data-view-link="en-memory">Memory</a><a href="#en-how" data-view-link="en-how">How it works</a><a href="#en-tech" data-view-link="en-tech">Tech</a></div>
     <div class="topbar-end">
       <select class="langsel" data-lang-select aria-label="Language">
         <option value="zh-Hans">简体中文</option>
@@ -332,7 +332,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
 <main id="top">
 
-    <div class="pane" data-lang-pane="zh-Hans" lang="zh-Hans">
+    <div class="pane" data-lang-pane="zh-Hans" lang="zh-Hans" hidden>
 
       <div class="view" data-view="zh-Hans-what">
         <header class="hero">
@@ -1640,7 +1640,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
       </footer>
     </div>
 
-    <div class="pane" data-lang-pane="en" lang="en" hidden>
+    <div class="pane" data-lang-pane="en" lang="en">
 
       <div class="view" data-view="en-what">
         <header class="hero">
@@ -2303,7 +2303,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   var links = document.querySelector("[data-navlinks]");
   var ctaLabel = document.querySelector("[data-cta-label]");
   var sub = document.querySelector("[data-brand-sub]");
-  var current = { code: "zh-Hans", view: NAV["zh-Hans"].nav[0][0] };
+  var current = { code: "en", view: NAV["en"].nav[0][0] };
 
   /** 显示某个分页面：只在**当前语言**的面板里切，其余语言整块本来就 hidden。
    *  语言切换时按同一个 view id 复位，读者不会因为换语言被丢回第一页。 */
@@ -2323,7 +2323,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   }
 
   function apply(code) {
-    if (!NAV[code]) code = "zh-Hans";
+    if (!NAV[code]) code = "en";
     current.code = code;
     document.querySelectorAll("[data-lang-pane]").forEach(function (p) {
       p.hidden = p.getAttribute("data-lang-pane") !== code;
@@ -2369,13 +2369,9 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   var stored = null;
   try { stored = localStorage.getItem(KEY); } catch (e) {}
-  // 没存过就跟随浏览器语言：繁体地区给繁体，非中文给英文
-  if (!stored) {
-    var l = (navigator.language || "").toLowerCase();
-    stored = l.indexOf("zh") === 0
-      ? (/hant|tw|hk|mo/.test(l) ? "zh-Hant" : "zh-Hans")
-      : (l.indexOf("zh") === -1 && l ? "en" : "zh-Hans");
-  }
+  // 2026-08-25 用户裁定：**默认英文**（评委在海外），不再跟随浏览器语言；
+  // 选过的语言仍持久化。初始 DOM 也是英文面板，无 JS 时同样成立。
+  if (!stored || !NAV[stored]) stored = "en";
   apply(stored);
   // 进来时如果 URL 带 hash，直接开到那一页（分享链接能落到具体一页）
   var fromHash = viewOfHash(location.hash);

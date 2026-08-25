@@ -4,7 +4,8 @@
 set -uo pipefail
 
 PROJECT_ID="${CAMPUSPATH_PROJECT_ID:-your-project-id}"
-BILLING_ACCOUNT=""
+# 计费账号从 infra/config.sh 读（公开导出里是空占位，检查会跳过）
+BILLING_ACCOUNT="$(bash -c 'source infra/config.sh >/dev/null 2>&1; printf %s "$BILLING_ACCOUNT"')"
 CREDIT_EXPIRY="2026-09-27"
 PASS=0; FAIL=0; WARN=0
 ok()   { printf "  \033[32m✓\033[0m %s\n" "$1"; PASS=$((PASS+1)); }
@@ -21,7 +22,9 @@ echo
 echo "[2/6] 计费绑定"
 if command -v gcloud >/dev/null 2>&1; then
   ACTUAL=$(gcloud billing projects describe "$PROJECT_ID" --format="value(billingAccountName)" 2>/dev/null)
-  if [ "$ACTUAL" = "billingAccounts/$BILLING_ACCOUNT" ]; then
+  if [ -z "$BILLING_ACCOUNT" ]; then
+    warn "未配置 BILLING_ACCOUNT（infra/config.sh）——跳过计费账号核对；当前=$ACTUAL"
+  elif [ "$ACTUAL" = "billingAccounts/$BILLING_ACCOUNT" ]; then
     ok "项目挂在赠金账号上 ($BILLING_ACCOUNT)"
   elif [ -z "$ACTUAL" ]; then
     bad "读不到计费信息——是否已 gcloud auth login？"
@@ -93,9 +96,13 @@ fi
 echo
 
 echo "[6/6] 基线文档"
-[ -f CLAUDE.md ] && ok "CLAUDE.md" || bad "CLAUDE.md 缺失"
-[ -f CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md ] && ok "Spec V4.1（唯一基线）" || bad "Spec V4.1 缺失"
-[ -f CampusPath_Implementation_Plan_V2.md ] && ok "Implementation Plan V2" || bad "Plan V2 缺失"
+if [ -f .public-export ]; then
+  ok "公开导出（.public-export 在场）：基线文档不随导出，跳过"
+else
+  [ -f CLAUDE.md ] && ok "CLAUDE.md" || bad "CLAUDE.md 缺失"
+  [ -f CampusPath_Complete_Product_Spec_V4.1_2026-07-28.md ] && ok "Spec V4.1（唯一基线）" || bad "Spec V4.1 缺失"
+  [ -f CampusPath_Implementation_Plan_V2.md ] && ok "Implementation Plan V2" || bad "Plan V2 缺失"
+fi
 echo
 
 echo "═══════════════════════════"
