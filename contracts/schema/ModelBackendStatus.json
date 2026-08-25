@@ -1,0 +1,54 @@
+{
+  "$id": "https://campuspath.invalid/schema/ModelBackendStatus.json",
+  "additionalProperties": false,
+  "properties": {
+    "available": {
+      "title": "Available",
+      "type": "boolean"
+    },
+    "default_model": {
+      "title": "Default Model",
+      "type": "string"
+    },
+    "generation_floor": {
+      "title": "Generation Floor",
+      "type": "string"
+    },
+    "last_model_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Model Version"
+    },
+    "location": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Location"
+    },
+    "vertex_only": {
+      "title": "Vertex Only",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "available",
+    "default_model",
+    "generation_floor",
+    "vertex_only"
+  ],
+  "title": "ModelBackendStatus",
+  "type": "object"
+}

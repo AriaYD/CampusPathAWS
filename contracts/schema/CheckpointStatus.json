@@ -1,0 +1,86 @@
+{
+  "$id": "https://campuspath.invalid/schema/CheckpointStatus.json",
+  "additionalProperties": false,
+  "properties": {
+    "backend": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Backend"
+    },
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "fields": {
+      "default": 0,
+      "title": "Fields",
+      "type": "integer"
+    },
+    "last_saved_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Last Saved At"
+    },
+    "restore_outcome": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Restore Outcome"
+    },
+    "saves": {
+      "default": 0,
+      "title": "Saves",
+      "type": "integer"
+    },
+    "stamp": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stamp"
+    }
+  },
+  "required": [
+    "enabled"
+  ],
+  "title": "CheckpointStatus",
+  "type": "object"
+}

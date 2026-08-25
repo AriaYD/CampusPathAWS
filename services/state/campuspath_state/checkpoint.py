@@ -114,7 +114,13 @@ class FirestoreCheckpoint:
         if self._client is None:
             from google.cloud import firestore  # noqa: PLC0415  # 延迟：本地/测试不需要
 
-            self._client = firestore.Client(project=self.project, database=self.database)
+            # 线上踩坑（2026-08-25，Cloud Run rev 00020 启动即崩）：显式传 database="(default)"
+            # 会被新版客户端 URL 编码成 %28default%29 → 400 Invalid database id。
+            # 默认库就**不传**这个参数，只有命名库才传。
+            kwargs: dict[str, Any] = {"project": self.project}
+            if self.database and self.database != "(default)":
+                kwargs["database"] = self.database
+            self._client = firestore.Client(**kwargs)
         return self._client.collection(self.collection)
 
     def save(self, stamp: str, fields: Fields, *, changed: set[str] | None = None) -> None:

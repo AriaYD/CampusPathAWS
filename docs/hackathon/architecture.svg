@@ -29,7 +29,7 @@
 
   <rect width="1600" height="960" fill="#ffffff"/>
   <text x="32" y="38" class="h1">CampusPath — architecture</text>
-  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.41.0</text>
+  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.42.0</text>
 
   <!-- ============ CLIENTS (x 32–312) ============ -->
   <rect x="32" y="84" width="280" height="270" class="zone"/>
@@ -60,7 +60,7 @@
   <text x="368" y="166" class="ts">violations are logged, never silent</text>
   <rect x="622" y="118" width="270" height="64" class="box"/>
   <text x="632" y="136" class="h3">Contract-typed endpoints</text>
-  <text x="632" y="152" class="ts">OpenAPI 1.41.0 · student / institution / ops</text>
+  <text x="632" y="152" class="ts">OpenAPI 1.42.0 · student / institution / ops</text>
   <text x="632" y="166" class="ts">endpoints · every response is a Pydantic model</text>
   <rect x="906" y="118" width="256" height="64" class="box" stroke="#b3412a"/>
   <text x="916" y="136" class="h3">B8 deployment gate</text>
@@ -158,8 +158,8 @@
   <text x="1232" y="312" class="ts">pages → A4 extraction → plaza, no human in the loop</text>
 
   <rect x="1222" y="330" width="332" height="44" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="348" class="h3">Secret Manager · IAM</text>
-  <text x="1232" y="364" class="ts">check-in HMAC secret · two runtime service accounts</text>
+  <text x="1232" y="348" class="h3">Cloud Trace (OpenTelemetry) · Secret Manager · IAM</text>
+  <text x="1232" y="364" class="ts">span per model / tool / repair round · two runtime service accounts</text>
 
   <rect x="1222" y="384" width="332" height="44" class="box" stroke="#3b6fc9"/>
   <text x="1232" y="402" class="h3">Firestore · checkpoint store</text>

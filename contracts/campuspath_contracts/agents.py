@@ -294,3 +294,73 @@ class AgentRuntimeStatus(CampusPathModel):
 
 
 # （AgentRuntimeCommand 已随启停端点撤除，2026-08-04 用户裁定）
+
+
+# --------------------------------------------------------------------------
+# Agent 注册表（Hackathon P4，2026-08-24）
+# --------------------------------------------------------------------------
+
+
+class AgentRegistryEntry(CampusPathModel):
+    """一个 Agent 的治理卡片。**从上面的治理表派生**，不手写，所以永远与白名单一致。"""
+
+    agent_id: AgentId
+    runtime: RuntimeId
+    role: str
+    #: 只出事实与候选 = False；A5 是唯一 True
+    makes_tradeoffs: bool
+    tool_whitelist: tuple[str, ...]
+    forbidden_tool_patterns: tuple[str, ...]
+    write_domains: tuple[DataDomain, ...]
+    #: 是否另有 Agent Engine 镜像（A0 / A4）
+    agent_engine_mirror: str | None = None
+
+
+class ModelBackendStatus(CampusPathModel):
+    available: bool
+    default_model: str
+    #: 最近一次响应报告的 model_version（线上核对"真的在跑 3.5"）
+    last_model_version: str | None = None
+    generation_floor: str
+    location: str | None = None
+    vertex_only: bool
+
+
+class CheckpointStatus(CampusPathModel):
+    enabled: bool
+    backend: str | None = None
+    stamp: str | None = None
+    saves: int = 0
+    last_saved_at: datetime | None = None
+    fields: int = 0
+    #: 启动回读的结果（restored / empty backend / stamp mismatch / failed）
+    restore_outcome: str | None = None
+    #: 最近一次失败（回读或落盘）；None = 正常。**如实暴露**，不吞
+    error: str | None = None
+
+
+class RecentSpan(CampusPathModel):
+    name: str
+    trace_id: str
+    duration_ms: float | None = None
+    status: str = ""
+    attributes: dict[str, str | int | float | bool] = {}
+
+
+class TraceExportStatus(CampusPathModel):
+    enabled: bool
+    exporter: str | None = None
+    spans_exported: int = 0
+    recent_spans: tuple[RecentSpan, ...] = ()
+
+
+class AgentRegistry(CampusPathModel):
+    """`GET /v1/ops/agents`：系统里有哪些 Agent、各能碰什么、跑在什么模型上、
+    状态存在哪、trace 往哪去——一屏说清，且每一项都是实测而非文档抄录。"""
+
+    contracts_version: str
+    agents: tuple[AgentRegistryEntry, ...]
+    model_backend: ModelBackendStatus
+    checkpoint: CheckpointStatus
+    trace: TraceExportStatus
+    checked_at: datetime

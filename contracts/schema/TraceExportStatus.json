@@ -1,0 +1,99 @@
+{
+  "$defs": {
+    "RecentSpan": {
+      "additionalProperties": false,
+      "properties": {
+        "attributes": {
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              }
+            ]
+          },
+          "default": {},
+          "title": "Attributes",
+          "type": "object"
+        },
+        "duration_ms": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Duration Ms"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "status": {
+          "default": "",
+          "title": "Status",
+          "type": "string"
+        },
+        "trace_id": {
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "trace_id"
+      ],
+      "title": "RecentSpan",
+      "type": "object"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/TraceExportStatus.json",
+  "additionalProperties": false,
+  "properties": {
+    "enabled": {
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "exporter": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Exporter"
+    },
+    "recent_spans": {
+      "default": [],
+      "items": {
+        "$ref": "#/components/schemas/RecentSpan"
+      },
+      "title": "Recent Spans",
+      "type": "array"
+    },
+    "spans_exported": {
+      "default": 0,
+      "title": "Spans Exported",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "enabled"
+  ],
+  "title": "TraceExportStatus",
+  "type": "object"
+}

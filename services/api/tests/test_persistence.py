@@ -179,3 +179,17 @@ def test_decode_refuses_types_outside_the_allowlist():
     hostile = {"__t__": "dataclass", "cls": "os:system", "__v__": {}}
     with pytest.raises(TypeError):
         Codec().decode(hostile)
+
+
+def test_restore_failure_does_not_kill_the_app(monkeypatch, tmp_path):
+    """线上 rev 00020 的教训：回读抛异常曾让 uvicorn 在 import 时就退出。现在：起来、记错、如实报。"""
+    path = tmp_path / "broken.json"
+    path.write_text("{not json")
+    monkeypatch.setenv(persistence.CHECKPOINT_ENV, f"file:{path}")
+    deps = Deps("full", model=None)
+    client = TestClient(create_app(deps))                 # 不抛
+    assert deps.checkpoint.restore_outcome == "failed"
+    assert deps.checkpoint.last_error and "restore:" in deps.checkpoint.last_error
+    body = client.get("/v1/ops/agents", headers={"X-CampusPath-Role": "career_center_admin"}).json()
+    assert body["checkpoint"]["enabled"] is True and body["checkpoint"]["error"].startswith("restore:")
+    assert body["checkpoint"]["restore_outcome"] == "failed"

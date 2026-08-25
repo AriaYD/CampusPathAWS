@@ -49,6 +49,8 @@ Nine **deterministic services** (zero LLM, AST-scanned in CI) own everything tha
 
 Two planes, contract-first: the **semantic plane** (A0–A5, the only code allowed to call a model, Vertex-only) and the **deterministic plane** (nine services, zero LLM). Every exchange between them is a Pydantic model in [`contracts/`](contracts/README.md) (the single source of truth: JSON Schema + OpenAPI + generated TypeScript types). Data the types don't allow physically cannot flow.
 
+**Agent registry (live):** `GET /v1/ops/agents` (institution roles) — the six agents with their runtime, tool whitelist, forbidden patterns and write domains, **derived from the contract governance tables, not hand-written** (a test asserts equality), plus the model backend (`default_model`, last observed `model_version`, generation floor, location), checkpoint status (backend, saves, last error) and trace status.
+
 **Google Cloud in use at runtime**
 
 | Service | Role |
@@ -59,6 +61,7 @@ Two planes, contract-first: the **semantic plane** (A0–A5, the only code allow
 | Vertex AI Agent Engine (us-central1) | Managed runtimes for the two ADK agents; the web app shows a live runtime/billing status light |
 | Cloud Run (asia-east2) | `campuspath-web` (Next.js 16, PWA) and `campuspath-api` (FastAPI) |
 | Cloud Run Jobs + Cloud Scheduler | Daily source sweep |
+| Cloud Trace (OpenTelemetry) | Every model call (`gen_ai.*` attributes: model, `model_version`, token usage, thinking level, purpose), every tool call (accepted/rejected against the whitelist), every A5 repair-loop attempt (violations per round, outcome) and every A0 route is a span, nested under the HTTP request. `GET /v1/ops/agents` also shows the last 25 spans in-process |
 | Secret Manager | Check-in HMAC secret and Moodle token |
 | Firestore `(default)` | **Checkpoint store**: every mutable container of the API (56 fields — profiles, proposals, plans, drafts, memory, reflections, exposures, review queue, credentials…) is snapshotted by a background writer (per-field digests, only changed fields written, one batch) and restored on cold start; a contract/seed version stamp guards against restoring stale shapes. Decoding accepts only allow-listed types |
 | Cloud Storage | Private evidence vault, provisioned by `infra/bootstrap.sh` (not yet written to by the demo) |
@@ -93,7 +96,7 @@ bash infra/verify.sh                   # negative checks: A4's SA must NOT hold 
 
 # 1. API — Vertex model calls go through the global endpoint
 gcloud run deploy campuspath-api --source . --region asia-east2 \
-  --update-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=<project>,GOOGLE_CLOUD_LOCATION=global,CAMPUSPATH_CHECKPOINT=firestore \
+  --update-env-vars GOOGLE_GENAI_USE_VERTEXAI=TRUE,GOOGLE_CLOUD_PROJECT=<project>,GOOGLE_CLOUD_LOCATION=global,CAMPUSPATH_CHECKPOINT=firestore,CAMPUSPATH_TRACE=gcp \
   --max-instances 1
 
 # 2. Web (ships the generated contract types into the image)
@@ -114,6 +117,7 @@ bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop`
 - **A plan item without a validation credential is not a plan item.** Making the Rules engine the issuer of `validation_id` and making the API reject unbacked items removed a whole class of "plausible but impossible" plans, and gave A5 a concrete repair signal instead of a vague "be careful with prerequisites".
 - **Gemini 3.5 changed the latency profile, not just the quality.** `thinking_budget=0` (the 2.x idiom) costs 20.9 s per call on 3.5-flash; `thinking_level=MINIMAL` costs 0.7 s. Every migration re-measures latency before trusting old parameters.
 - **Durability first, then horizontal scale.** The API used to rebuild its seed on every cold start; now the whole mutable state is checkpointed to Firestore and restored on boot (survives redeploys and scale-to-zero). It still runs with `max-instances=1` because background jobs and locks are process-local — the checkpoint buys durability, not multi-instance consistency, and the README says so rather than implying otherwise.
+- **A green deploy is not a green deploy until the new revision serves.** Piping `gcloud run deploy` through `tail` hid a non-zero exit; the new revision crashed at import (a Firestore client quirk: an explicit `database="(default)"` is URL-encoded to `%28default%29`) while the previous revision kept serving. Now the restore step fails open (start from seed, expose the error in `/v1/ops/agents`), and deploy exit codes are checked.
 - **A deserializer that imports what the payload names is an attack surface.** Our zero-LLM AST scan flagged `importlib.import_module(name_from_data)` in the checkpoint codec; the fix — an allow-list of contract types, unknown references refused — is also the right security posture for data that lives in a shared database.
 - **Metrics names decide how people read them.** An institution metric first called "discovery rate" read as an algorithm report card; renaming it "reach rate" and keeping the denominator fixed made the same number honest.
 
@@ -122,7 +126,7 @@ bash infra/agent_engine.sh start && bash infra/agent_engine.sh status   # `stop`
 This repository was started on **2026-07-29** for a university-internal Google hackathon and was substantially extended during the *All Things Agentic* submission period (2026-08-04 → 2026-08-31). In the spirit of the rules we disclose the split explicitly:
 
 - **Pre-existing (before 2026-08-04, commits `afd5f45..b37be24`)**: product spec, contract layer, synthetic seed, the nine deterministic services, the A0–A5 agent roster on Gemini 2.5, the two portals' UI, Cloud Run deployment, evaluation harness.
-- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (Firestore checkpointing of all mutable state, observability, agent registry, ADK on the request path).
+- **Built during the submission period (commits `b37be24..HEAD`; 47+ commits, +22k lines at the time of writing)**: plan draft → approval gate, résumé direct-write with undo, expiry governance and curation badges, the institution metrics pipeline (`/insights`) and visual reports, mobile-first rewrite + installable PWA, trilingual landing page, **Gemini 3.5 migration with the generation floor**, and the hackathon batches listed in [`docs/plans/hackathon-all-things-agentic-2026-08-24.md`](docs/plans/hackathon-all-things-agentic-2026-08-24.md) (Firestore checkpointing of all mutable state, OpenTelemetry → Cloud Trace on every agent step, the live agent registry, ADK on the request path).
 
 Third-party inputs: HKUST public course catalog (scraped with a 1 s polite interval and disk cache; no student data), public job postings via Google Search grounding, open-source libraries under their licenses. No sponsor funding or support was received.
 

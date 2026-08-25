@@ -279,6 +279,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/ops/agents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Agent 注册表（P4，2026-08-24）：六个 Agent 的治理卡片（从治理表派生）+ 模型后端 + 检查点 + trace 导出状态；每项都是运行时实测 */
+        get: operations["get_v1_ops_agents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/ops/opportunities/quality-summary": {
         parameters: {
             query?: never;
@@ -2028,6 +2045,48 @@ export interface components {
          * @enum {string}
          */
         AgentId: "A0" | "A1" | "A2" | "A3" | "A4" | "A5";
+        /**
+         * AgentRegistry
+         * @description `GET /v1/ops/agents`：系统里有哪些 Agent、各能碰什么、跑在什么模型上、
+         *     状态存在哪、trace 往哪去——一屏说清，且每一项都是实测而非文档抄录。
+         */
+        AgentRegistry: {
+            /** Agents */
+            agents: components["schemas"]["AgentRegistryEntry"][];
+            /**
+             * Checked At
+             * Format: date-time
+             */
+            checked_at: string;
+            checkpoint: components["schemas"]["CheckpointStatus"];
+            /** Contracts Version */
+            contracts_version: string;
+            model_backend: components["schemas"]["ModelBackendStatus"];
+            trace: components["schemas"]["TraceExportStatus"];
+        };
+        /**
+         * AgentRegistryEntry
+         * @description 一个 Agent 的治理卡片。**从上面的治理表派生**，不手写，所以永远与白名单一致。
+         */
+        AgentRegistryEntry: {
+            /**
+             * Agent Engine Mirror
+             * @default null
+             */
+            agent_engine_mirror: string | null;
+            agent_id: components["schemas"]["AgentId"];
+            /** Forbidden Tool Patterns */
+            forbidden_tool_patterns: string[];
+            /** Makes Tradeoffs */
+            makes_tradeoffs: boolean;
+            /** Role */
+            role: string;
+            runtime: components["schemas"]["RuntimeId"];
+            /** Tool Whitelist */
+            tool_whitelist: string[];
+            /** Write Domains */
+            write_domains: components["schemas"]["DataDomain"][];
+        };
         /** AgentRuntimeStatus */
         AgentRuntimeStatus: {
             /**
@@ -2485,6 +2544,46 @@ export interface components {
             attend_count: number;
             /** Opportunity Id */
             opportunity_id: string;
+        };
+        /** CheckpointStatus */
+        CheckpointStatus: {
+            /**
+             * Backend
+             * @default null
+             */
+            backend: string | null;
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Error
+             * @default null
+             */
+            error: string | null;
+            /**
+             * Fields
+             * @default 0
+             */
+            fields: number;
+            /**
+             * Last Saved At
+             * @default null
+             */
+            last_saved_at: string | null;
+            /**
+             * Restore Outcome
+             * @default null
+             */
+            restore_outcome: string | null;
+            /**
+             * Saves
+             * @default 0
+             */
+            saves: number;
+            /**
+             * Stamp
+             * @default null
+             */
+            stamp: string | null;
         };
         /**
          * ClarificationRequest
@@ -3162,6 +3261,12 @@ export interface components {
             /** Window Days */
             window_days: number;
         };
+        /**
+         * DataDomain
+         * @description Spec §13.2 的数据域。跨域传递必须经过显式的边界模型。
+         * @enum {string}
+         */
+        DataDomain: "student_private" | "student_operational" | "calendar" | "wellbeing" | "academic" | "catalog_public" | "aggregated_insights";
         /**
          * DataUncertainty
          * @description A2 的产出之一：明确说"这个字段我不确定"，而不是猜一个值填上（Spec §8.1.1）。
@@ -4750,6 +4855,27 @@ export interface components {
             target_term: string | null;
             title: components["schemas"]["LocalizedText"];
         };
+        /** ModelBackendStatus */
+        ModelBackendStatus: {
+            /** Available */
+            available: boolean;
+            /** Default Model */
+            default_model: string;
+            /** Generation Floor */
+            generation_floor: string;
+            /**
+             * Last Model Version
+             * @default null
+             */
+            last_model_version: string | null;
+            /**
+             * Location
+             * @default null
+             */
+            location: string | null;
+            /** Vertex Only */
+            vertex_only: boolean;
+        };
         /**
          * ModerationDecision
          * @description 人工审核的一次决定。不可变——改判需新增一条记录。
@@ -6295,6 +6421,30 @@ export interface components {
              */
             stale: boolean;
         };
+        /** RecentSpan */
+        RecentSpan: {
+            /**
+             * Attributes
+             * @default {}
+             */
+            attributes: {
+                [key: string]: string | number | boolean;
+            };
+            /**
+             * Duration Ms
+             * @default null
+             */
+            duration_ms: number | null;
+            /** Name */
+            name: string;
+            /**
+             * Status
+             * @default
+             */
+            status: string;
+            /** Trace Id */
+            trace_id: string;
+        };
         /**
          * RecordSource
          * @enum {string}
@@ -6949,6 +7099,12 @@ export interface components {
          * @enum {string}
          */
         RuleCategory: "eligibility" | "prerequisite" | "credit" | "deadline" | "capacity" | "protected_block" | "offering" | "schedule_conflict" | "context_pack" | "wellbeing_threshold";
+        /**
+         * RuntimeId
+         * @description 2 个 Runtime（Spec §8.1）。A4 独立部署是安全边界，不是性能优化。
+         * @enum {string}
+         */
+        RuntimeId: "student_path_runtime" | "opportunity_ops_runtime";
         /** ScheduleConflict */
         ScheduleConflict: {
             /**
@@ -7566,6 +7722,26 @@ export interface components {
              * Format: date-time
              */
             start: string;
+        };
+        /** TraceExportStatus */
+        TraceExportStatus: {
+            /** Enabled */
+            enabled: boolean;
+            /**
+             * Exporter
+             * @default null
+             */
+            exporter: string | null;
+            /**
+             * Recent Spans
+             * @default []
+             */
+            recent_spans: components["schemas"]["RecentSpan"][];
+            /**
+             * Spans Exported
+             * @default 0
+             */
+            spans_exported: number;
         };
         /**
          * Uncertainty
@@ -8540,6 +8716,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AgentRuntimeStatus"];
+                };
+            };
+        };
+    };
+    get_v1_ops_agents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AgentRegistry"];
                 };
             };
         };

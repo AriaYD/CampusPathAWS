@@ -159,6 +159,8 @@ class Persister:
         self.field_digests: dict[str, str] = {}
         self.last_saved_at: float | None = None
         self.saves = 0
+        self.last_error: str | None = None
+        self.restore_outcome: str | None = None
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
 
@@ -180,7 +182,9 @@ class Persister:
         while not self._stop.wait(self.interval):
             try:
                 self.tick()
-            except Exception:  # noqa: BLE001 —— 后台线程不许死，下一轮再试
+                self.last_error = None
+            except Exception as exc:  # noqa: BLE001 —— 后台线程不许死，下一轮再试
+                self.last_error = f"save: {type(exc).__name__}: {exc}"[:300]
                 log.exception("checkpoint save failed")
 
     def start(self) -> None:
@@ -219,9 +223,17 @@ def install(app: Any, deps: "Deps") -> Persister | None:
     backend = backend_from_env()
     if backend is None:
         return None
-    outcome = restore_from(deps, backend)
-    log.info("checkpoint %s: %s (%d fields)", backend.describe(), outcome.reason, outcome.fields)
     persister = Persister(deps, backend)
+    # 回读失败**不许**把整个 api 拖死（线上 rev 00020 就是这么启动即崩的）：
+    # 记下错误、继续用 seed 起，错误在 GET /v1/ops/agents 的 checkpoint.error 里如实可见。
+    try:
+        outcome = restore_from(deps, backend)
+        log.info("checkpoint %s: %s (%d fields)", backend.describe(), outcome.reason, outcome.fields)
+        persister.restore_outcome = outcome.reason
+    except Exception as exc:  # noqa: BLE001
+        log.exception("checkpoint restore failed; starting from seed")
+        persister.last_error = f"restore: {type(exc).__name__}: {exc}"[:300]
+        persister.restore_outcome = "failed"
     deps.checkpoint = persister
 
     @app.on_event("startup")

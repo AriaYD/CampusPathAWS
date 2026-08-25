@@ -1,0 +1,103 @@
+{
+  "$defs": {
+    "AgentId": {
+      "description": "6 个语义 Agent（Spec §8.1）。数量固定，新增需改 Spec。",
+      "enum": [
+        "A0",
+        "A1",
+        "A2",
+        "A3",
+        "A4",
+        "A5"
+      ],
+      "title": "AgentId",
+      "type": "string"
+    },
+    "DataDomain": {
+      "description": "Spec §13.2 的数据域。跨域传递必须经过显式的边界模型。",
+      "enum": [
+        "student_private",
+        "student_operational",
+        "calendar",
+        "wellbeing",
+        "academic",
+        "catalog_public",
+        "aggregated_insights"
+      ],
+      "title": "DataDomain",
+      "type": "string"
+    },
+    "RuntimeId": {
+      "description": "2 个 Runtime（Spec §8.1）。A4 独立部署是安全边界，不是性能优化。",
+      "enum": [
+        "student_path_runtime",
+        "opportunity_ops_runtime"
+      ],
+      "title": "RuntimeId",
+      "type": "string"
+    }
+  },
+  "$id": "https://campuspath.invalid/schema/AgentRegistryEntry.json",
+  "additionalProperties": false,
+  "description": "一个 Agent 的治理卡片。**从上面的治理表派生**，不手写，所以永远与白名单一致。",
+  "properties": {
+    "agent_engine_mirror": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Agent Engine Mirror"
+    },
+    "agent_id": {
+      "$ref": "#/components/schemas/AgentId"
+    },
+    "forbidden_tool_patterns": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Forbidden Tool Patterns",
+      "type": "array"
+    },
+    "makes_tradeoffs": {
+      "title": "Makes Tradeoffs",
+      "type": "boolean"
+    },
+    "role": {
+      "title": "Role",
+      "type": "string"
+    },
+    "runtime": {
+      "$ref": "#/components/schemas/RuntimeId"
+    },
+    "tool_whitelist": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Tool Whitelist",
+      "type": "array"
+    },
+    "write_domains": {
+      "items": {
+        "$ref": "#/components/schemas/DataDomain"
+      },
+      "title": "Write Domains",
+      "type": "array"
+    }
+  },
+  "required": [
+    "agent_id",
+    "runtime",
+    "role",
+    "makes_tradeoffs",
+    "tool_whitelist",
+    "forbidden_tool_patterns",
+    "write_domains"
+  ],
+  "title": "AgentRegistryEntry",
+  "type": "object"
+}

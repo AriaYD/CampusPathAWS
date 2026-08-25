@@ -16,7 +16,8 @@ COPY jobs jobs
 
 RUN pip install --no-cache-dir \
     "fastapi>=0.115" "uvicorn>=0.30" "pydantic>=2.7" \
-    "google-genai>=1.0" "google-auth>=2.30" "pypdf>=5.0" "google-cloud-firestore>=2.16"
+    "google-genai>=1.0" "google-auth>=2.30" "pypdf>=5.0" "google-cloud-firestore>=2.16" \
+    "opentelemetry-sdk>=1.30" "opentelemetry-exporter-gcp-trace>=1.9"
 
 ENV PYTHONPATH=/app/contracts:/app/seed:/app/agents:/app/services/api:/app/services/rules:/app/services/capacity:/app/services/wellbeing:/app/services/state:/app/services/action:/app/services/aggregation:/app/services/publishing:/app/services/monitor:/app/services/connector:/app/services/packs:/app/services/mock-campus
 ENV GOOGLE_GENAI_USE_VERTEXAI=TRUE

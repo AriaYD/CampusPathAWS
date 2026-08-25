@@ -1,6 +1,22 @@
 # CampusPath 架构文档
 
-> 版本对应：Spec **v4.1.35** · Plan V2 · 契约 **1.41.0** · Seed **1.12.0**（2026-08-24 main 同步）
+> 版本对应：Spec **v4.1.36** · Plan V2 · 契约 **1.42.0** · Seed **1.12.0**（2026-08-24 main 同步）
+>
+> 2026-08-24 可观测性 + Agent 注册表（Spec v4.1.36，契约 1.41.0→1.42.0，Hackathon P4）：
+> **① trace**——`campuspath_agents.telemetry.span()` 只依赖 opentelemetry-api（没配导出器即 no-op）；
+> 打点在四处：`VertexModel.generate/generate_grounded`（`gen_ai.*`：请求模型、响应 `model_version`、
+> 输入/输出/思考 token、purpose、thinking_level）、`ToolBelt.call`（含被白名单拦下的调用，
+> `campuspath.tool.accepted=false` 也留痕）、`run_repair_loop`（每轮一条子 span：上一轮违规数、
+> 本轮违规数；循环 span 记 `outcome=valid|exhausted`）、`OrchestratorAgent.route`
+> （`kind=deterministic_route`, `gen_ai.request.model=none`——"没调模型"也看得见）。
+> 属性只收标量且截断 200 字符，**prompt 原文永不进 trace**。api 层 `campuspath_api.telemetry`
+> 决定去向：`CAMPUSPATH_TRACE=gcp` → Cloud Trace（BatchSpanProcessor，不阻塞请求）/ `console` /
+> `memory`；每个 HTTP 请求一条根 span，模型/工具/修复循环挂在下面——Cloud Trace 里一次
+> 「起草规划」是一棵树。**② 注册表** `GET /v1/ops/agents`（`AgentRegistry`，仅机构角色）：
+> 六个 Agent 的运行时归属、工具白名单、禁止清单、写域**从 `contracts.agents` 治理表派生**
+> （测试逐项对拍，不手写）+ `ModelBackendStatus`（默认模型、最近响应的 `model_version`、
+> 代际门槛、location、vertex_only）+ `CheckpointStatus`（后端、保存次数、回读结果、最近错误）
+> + `TraceExportStatus`（导出器、已导出数、最近 25 条 span）。
 >
 > 2026-08-24 状态持久化（Spec v4.1.35，Hackathon P3）：**api 的可变状态不再随冷启动清零**。
 > 新增数据流 **Deps → 检查点 → Firestore**：`campuspath_api.persistence` 维护一份**穷举**
@@ -212,6 +228,7 @@ flowchart TB
         CATALOG["HKUST 真实公开数据<br/>课程目录 1534 门 · Engage 活动 · 5 专业培养要求"]
         SEED["Synthetic Seed 1.12.0<br/>12 学生 · 205 机会 · Gold Set"]
         FS["Firestore (default)<br/>检查点：MANIFEST 56 字段<br/>变了才写 · 冷启动回读 · 版本戳守门"]
+        CT["Cloud Trace（OpenTelemetry）<br/>gen_ai.* 模型 span · 工具 span<br/>修复循环逐轮 · A0 路由"]
     end
 
     SP --> LG --> RBAC
@@ -229,6 +246,7 @@ flowchart TB
     EP --> SEED
     EP -. "persistence.Persister 10s<br/>逐字段摘要 · batch" .-> FS
     FS -. "restore_from（stamp 匹配才回）" .-> EP
+    A1 & A2 & A3 & A4 & A5 -. "span（属性只收标量，无 prompt 原文）" .-> CT
     A4 -. "外部内容作 user-role 数据<br/>永不进 system prompt" .-> CON
 
     style CAP fill:#fff3e0,stroke:#e65100

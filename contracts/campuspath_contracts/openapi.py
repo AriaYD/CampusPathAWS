@@ -619,6 +619,13 @@ _INSTITUTION: tuple[Endpoint, ...] = (
     # （曾有的 POST /v1/ops/agent-runtime 一键启停已整体撤除——2026-08-04
     # 用户裁定：站点用户不得启停运行时，启停唯一通道是 infra/agent_engine.sh）
     Endpoint(
+        "GET", "/v1/ops/agents",
+        "Agent 注册表（P4，2026-08-24）：六个 Agent 的治理卡片（从治理表派生）+ 模型后端 + "
+        "检查点 + trace 导出状态；每项都是运行时实测",
+        "AgentRegistry",
+        roles=(ActorRole.CAREER_CENTER_ADMIN, ActorRole.SECURITY_ADMIN),
+    ),
+    Endpoint(
         "GET", "/v1/ops/sources",
         "官方信息源注册表（C，2026-08-02）：真实/合成源同表登记、is_real_fetch 如实区分",
         "RegisteredSource", roles=(ActorRole.CONNECTOR_ADMIN, ActorRole.CURATOR, ActorRole.CAREER_CENTER_ADMIN),

@@ -720,6 +720,111 @@
         "title": "AgentId",
         "type": "string"
       },
+      "AgentRegistry": {
+        "additionalProperties": false,
+        "description": "`GET /v1/ops/agents`：系统里有哪些 Agent、各能碰什么、跑在什么模型上、\n状态存在哪、trace 往哪去——一屏说清，且每一项都是实测而非文档抄录。",
+        "properties": {
+          "agents": {
+            "items": {
+              "$ref": "#/components/schemas/AgentRegistryEntry"
+            },
+            "title": "Agents",
+            "type": "array"
+          },
+          "checked_at": {
+            "format": "date-time",
+            "title": "Checked At",
+            "type": "string"
+          },
+          "checkpoint": {
+            "$ref": "#/components/schemas/CheckpointStatus"
+          },
+          "contracts_version": {
+            "title": "Contracts Version",
+            "type": "string"
+          },
+          "model_backend": {
+            "$ref": "#/components/schemas/ModelBackendStatus"
+          },
+          "trace": {
+            "$ref": "#/components/schemas/TraceExportStatus"
+          }
+        },
+        "required": [
+          "contracts_version",
+          "agents",
+          "model_backend",
+          "checkpoint",
+          "trace",
+          "checked_at"
+        ],
+        "title": "AgentRegistry",
+        "type": "object"
+      },
+      "AgentRegistryEntry": {
+        "additionalProperties": false,
+        "description": "一个 Agent 的治理卡片。**从上面的治理表派生**，不手写，所以永远与白名单一致。",
+        "properties": {
+          "agent_engine_mirror": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Agent Engine Mirror"
+          },
+          "agent_id": {
+            "$ref": "#/components/schemas/AgentId"
+          },
+          "forbidden_tool_patterns": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Forbidden Tool Patterns",
+            "type": "array"
+          },
+          "makes_tradeoffs": {
+            "title": "Makes Tradeoffs",
+            "type": "boolean"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/RuntimeId"
+          },
+          "tool_whitelist": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Tool Whitelist",
+            "type": "array"
+          },
+          "write_domains": {
+            "items": {
+              "$ref": "#/components/schemas/DataDomain"
+            },
+            "title": "Write Domains",
+            "type": "array"
+          }
+        },
+        "required": [
+          "agent_id",
+          "runtime",
+          "role",
+          "makes_tradeoffs",
+          "tool_whitelist",
+          "forbidden_tool_patterns",
+          "write_domains"
+        ],
+        "title": "AgentRegistryEntry",
+        "type": "object"
+      },
       "AgentRuntimeStatus": {
         "additionalProperties": false,
         "properties": {
@@ -1634,6 +1739,91 @@
           "attend_count"
         ],
         "title": "CheckinResult",
+        "type": "object"
+      },
+      "CheckpointStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Backend"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Error"
+          },
+          "fields": {
+            "default": 0,
+            "title": "Fields",
+            "type": "integer"
+          },
+          "last_saved_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Saved At"
+          },
+          "restore_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Restore Outcome"
+          },
+          "saves": {
+            "default": 0,
+            "title": "Saves",
+            "type": "integer"
+          },
+          "stamp": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Stamp"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "CheckpointStatus",
         "type": "object"
       },
       "ClarificationRequest": {
@@ -2979,6 +3169,20 @@
         ],
         "title": "DataCoverage",
         "type": "object"
+      },
+      "DataDomain": {
+        "description": "Spec §13.2 的数据域。跨域传递必须经过显式的边界模型。",
+        "enum": [
+          "student_private",
+          "student_operational",
+          "calendar",
+          "wellbeing",
+          "academic",
+          "catalog_public",
+          "aggregated_insights"
+        ],
+        "title": "DataDomain",
+        "type": "string"
       },
       "DataUncertainty": {
         "additionalProperties": false,
@@ -6298,6 +6502,59 @@
         "title": "Milestone",
         "type": "object"
       },
+      "ModelBackendStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "default_model": {
+            "title": "Default Model",
+            "type": "string"
+          },
+          "generation_floor": {
+            "title": "Generation Floor",
+            "type": "string"
+          },
+          "last_model_version": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Last Model Version"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Location"
+          },
+          "vertex_only": {
+            "title": "Vertex Only",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "available",
+          "default_model",
+          "generation_floor",
+          "vertex_only"
+        ],
+        "title": "ModelBackendStatus",
+        "type": "object"
+      },
       "ModerationDecision": {
         "additionalProperties": false,
         "description": "人工审核的一次决定。不可变——改判需新增一条记录。",
@@ -9554,6 +9811,63 @@
         "title": "RecalledMemory",
         "type": "object"
       },
+      "RecentSpan": {
+        "additionalProperties": false,
+        "properties": {
+          "attributes": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "boolean"
+                }
+              ]
+            },
+            "default": {},
+            "title": "Attributes",
+            "type": "object"
+          },
+          "duration_ms": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Duration Ms"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "status": {
+            "default": "",
+            "title": "Status",
+            "type": "string"
+          },
+          "trace_id": {
+            "title": "Trace Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "trace_id"
+        ],
+        "title": "RecentSpan",
+        "type": "object"
+      },
       "RecordSource": {
         "enum": [
           "sis",
@@ -10923,6 +11237,15 @@
         "title": "RuleCategory",
         "type": "string"
       },
+      "RuntimeId": {
+        "description": "2 个 Runtime（Spec §8.1）。A4 独立部署是安全边界，不是性能优化。",
+        "enum": [
+          "student_path_runtime",
+          "opportunity_ops_runtime"
+        ],
+        "title": "RuntimeId",
+        "type": "string"
+      },
       "ScheduleConflict": {
         "additionalProperties": false,
         "properties": {
@@ -12197,6 +12520,45 @@
         "title": "TimeRange",
         "type": "object"
       },
+      "TraceExportStatus": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "exporter": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Exporter"
+          },
+          "recent_spans": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/RecentSpan"
+            },
+            "title": "Recent Spans",
+            "type": "array"
+          },
+          "spans_exported": {
+            "default": 0,
+            "title": "Spans Exported",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "enabled"
+        ],
+        "title": "TraceExportStatus",
+        "type": "object"
+      },
       "Uncertainty": {
         "description": "字段级不确定性。``NEEDS_CONFIRMATION`` 永远不能被当成淘汰依据（Spec §16.2）。",
         "enum": [
@@ -13018,7 +13380,7 @@
   "info": {
     "description": "契约先行：本文档由 campuspath_contracts.openapi 生成，是实现必须满足的合同，不是从实现反推的文档。",
     "title": "CampusPath API",
-    "version": "1.41.0"
+    "version": "1.42.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -13834,6 +14196,28 @@
         "summary": "Demo 运行时状态（F1）：Vertex Agent Engine 是否在跑 + 启停任务进度",
         "x-allowed-roles": [
           "student",
+          "career_center_admin",
+          "security_admin"
+        ]
+      }
+    },
+    "/v1/ops/agents": {
+      "get": {
+        "operationId": "get_v1_ops_agents",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AgentRegistry"
+                }
+              }
+            },
+            "description": "OK"
+          }
+        },
+        "summary": "Agent 注册表（P4，2026-08-24）：六个 Agent 的治理卡片（从治理表派生）+ 模型后端 + 检查点 + trace 导出状态；每项都是运行时实测",
+        "x-allowed-roles": [
           "career_center_admin",
           "security_admin"
         ]

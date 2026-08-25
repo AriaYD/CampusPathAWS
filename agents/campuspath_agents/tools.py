@@ -19,6 +19,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Any, Callable
 
+from .telemetry import span
+
 from campuspath_contracts.agents import (
     AGENT_TOOL_WHITELIST,
     FORBIDDEN_TOOL_PATTERNS,
@@ -64,21 +66,30 @@ class ToolBelt:
         return tuple(self._log)
 
     def call(self, name: str, /, **kwargs: Any) -> Any:
-        """调用一个工具。**每次都重新查白名单**，不信任注册时的判断。"""
-        try:
-            assert_tool_allowed(self.agent, name)
-        except ToolPermissionError as exc:
-            self._log.append(ToolCall(self.agent, name, False, str(exc)))
-            raise
-        fn = self._tools.get(name)
-        if fn is None:
-            self._log.append(ToolCall(self.agent, name, False, "工具未注册"))
-            raise ToolPermissionError(
-                f"{self.agent.value} 没有装备工具 {name!r}；"
-                f"已装备：{sorted(self._tools)}"
-            )
-        self._log.append(ToolCall(self.agent, name, True))
-        return fn(**kwargs)
+        """调用一个工具。**每次都重新查白名单**，不信任注册时的判断。
+
+        每次调用一条 span（含被拒的）：Cloud Trace 里"A4 试图 publish 被白名单拦下"
+        和"A5 调 validate_constraints 三次"同样看得见。
+        """
+        with span("agent.tool", **{"campuspath.agent": self.agent.value,
+                                   "gen_ai.tool.name": name}) as current:
+            try:
+                assert_tool_allowed(self.agent, name)
+            except ToolPermissionError as exc:
+                self._log.append(ToolCall(self.agent, name, False, str(exc)))
+                current.set_attribute("campuspath.tool.accepted", False)
+                raise
+            fn = self._tools.get(name)
+            if fn is None:
+                self._log.append(ToolCall(self.agent, name, False, "工具未注册"))
+                current.set_attribute("campuspath.tool.accepted", False)
+                raise ToolPermissionError(
+                    f"{self.agent.value} 没有装备工具 {name!r}；"
+                    f"已装备：{sorted(self._tools)}"
+                )
+            self._log.append(ToolCall(self.agent, name, True))
+            current.set_attribute("campuspath.tool.accepted", True)
+            return fn(**kwargs)
 
 
 def belt_for(agent: AgentId, tools: dict[str, Callable[..., Any]]) -> ToolBelt:

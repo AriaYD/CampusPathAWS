@@ -94,7 +94,13 @@ from campuspath_contracts.opportunity import (
     SourceIngestRequest,
 )
 from campuspath_contracts.agents import (
+    AgentRegistry,
+    AgentRegistryEntry,
     AgentRuntimeStatus,
+    CheckpointStatus,
+    ModelBackendStatus,
+    RecentSpan,
+    TraceExportStatus,
     IntentId,
     WorkflowPlan,
 )
@@ -4032,6 +4038,83 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             threading.Thread(target=_revalidate, daemon=True).start()
         return cached.model_copy(update={"checked_at": now})
 
+    @implements("GET", "/ops/agents", response_model=AgentRegistry)
+    def agent_registry() -> AgentRegistry:
+        """P4（2026-08-24）：注册表从契约治理表**派生**，模型/检查点/trace 三项是运行时实测。"""
+        from campuspath_agents.model import DEFAULT_MODEL, MIN_GEMINI_GENERATION, resolve_model
+        from campuspath_agents.vertex import check_environment
+        from campuspath_contracts.agents import (
+            AGENT_RUNTIME, AGENT_TOOL_WHITELIST, AGENT_WRITE_DOMAINS, FORBIDDEN_TOOL_PATTERNS,
+        )
+
+        roles = {
+            AgentId.A0_ORCHESTRATOR: "Orchestrator: deterministic routing table first, LLM composes only unknown intents",
+            AgentId.A1_STUDENT_CONTEXT: "Student context: résumé/reflection extraction → always a pending proposal (B3)",
+            AgentId.A2_ACADEMIC: "Academic: facts and candidate courses only",
+            AgentId.A3_GOAL_GAP: "Goal-gap: role packs + live grounded research, fork points",
+            AgentId.A4_OPPORTUNITY: "Opportunity scout: untrusted external text → draft only, two-tool whitelist",
+            AgentId.A5_PATHWAY: "Pathway: the only agent that makes trade-offs; every item carries a validation_id",
+        }
+        mirrors = {AgentId.A0_ORCHESTRATOR: "campuspath-orchestrator",
+                   AgentId.A4_OPPORTUNITY: "campuspath-opportunity-scout"}
+        entries = tuple(
+            AgentRegistryEntry(
+                agent_id=agent, runtime=AGENT_RUNTIME[agent], role=roles[agent],
+                makes_tradeoffs=agent is AgentId.A5_PATHWAY,
+                tool_whitelist=tuple(sorted(AGENT_TOOL_WHITELIST[agent])),
+                forbidden_tool_patterns=tuple(sorted(FORBIDDEN_TOOL_PATTERNS[agent])),
+                write_domains=tuple(sorted(AGENT_WRITE_DOMAINS[agent], key=lambda d: d.value)),
+                agent_engine_mirror=mirrors.get(agent),
+            )
+            for agent in AgentId
+        )
+        try:
+            default_model = resolve_model()
+        except Exception:  # noqa: BLE001 —— 环境覆盖了一个不合格的型号，也如实报默认值
+            default_model = DEFAULT_MODEL
+        model_backend = ModelBackendStatus(
+            available=deps.model is not None,
+            default_model=getattr(deps.model, "model", None) or default_model,
+            last_model_version=getattr(deps.model, "last_model_version", None),
+            generation_floor=".".join(str(x) for x in MIN_GEMINI_GENERATION),
+            location=os.environ.get("GOOGLE_CLOUD_LOCATION") or None,
+            vertex_only=not check_environment() if deps.model is not None else
+            os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in {"1", "true", "yes", "on"},
+        )
+        persister = getattr(deps, "checkpoint", None)
+        if persister is None:
+            checkpoint = CheckpointStatus(enabled=False)
+        else:
+            from . import persistence as _p
+
+            checkpoint = CheckpointStatus(
+                enabled=True, backend=persister.backend.describe(), stamp=_p.stamp(),
+                saves=persister.saves,
+                last_saved_at=datetime.fromtimestamp(persister.last_saved_at, tz=timezone.utc)
+                if persister.last_saved_at else None,
+                fields=len(_p.MANIFEST), restore_outcome=persister.restore_outcome,
+                error=persister.last_error,
+            )
+        trace_status = getattr(app.state, "trace", None)
+        if trace_status is None:
+            trace = TraceExportStatus(enabled=False)
+        else:
+            rows = trace_status.recent.rows()[:25] if trace_status.recent else []
+            trace = TraceExportStatus(
+                enabled=True, exporter=trace_status.exporter,
+                spans_exported=trace_status.recent.exported if trace_status.recent else 0,
+                recent_spans=tuple(RecentSpan(
+                    name=r["name"], trace_id=r["trace_id"], duration_ms=r["duration_ms"],
+                    status=r["status"],
+                    attributes={k: v for k, v in r["attributes"].items()
+                                if isinstance(v, (str, int, float, bool))},
+                ) for r in rows),
+            )
+        return AgentRegistry(
+            contracts_version=CONTRACTS_VERSION, agents=entries, model_backend=model_backend,
+            checkpoint=checkpoint, trace=trace, checked_at=datetime.now(timezone.utc),
+        )
+
     # （POST /ops/agent-runtime 一键启停已整体撤除——2026-08-04 用户
     # 裁定：站点用户不得启停运行时；启停唯一通道 infra/agent_engine.sh。
     # GET 状态探测与顶栏状态灯保留。）
@@ -6604,7 +6687,9 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     # P3（2026-08-24）：检查点。未设 CAMPUSPATH_CHECKPOINT 即 no-op（测试与本地默认），
     # 线上 Cloud Run 设 firestore——冷启动回读、后台按需写，见 persistence.py。
     from . import persistence as _persistence
+    from . import telemetry as _telemetry
 
+    _telemetry.install(app)          # P4：未设 CAMPUSPATH_TRACE 即 no-op
     _persistence.install(app, deps)
     return app
 

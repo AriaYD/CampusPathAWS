@@ -73,6 +73,7 @@ from campuspath_contracts.reflection import (
     QualityDimension,
 )
 
+from .telemetry import span
 from .model import ModelClient, ModelRequest
 from .tools import ToolBelt
 from .vertex import assert_vertex_only
@@ -812,6 +813,10 @@ class OrchestratorAgent(AgentBase):
     def route(self, student_id: str, intent: IntentId, *, plan_id: str,
               now: datetime) -> WorkflowPlan:
         """确定性路由。**不调用模型**——路由表命中就直接出计划。"""
+        with span("agent.route", **{"campuspath.agent": "A0", "campuspath.intent": intent.value,
+                                    "campuspath.kind": "deterministic_route",
+                                    "gen_ai.request.model": "none"}):
+            pass                      # 路由本身是查表；留一条 span 让 trace 里看得见"没调模型"
         agents = self.ROUTES[intent]
         calls = tuple(
             AgentCall(

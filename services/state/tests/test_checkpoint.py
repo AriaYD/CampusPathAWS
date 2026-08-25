@@ -149,3 +149,38 @@ def test_file_checkpoint_survives_partial_write(tmp_path):
     backend.save("s", {"a": "1"})
     (tmp_path / "ckpt.json.tmp").write_text("{garbage")
     assert backend.load() == ("s", {"a": "1"})
+
+
+def test_firestore_client_kwargs_omit_the_default_database():
+    """显式 database="(default)" 会被客户端 URL 编码成 %28default%29（线上 400）。"""
+    from campuspath_state.checkpoint import FirestoreCheckpoint
+
+    captured = {}
+
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured.update(kwargs)
+
+        def collection(self, name):
+            return name
+
+    import sys, types
+    fake = types.ModuleType("google.cloud.firestore"); fake.Client = FakeClient
+    saved = sys.modules.get("google.cloud.firestore")
+    sys.modules["google.cloud.firestore"] = fake
+    try:
+        import google.cloud
+        original = getattr(google.cloud, "firestore", None)
+        google.cloud.firestore = fake
+        FirestoreCheckpoint(project="p")._col()
+        assert captured == {"project": "p"}
+        captured.clear()
+        FirestoreCheckpoint(project="p", database="named")._col()
+        assert captured == {"project": "p", "database": "named"}
+    finally:
+        if saved is not None:
+            sys.modules["google.cloud.firestore"] = saved
+        else:
+            sys.modules.pop("google.cloud.firestore", None)
+        if original is not None:
+            google.cloud.firestore = original

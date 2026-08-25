@@ -20,6 +20,8 @@ from __future__ import annotations
 import dataclasses
 from typing import Callable, Generic, Iterable, Sequence, TypeVar
 
+from .telemetry import span
+
 from campuspath_contracts.academic import CoursePlanVariant
 
 T = TypeVar("T")
@@ -92,12 +94,18 @@ def run_repair_loop(
     """
     reasons: tuple[str, ...] = ()
     candidate: T | None = None
-    for attempt in range(1, max_iterations + 1):
-        candidate = generate(reasons)
-        violations = tuple(validate(candidate))
-        if not violations:
-            return candidate, attempt
-        reasons = violations
+    with span("agent.repair_loop", **{"campuspath.max_iterations": max_iterations}) as loop:
+        for attempt in range(1, max_iterations + 1):
+            with span("agent.repair_attempt", **{"campuspath.attempt": attempt,
+                                                 "campuspath.prior_violations": len(reasons)}) as step:
+                candidate = generate(reasons)
+                violations = tuple(validate(candidate))
+                step.set_attribute("campuspath.violations", len(violations))
+            if not violations:
+                loop.set_attributes({"campuspath.iterations": attempt, "campuspath.outcome": "valid"})
+                return candidate, attempt
+            reasons = violations
+        loop.set_attributes({"campuspath.iterations": max_iterations, "campuspath.outcome": "exhausted"})
     raise ConstraintRepairFailed(max_iterations, reasons)
 
 
