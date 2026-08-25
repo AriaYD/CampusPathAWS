@@ -5,7 +5,7 @@ HKUST Google 黑客松参赛项目（命题：Gemini Enterprise for Higher Educa
 一个由 Gemini Enterprise 驱动的动态校园成长路径 Agent 系统：持续整合校内外可信资源与学生真实反馈，把学生想成为的人动态倒推成当下可执行、并随变化实时校准的校园成长路径。
 
 - MVP Study Case：Undergraduate → Direct Employment
-- 架构：6 语义 Agent（A0–A5）/ 9 个确定性服务，双平面 + 契约先行（详见 [ARCHITECTURE.md](ARCHITECTURE.md)）
+- 架构：6 语义 Agent（A0–A5）/ 9 个确定性服务，双平面 + 契约先行（详见 [ARCHITECTURE.md](ARCHITECTURE.md)）；模型 **Gemini 3.5 Flash via Vertex AI（global 端点，代际门槛 ≥3.5 在构造时检查）**，google-genai + ADK（Agent Engine 镜像）
 - 功能基线：F01–F27（零删减）
 - 交付形态：Web App（学生 / 校方双门户，简/繁/英三语；桌面 + 移动端，PWA 建设中）
 
@@ -157,7 +157,7 @@ make check                      # preflight + 契约/Seed 一致性 + 全量测�
 - **Agent 运行时 ×2**：Vertex AI Agent Engine（us-central1），`bash infra/agent_engine.sh status|query|delete`；
   顶栏**状态灯**实时显示（绿=运行中计费——云端探测走 Vertex REST 回退，2026-08-03 起线上可见）；**控制按钮已撤除（2026-08-04 用户裁定：站点用户不得启停运行时）**，启停只走 infra/agent_engine.sh
 - 缩容到零，闲置近乎零成本；Agent Engine 按小时计费（约 HK$50–100/天量级，实测以账单为准），用完 delete。
-- 重新发布：仓库根 `gcloud run deploy campuspath-api --source .`（Dockerfile 现含 `jobs/`，Job 镜像同源需一并 `gcloud run jobs deploy`）；`apps/web` 下先 `rm -rf .contracts-generated && cp -r ../../contracts/generated .contracts-generated`（**必须先 rm**——目录已存在时 cp -r 会拷成嵌套子目录，云构建吃到旧类型）再 `gcloud run deploy campuspath-web --source .`。
+- 重新发布：仓库根 `gcloud run deploy campuspath-api --source . --region asia-east2 --update-env-vars GOOGLE_CLOUD_LOCATION=global`（**2026-08-24 起模型走 `global` 端点**，`gemini-3.5-flash` 在 us-central1 是 404）（Dockerfile 现含 `jobs/`，Job 镜像同源需一并 `gcloud run jobs deploy`）；`apps/web` 下先 `rm -rf .contracts-generated && cp -r ../../contracts/generated .contracts-generated`（**必须先 rm**——目录已存在时 cp -r 会拷成嵌套子目录，云构建吃到旧类型）再 `gcloud run deploy campuspath-web --source .`。
   **契约变更的发布次序按变更方向定**（1.32.0 审查裁定）：
   ① 新增**响应**字段/枚举值（api 说新话）→ 先发 web 后发 api（旧前端读新值会渲染误导性 UI；新前端对旧 api 有 `?? []` 守卫）；
   ② 新增**请求体**字段/枚举值（前端说新话，如 ProposedChange.entity_type 扩容）→ **先发 api 后发 web**（旧 api 收到新枚举直接 422）。

@@ -11,6 +11,16 @@
 """
 
 from google.adk.agents import Agent
+from google.adk.models import Gemini
+
+#: 与本地 ``campuspath_agents.model.DEFAULT_MODEL`` 同值（``test_model_generation``
+#: 断言两边都 ≥ 3.5）。镜像独立打包，不能 import 本仓，所以这里是第二份。
+MODEL_ID = "gemini-3.5-flash"
+
+#: ``gemini-3.5-flash`` 只在 Vertex 的 ``global`` 端点可用；Agent Engine 运行时
+#: 自己落在 us-central1，若沿用运行时区域模型调用直接 404。
+#: 所以模型客户端的 location 在这里钉死，不随运行时走。
+MODEL = Gemini(model=MODEL_ID, client_kwargs={"vertexai": True, "location": "global"})
 
 #: 与 roster.OrchestratorAgent.ROUTES 逐项一致（有 CI 断言守着）。
 #: 已知意图 → 确定性路由，**不调模型**；只有未命中才由 LLM 编排。
@@ -63,7 +73,7 @@ def route_intent(intent: str) -> dict:
 
 root_agent = Agent(
     name="campuspath_orchestrator",
-    model="gemini-2.5-flash",
+    model=MODEL,
     description="CampusPath A0：意图路由编排器（确定性路由表优先，模型只做兜底）",
     instruction=(
         "你是 CampusPath 的 A0 Orchestrator。收到学生请求时：\n"

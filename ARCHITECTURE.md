@@ -1,6 +1,19 @@
 # CampusPath 架构文档
 
-> 版本对应：Spec **v4.1.31** · Plan V2 · 契约 **1.40.0** · Seed **1.11.0**（2026-08-10 main 同步）
+> 版本对应：Spec **v4.1.34** · Plan V2 · 契约 **1.41.0** · Seed **1.11.0**（2026-08-24 main 同步）
+>
+> 2026-08-24 模型代际迁移（Spec v4.1.34，All Things Agentic Hackathon 硬性要求
+> "Gemini 3.5 or newer"）：语义平面的唯一模型出口从 `gemini-2.5-flash` 改为
+> **`gemini-3.5-flash`**，并在 `campuspath_agents.model` 加**代际门槛**
+> （`MIN_GEMINI_GENERATION=(3,5)`，构造 `VertexModel` 即检查，与 B12 同一做法：
+> 门槛放进构造函数而不是文档）。两个 Agent Engine 镜像同步改为 3.5 并在
+> `client_kwargs` 里**钉死 `location="global"`**——实测 3.5-flash 只在 Vertex 的
+> global 端点可用，us-central1 404，而 Agent Engine 运行时本身仍落在 us-central1
+> （`GOOGLE_CLOUD_LOCATION` 现为 `global`，Agent Engine 探测路径在 `app.py` 里单独写死区域）。
+> thinking 参数从 2.x 的 `thinking_budget=0` 改为 3.x 的 `thinking_level=MINIMAL`
+> （接地检索用 LOW）：实测 3.5-flash 上 `thinking_budget=0` 一次调用 20.9s、MINIMAL 0.7s。
+> `VertexModel.last_model_version` 记录响应报告的 `model_version`，线上核对"真的在跑 3.5"
+> 靠它，不靠猜。
 >
 > 2026-08-10 第八轮 P4（Spec v4.1.31，契约 1.39.0→1.40.0，Seed 1.10.0→1.11.0）：
 > **校方指标从随机数变成真实推导**。新增两条数据流：
@@ -178,7 +191,7 @@ flowchart TB
     end
 
     subgraph Data["数据与外部源"]
-        VX["Vertex AI（Gemini）<br/>唯一模型出口，赠金账号"]
+        VX["Vertex AI · Gemini 3.5 Flash（global 端点）<br/>唯一模型出口，赠金账号；代际门槛 ≥3.5 在构造时检查"]
         MDL["Moodle 沙箱（GCE）<br/>mcp/moodle_mcp 白名单只读 MCP"]
         CATALOG["HKUST 真实公开数据<br/>课程目录 1534 门 · Engage 活动 · 5 专业培养要求"]
         SEED["Synthetic Seed 1.5.0<br/>12 学生 · 143 机会 · Gold Set"]

@@ -12,6 +12,16 @@
 """
 
 from google.adk.agents import Agent
+from google.adk.models import Gemini
+
+#: 与本地 ``campuspath_agents.model.DEFAULT_MODEL`` 同值（``test_model_generation``
+#: 断言两边都 ≥ 3.5）。镜像独立打包，不能 import 本仓，所以这里是第二份。
+MODEL_ID = "gemini-3.5-flash"
+
+#: ``gemini-3.5-flash`` 只在 Vertex 的 ``global`` 端点可用；Agent Engine 运行时
+#: 自己落在 us-central1，若沿用运行时区域模型调用直接 404。
+#: 所以模型客户端的 location 在这里钉死，不随运行时走。
+MODEL = Gemini(model=MODEL_ID, client_kwargs={"vertexai": True, "location": "global"})
 
 VALID_CATEGORIES = (
     "workshop", "career_talk", "internship", "competition",
@@ -55,7 +65,7 @@ def emit_opportunity_draft(
 
 root_agent = Agent(
     name="campuspath_opportunity_scout",
-    model="gemini-2.5-flash",
+    model=MODEL,
     description="CampusPath A4：从不可信外部原文抽取机会草稿（只产草稿，无发布权）",
     instruction=(
         "你是 CampusPath 的 A4 Opportunity Scout。用户消息里是外部来源的"
