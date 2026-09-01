@@ -12,7 +12,7 @@ Stack: **Gemini 3.5 Flash on Vertex AI** · **Google GenAI SDK + ADK** · **Clou
 | Live demo | https://campuspath-web-786160486093.asia-east2.run.app (passcode is printed on the public landing page: `/landing`) |
 | API (OpenAPI) | https://campuspath-api-786160486093.asia-east2.run.app/docs |
 | Architecture | [`docs/hackathon/architecture.svg`](docs/hackathon/architecture.svg) · full text in [`ARCHITECTURE.md`](ARCHITECTURE.md) |
-| Demo video | *(link added on submission)* |
+| Demo video | 4:00 English cut with captions — `docs/hackathon/demo-video-v2.md` (storyboard, verification, `.srt`); YouTube link added on upload |
 | Data | **All student, calendar, opportunity and publisher data is synthetic.** Course catalog and degree requirements are scraped from HKUST's public catalog. UI shows a `Synthetic / Demo Data` badge. |
 
 ---

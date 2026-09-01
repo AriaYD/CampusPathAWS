@@ -888,7 +888,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <div class="cards">
           <article class="card">
             <h3>Google 生态里的位置</h3>
-            <p>模型只有一个出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代际下限在构造时检查）；编排与抽取两个 Agent 另以 ADK 镜像跑在 Vertex AI Agent Engine；Cloud Run 跑学生 App、API 与每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 <strong>Firestore</strong>、冷启动回读；每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 <strong>Cloud Trace</strong>；Moodle 沙箱通过自研<strong>只读 MCP</strong> 接入；密钥在 Secret Manager。</p>
+            <p>模型只有一个出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代际下限在构造时检查）；编排与抽取两个 Agent 另有 ADK 镜像，可按需部署到 Vertex AI Agent Engine（演示间隙关停省额度）；Cloud Run 跑学生 App、API 与每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 <strong>Firestore</strong>、冷启动回读；每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 <strong>Cloud Trace</strong>；Moodle 沙箱通过自研<strong>只读 MCP</strong> 接入；密钥在 Secret Manager。</p>
           </article>
           <article class="card">
             <h3>模型可以换（架构承诺）</h3>
@@ -1542,7 +1542,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <div class="cards">
           <article class="card">
             <h3>Google 生態裏的位置</h3>
-            <p>模型只有一個出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代際下限在構造時檢查）；編排與抽取兩個 Agent 另以 ADK 鏡像跑在 Vertex AI Agent Engine；Cloud Run 跑學生 App、API 與每日巡檢的 Cloud Run Job（Cloud Scheduler 觸發）；全部可變狀態檢查點到 <strong>Firestore</strong>、冷啓動回讀；每次模型調用、工具調用、修復循環都是一條 OpenTelemetry span 進 <strong>Cloud Trace</strong>；Moodle 沙箱通過自研<strong>只讀 MCP</strong> 接入；密鑰在 Secret Manager。</p>
+            <p>模型只有一個出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代際下限在構造時檢查）；編排與抽取兩個 Agent 另有 ADK 鏡像，可按需部署到 Vertex AI Agent Engine（演示間隙關停省額度）；Cloud Run 跑學生 App、API 與每日巡檢的 Cloud Run Job（Cloud Scheduler 觸發）；全部可變狀態檢查點到 <strong>Firestore</strong>、冷啓動回讀；每次模型調用、工具調用、修復循環都是一條 OpenTelemetry span 進 <strong>Cloud Trace</strong>；Moodle 沙箱通過自研<strong>只讀 MCP</strong> 接入；密鑰在 Secret Manager。</p>
           </article>
           <article class="card">
             <h3>模型可以換（架構承諾）</h3>
@@ -2196,7 +2196,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <div class="cards">
           <article class="card">
             <h3>Where it sits in Google's stack</h3>
-            <p>One model exit: <strong>Gemini 3.5 Flash via Vertex AI</strong> (GenAI SDK, with the generation floor asserted at construction). The orchestration and extraction agents also run as ADK mirrors on Vertex AI Agent Engine; Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); all mutable state is checkpointed to <strong>Firestore</strong> and restored on cold start; every model call, tool call and repair round is an OpenTelemetry span in <strong>Cloud Trace</strong>; the Moodle sandbox connects through a <strong>read-only MCP</strong> we built; secrets live in Secret Manager.</p>
+            <p>One model exit: <strong>Gemini 3.5 Flash via Vertex AI</strong> (GenAI SDK, with the generation floor asserted at construction). The orchestration and extraction agents also ship as ADK mirrors for Vertex AI Agent Engine, deployed on demand and switched off between demos; Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); all mutable state is checkpointed to <strong>Firestore</strong> and restored on cold start; every model call, tool call and repair round is an OpenTelemetry span in <strong>Cloud Trace</strong>; the Moodle sandbox connects through a <strong>read-only MCP</strong> we built; secrets live in Secret Manager.</p>
           </article>
           <article class="card">
             <h3>The model is replaceable (an architectural commitment)</h3>

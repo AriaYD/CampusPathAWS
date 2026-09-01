@@ -406,7 +406,7 @@ export const zhHans = {
           title: "Google 生态里的位置",
           body:
             "模型只有一个出口：**Gemini 3.5 Flash via Vertex AI**（GenAI SDK，代际下限在构造时检查）；" +
-            "编排与抽取两个 Agent 另以 ADK 镜像跑在 Vertex AI Agent Engine；Cloud Run 跑学生 App、API 与" +
+            "编排与抽取两个 Agent 另有 ADK 镜像，可按需部署到 Vertex AI Agent Engine（演示间隙关停省额度）；Cloud Run 跑学生 App、API 与" +
             "每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 **Firestore**、冷启动回读；" +
             "每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 **Cloud Trace**；" +
             "Moodle 沙箱通过自研**只读 MCP** 接入；密钥在 Secret Manager。",
@@ -920,7 +920,7 @@ export const en = {
           title: "Where it sits in Google's stack",
           body:
             "One model exit: **Gemini 3.5 Flash via Vertex AI** (GenAI SDK, with the generation floor asserted at " +
-            "construction). The orchestration and extraction agents also run as ADK mirrors on Vertex AI Agent Engine; " +
+            "construction). The orchestration and extraction agents also ship as ADK mirrors for Vertex AI Agent Engine, deployed on demand and switched off between demos; " +
             "Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); " +
             "all mutable state is checkpointed to **Firestore** and restored on cold start; every model call, tool " +
             "call and repair round is an OpenTelemetry span in **Cloud Trace**; the Moodle sandbox connects through a " +
