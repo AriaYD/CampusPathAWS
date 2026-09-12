@@ -55,7 +55,7 @@ help:
 setup:
 	uv venv --python 3.12 .venv
 	uv pip install --python $(PY) -e "$(CONTRACTS)[dev]" -e "$(SEED)[dev]" \
-		$(foreach s,$(SERVICES),-e "services/$(s)[dev]") -e "eval[dev]"
+		$(foreach s,$(SERVICES),-e "services/$(s)[dev]") -e "agents[dev]" -e "eval[dev]"
 
 # D6 的验收合同：一条命令产出机器判定的 PASS / FAIL。
 # 退出码分级——任何 BLOCKER 未通过就非零，仅 TARGET 未达标退出 0 但报告标红。
