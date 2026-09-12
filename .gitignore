@@ -75,3 +75,13 @@ seed/raw/hkust_programs/_cache/
 # AWS 控制台下载的访问密钥 CSV（绝不入库）
 *accessKeys*.csv
 *_accessKeys.csv
+
+# AgentCore CodeZip 的构建目录：语义平面的源码由 scripts/agentcore_stage.sh
+# rsync 进来（源头在 contracts/ 、agents/ 、services/ ）。
+# vendored 的副本是**产物不是源码**——入库会让同一段代码有两份、并且迟早分叉。
+infra/agentcore/app/campuspath/campuspath_*/
+infra/agentcore/app/campuspath/campuspath_cloud/
+infra/agentcore/app/campuspath/.venv/
+infra/agentcore/agentcore/.cli/
+infra/agentcore/agentcore/.env.local
+infra/agentcore/agentcore/cdk/cdk.out/

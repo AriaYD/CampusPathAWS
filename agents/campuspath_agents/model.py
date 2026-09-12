@@ -131,7 +131,9 @@ class ModelRequest:
     def prompt(self) -> str:
         """数据块作为 user-role 内容，带边界标记（§8.9.1 第 1 条）。"""
         if not self.data:
-            return "按 system 指令处理。没有附加数据块。"
+            # 实测（2026-09-12，Nova Pro）：写成「按 system 指令处理。没有附加数据块。」
+            # 模型会把"系统"当话题闲聊；下面这句 0.6 s 内按指令作答。
+            return "按 system 指令执行，只输出要求的内容，不要解释。"
         parts = []
         for index, block in enumerate(self.data, start=1):
             parts.append(
@@ -341,12 +343,18 @@ class VertexModel(StrandsModelClient):
         return response.text or ""
 
 
-def autodetect_model(env: dict[str, str] | None = None) -> StrandsModelClient | None:
+def autodetect_model(env: dict[str, str] | None = None) -> Any | None:
     """环境允许就接真模型，否则返回 None（依赖它的端点照旧 503）。
 
     构造失败被吞掉是**故意**的：它意味着"没有可用后端"，不是"出错了"。
     Bedrock：先看 AWS 凭据链有没有东西——没有就不构造，避免每个请求
     都去撞 IMDS 超时。
+
+    ``CAMPUSPATH_AGENT_RUNTIME=agentcore`` 时语义平面不在本进程里跑，
+    返回 :class:`~.agentcore_client.AgentCoreModelClient`（同一套表面，
+    调用经 ``invoke_agent_runtime`` 出境）。**选了 agentcore 却没给
+    ``AGENTCORE_RUNTIME_ARN`` 就返回 None，不退回本地 Bedrock**——
+    否则"语义平面跑在 AgentCore 上"会变成看运气的事。
     """
     env = os.environ if env is None else env
     try:
@@ -360,6 +368,18 @@ def autodetect_model(env: dict[str, str] | None = None) -> StrandsModelClient | 
             session = boto3.Session(region_name=env.get("AWS_REGION") or None)
             if session.get_credentials() is None:
                 return None
+            from .agentcore_client import (  # noqa: PLC0415  —— 反向依赖，惰性
+                RUNTIME_ARN_ENV,
+                AgentCoreModelClient,
+                agentcore_selected,
+            )
+
+            if agentcore_selected(env):
+                arn = (env.get(RUNTIME_ARN_ENV) or "").strip()
+                if not arn:
+                    return None
+                return AgentCoreModelClient(arn, region=env.get("AWS_REGION") or None,
+                                            env=env)
             return BedrockModelClient()
         return VertexModel()
     except Exception:

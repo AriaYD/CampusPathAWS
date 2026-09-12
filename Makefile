@@ -41,6 +41,8 @@ help:
 	@echo ""
 	@echo "  make mock-campus      本地起 Mock Campus REST（:8080）"
 	@echo "  make llm-free         全部确定性服务的零 LLM 扫描（B11/B12）"
+	@echo "  make agentcore-stage  把语义平面 rsync 进 AgentCore 打包目录并自检"
+	@echo "  make agentcore-deploy 打印部署命令（不自动部署：要花钱、要建资源）"
 	@echo "  make harness-selftest 验证 make 在测试失败时真的会非零退出"
 	@echo "  make check            上述全部 + llm-free + harness-selftest"
 	@echo "  make eval             D6 验收：13 BLOCKER + 12 TARGET，机器判定"
@@ -125,6 +127,33 @@ llm-free:
 			rc=1; printf '\033[31mFAILED\033[0m\n'; printf '%s\n' "$$out" | tail -25; \
 		fi; \
 	done; exit $$rc
+
+# ── Bedrock AgentCore Runtime（P3：语义平面上云）────────────────────
+#
+# AgentCore 的 CodeZip 构建打包 `infra/agentcore/app/campuspath/` 整个目录，
+# 所以五个 campuspath_* 包要先 rsync 进去（产物，.gitignore 排除）。
+# stage 之后**立刻**在那份打包目录里跑一次真调用——"复制完了"不等于
+# "那份代码自己站得住"，这两件事差一个缺失的包。
+
+.PHONY: agentcore-stage
+agentcore-stage:
+	@bash scripts/agentcore_stage.sh
+	@cd infra/agentcore/app/campuspath && \
+		PYTHONPATH=. ../../../../$(PY) - < ../../verify_staged.py
+
+# 部署要花真钱、要建真资源，所以这条**只打印命令**，不替人按下去。
+# `agentcore deploy --dry-run` 只预览（不建资源），可以随便跑。
+.PHONY: agentcore-deploy
+agentcore-deploy: agentcore-stage
+	@echo ""
+	@echo "打包目录已就位且自检通过。部署要在 infra/agentcore 里手动跑："
+	@echo ""
+	@echo "  cd infra/agentcore && AWS_PROFILE=campuspath AWS_REGION=us-east-1 agentcore deploy --dry-run"
+	@echo "  cd infra/agentcore && AWS_PROFILE=campuspath AWS_REGION=us-east-1 agentcore deploy"
+	@echo ""
+	@echo "部署后把返回的 Runtime ARN 写进 API 侧环境："
+	@echo "  CAMPUSPATH_AGENT_RUNTIME=agentcore   AGENTCORE_RUNTIME_ARN=arn:aws:bedrock-agentcore:..."
+	@echo "（ARN 缺席时 autodetect_model() 返回 None，依赖模型的端点照旧 503，不会退回本地 Bedrock）"
 
 .PHONY: contracts
 contracts:

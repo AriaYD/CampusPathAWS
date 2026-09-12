@@ -1,0 +1,36 @@
+{
+  "$schema": "https://schema.agentcore.aws.dev/v1/agentcore.json",
+  "name": "campuspath",
+  "version": 1,
+  "managedBy": "CDK",
+  "tags": {
+    "agentcore:project-name": "campuspath",
+    "campuspath:plane": "semantic"
+  },
+  "runtimes": [
+    {
+      "name": "campuspath_semantic",
+      "description": "CampusPath semantic plane (A0-A5) on Strands Agents; Cloud Run only sends ModelRequest payloads",
+      "build": "CodeZip",
+      "entrypoint": "main.py",
+      "codeLocation": "app/campuspath/",
+      "runtimeVersion": "PYTHON_3_14",
+      "networkMode": "PUBLIC",
+      "protocol": "HTTP",
+      "instrumentation": { "enableOtel": true }
+    }
+  ],
+  "memories": [],
+  "knowledgeBases": [],
+  "credentials": [],
+  "evaluators": [],
+  "onlineEvalConfigs": [],
+  "agentCoreGateways": [],
+  "policyEngines": [],
+  "configBundles": [],
+  "abTests": [],
+  "harnesses": [],
+  "datasets": [],
+  "capacityProviders": [],
+  "payments": []
+}

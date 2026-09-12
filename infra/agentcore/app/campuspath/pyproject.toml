@@ -1,0 +1,34 @@
+# CampusPath 语义平面 —— AgentCore Runtime 的构建清单。
+#
+# 本目录里的 campuspath_* 包是 `scripts/agentcore_stage.sh` rsync 进来的**构建产物**
+# （.gitignore 排除），源头在 contracts/ 、agents/ 、services/rules 、services/capacity 、
+# services/packs。因此这里**不列**它们为依赖——它们是随包一起 zip 上去的源码，
+# 不是 PyPI 上能装到的东西。列在这里只会让 CodeBuild 去 PyPI 找一个不存在的包。
+#
+# 依赖的取舍：
+# * strands-agents[otel] —— 运行时本体（每次模型调用都是一次 Strands Agent 调用）。
+#   **不要 [gemini] extra**：Vertex 那条路在 AWS 上用不到，google-genai 只会让镜像变大；
+# * bedrock-agentcore —— BedrockAgentCoreApp（HTTP 服务外壳）；
+# * boto3 —— Bedrock 模型客户端走 AWS SDK 默认凭据链（AgentCore 注入执行角色）；
+# * pydantic —— campuspath_contracts 的唯一依赖；
+# * aws-opentelemetry-distro —— CloudWatch GenAI Observability 的 trace 出口。
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "campuspath-semantic"
+version = "1.0.0"
+description = "CampusPath semantic plane (A0-A5) on Strands Agents, deployed to Bedrock AgentCore Runtime"
+requires-python = ">=3.12"
+dependencies = [
+    "strands-agents[otel]>=1.55",
+    "bedrock-agentcore>=1.9",
+    "boto3>=1.40",
+    "pydantic>=2.9,<3",
+    "aws-opentelemetry-distro~=0.18.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]

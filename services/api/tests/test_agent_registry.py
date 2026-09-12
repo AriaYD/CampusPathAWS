@@ -139,3 +139,49 @@ def test_registry_includes_recent_spans_when_tracing(monkeypatch):
     assert body["trace"]["enabled"] is True and body["trace"]["exporter"] == "memory"
     names = {s["name"] for s in body["trace"]["recent_spans"]}
     assert "http.request" in names
+
+
+def test_registry_reports_the_agentcore_runtime_when_the_semantic_plane_is_remote(monkeypatch):
+    """P3：语义平面搬进 Bedrock AgentCore Runtime 之后，注册表必须说出来。
+
+    ``runtime`` 是运维分诊的第一格：``strands`` = 模型调用在这个进程里跑，
+    ``agentcore`` = 在 AgentCore Runtime 里跑，出了事要去 CloudWatch 看。
+    两者的日志、配额、故障面完全不同，写死 ``strands`` 会把人指错方向。
+    """
+    for name in ("GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_CLOUD_PROJECT",
+                 "GOOGLE_CLOUD_LOCATION"):
+        monkeypatch.delenv(name, raising=False)
+
+    class _FakeAgentCore:
+        backend = "bedrock"
+        runtime = "agentcore"
+        model = "amazon.nova-pro-v1:0"
+        region = "us-east-1"
+        last_model_version = None
+        last_usage = {"inputTokens": 120, "outputTokens": 18}
+        last_rejected_tools = (("publish_opportunity", "不在 A4 白名单"),)
+
+    client = TestClient(create_app(Deps("full", model=_FakeAgentCore())))
+    model = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert model["available"] is True
+    assert model["runtime"] == "agentcore"
+    assert model["backend"] == "bedrock"
+    assert model["location"] == "us-east-1"
+    assert model["tool_rejections_last_call"] == 1
+
+
+def test_model_unavailable_503_names_all_three_ways_to_get_a_backend(client):
+    """已知会失败的样例：AgentCore 形态下 503 只说 Bedrock 与 Vertex，
+    运维会以为"配 AWS 凭据"就够了，而缺的其实是 ``AGENTCORE_RUNTIME_ARN``。
+
+    这条同时守着另一件事：``_require_model()`` 不再是死代码——它此前只被
+    定义、从没被调用过，于是"503 的措辞"从来没被任何请求走到过。
+    """
+    got = client.post("/v1/students/STU-A/goals/GOAL-A-P/decomposition/research",
+                      headers={"X-CampusPath-Role": "student"})
+    assert got.status_code == 503, got.text
+    body = got.json()["detail"]
+    assert body["error"] == "model_backend_unavailable"
+    detail = body["detail"]
+    assert "AgentCore" in detail and "AGENTCORE_RUNTIME_ARN" in detail
+    assert "Bedrock" in detail and "Vertex" in detail

@@ -4815,12 +4815,26 @@ def create_app(deps: Deps | None = None) -> FastAPI:
 
     # ── 依赖模型的端点：有后端就跑，没有就 503 ──────────────────────
     def _require_model():
+        """没有模型后端就 503，并**说清该去配哪一套**。
+
+        三条路，缺的东西各不相同——只说"需要模型后端"等于让运维去猜：
+
+        1. 进程内 Amazon Bedrock：AWS 凭据 + ``CAMPUSPATH_MODEL_BACKEND=bedrock``；
+        2. Bedrock **AgentCore Runtime**（语义平面在云上跑，P3）：以上再加
+           ``CAMPUSPATH_AGENT_RUNTIME=agentcore`` 与 ``AGENTCORE_RUNTIME_ARN``——
+           ARN 缺席时 ``autodetect_model()`` **返回 None 而不是退回本地 Bedrock**，
+           所以"AWS 凭据明明配好了却还是 503"正是这一条；
+        3. Vertex AI：ADC，见 ``.env.example``。
+        """
         if deps.model is None:
             raise HTTPException(503, {
                 "error": "model_backend_unavailable",
                 "detail": (
-                    "本端点需要模型后端：Amazon Bedrock（AWS 凭据 + "
-                    "CAMPUSPATH_MODEL_BACKEND=bedrock）或 Vertex AI（ADC，见 .env.example）。"
+                    "本端点需要模型后端，三选一："
+                    "① 进程内 Amazon Bedrock（AWS 凭据 + CAMPUSPATH_MODEL_BACKEND=bedrock）；"
+                    "② Bedrock AgentCore Runtime（同上，再加 CAMPUSPATH_AGENT_RUNTIME=agentcore "
+                    "与 AGENTCORE_RUNTIME_ARN；缺 ARN 时不会退回本地 Bedrock，就是 503）；"
+                    "③ Vertex AI（ADC，见 .env.example）。"
                     "这不是「未实现」——结构与契约已就位，缺的是运行时依赖。"
                 ),
             })
@@ -5754,9 +5768,10 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             (g for g in deps.goals.get(student_id, ()) if g.goal_id == goal_id), None)
         if goal is None:
             raise HTTPException(404, {"error": "unknown_goal", "detail": goal_id})
-        if deps.model is None:
-            raise HTTPException(503, {"error": "model_backend_unavailable",
-                                      "detail": "现场拆解需要模型后端（Bedrock 或 Vertex）"})
+        # 措辞只有一处出处（``_require_model``）：这里曾经自己写了一句
+        # "Bedrock 或 Vertex"，AgentCore 形态上线后它就是**错的**——
+        # 配好了 AWS 凭据仍然 503 的真因是没给 AGENTCORE_RUNTIME_ARN。
+        _require_model()
         key = (student_id, goal_id)
         now = datetime.now(timezone.utc)
         day_key = (student_id, now.date().isoformat())

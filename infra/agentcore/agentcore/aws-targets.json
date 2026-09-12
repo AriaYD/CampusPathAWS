@@ -1,0 +1,8 @@
+[
+  {
+    "name": "default",
+    "description": "CampusPath hackathon account; AgentCore + Bedrock in-region inference (free plan has no cross-Region inference)",
+    "account": "<your-account-id>",
+    "region": "us-east-1"
+  }
+]
