@@ -61,6 +61,55 @@ Values never go into the repo, the docs, or commit messages (Plan §9).
 `verify.sh` reports which secrets "exist but have no value" — those features will fail at runtime,
 and it's better to know that ahead of time than to find out live during the demo.
 
+## Strands standalone deployment (AWS "Agents for Humans" submission)
+
+`infra/deploy_strands.sh` only touches two **brand-new, independent** Cloud
+Run services: `campuspath-api-strands` / `campuspath-web-strands`. The
+pre-existing `campuspath-api` / `campuspath-web` are still under judging for
+an earlier Google hackathon (through 2026-10-01); every subcommand does a
+literal string check against the target service name and refuses to touch
+the existing ones.
+
+```bash
+bash infra/deploy_strands.sh --help              # list subcommands and env vars
+DRY_RUN=1 bash infra/deploy_strands.sh all       # print the gcloud commands only
+bash infra/deploy_strands.sh all                 # actually run it (or make deploy-strands)
+```
+
+Subcommands: `secrets` (AWS credentials → Secret Manager, plus IAM grant),
+`api` (builds the root `Dockerfile` and deploys with
+`CAMPUSPATH_AGENT_RUNTIME=agentcore` + Bedrock), `web` (builds
+`apps/web/Dockerfile`, points `CAMPUSPATH_API_ORIGIN` at the new API's
+URL), `status` (read-only: URLs / revisions / health check), `all` (runs
+the first four in order).
+
+Two design choices differ from `bootstrap.sh`/`verify.sh`:
+- **`DRY_RUN=1` is an environment variable, not an `--apply` flag** — this
+  script actually creates Cloud Run services and Secret Manager secrets, so
+  it doesn't reuse `config.sh`'s default-dry-run `run()`/`run_idempotent()`
+  convention. A real run wraps each gcloud call in a scoped `set -x` so the
+  exact expanded command is printed to stderr before it executes; `DRY_RUN=1`
+  prints the equivalent preview and executes nothing.
+- **AWS credentials and the freshly generated web `AUTH_SECRET`/
+  `CAMPUSPATH_DEMO_PASSCODE` are always masked in printed previews** — the
+  `secrets` subcommand reads from a local AWS profile (`AWS_PROFILE`,
+  default `campuspath`) via `aws configure get`, falling back to parsing
+  `~/.aws/credentials` with awk if the `aws` CLI isn't installed; the value
+  passes through exactly one pipe into `gcloud secrets versions add
+  --data-file=-` and never appears in any `printf` or `set -x` trace.
+
+The service account isn't hardcoded: the `api`/`secrets` subcommands do one
+read-only `gcloud run services describe campuspath-api ...
+--format='value(spec.template.spec.serviceAccountName)'` to measure which
+service account the live API actually uses (as of 2026-09-12 that's Cloud
+Run's default compute service account, not the `campuspath-student-runtime`
+that `bootstrap.sh` creates — the live service was originally deployed with
+`gcloud run deploy --source .` without an explicit `--service-account`), and
+the new service copies that same account; override with the
+`API_SERVICE_ACCOUNT` env var. The health path `/healthz` (no `/v1` prefix)
+and `/v1/ops/agents` are taken from the actual routes in
+`services/api/campuspath_api/app.py`, not guessed.
+
 ## Known rough edges
 
 - **`gcloud` calls are slow.** Even a dry-run has to `describe` each resource one at a time to determine whether it exists,

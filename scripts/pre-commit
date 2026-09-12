@@ -56,7 +56,7 @@ if [ -n "$DIFF" ]; then
   # 赋值型密钥：KEY=<24位以上实值>，排除占位符与环境变量引用
   ASSIGN=$(echo "$DIFF" \
     | grep -iE '(api[_-]?key|secret|password|passwd|token|client[_-]?secret)[[:space:]]*[=:][[:space:]]*["'"'"']?[A-Za-z0-9/+_-]{24,}' \
-    | grep -vE '\$\{|\$[A-Z_]+|process\.env|os\.environ|getenv|<[^>]+>|xxx|XXX|your[_-]|placeholder|example|\.\.\.|REPLACE|TODO' \
+    | grep -vE '\$\{|\$[A-Z_]+|process\.env|os\.environ|getenv|<[^>]+>|xxx|XXX|your[_-]|placeholder|example|\.\.\.|REPLACE|TODO|--set-secrets|:latest' \
     | head -3 || true)
   if [ -n "$ASSIGN" ]; then
     block "疑似硬编码密钥赋值："

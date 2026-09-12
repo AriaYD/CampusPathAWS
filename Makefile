@@ -43,6 +43,7 @@ help:
 	@echo "  make llm-free         全部确定性服务的零 LLM 扫描（B11/B12）"
 	@echo "  make agentcore-stage  把语义平面 rsync 进 AgentCore 打包目录并自检"
 	@echo "  make agentcore-deploy 打印部署命令（不自动部署：要花钱、要建资源）"
+	@echo "  make deploy-strands   部署独立的 campuspath-api-strands / campuspath-web-strands（先 DRY_RUN=1 预览）"
 	@echo "  make harness-selftest 验证 make 在测试失败时真的会非零退出"
 	@echo "  make check            上述全部 + llm-free + harness-selftest"
 	@echo "  make eval             D6 验收：13 BLOCKER + 12 TARGET，机器判定"
@@ -154,6 +155,13 @@ agentcore-deploy: agentcore-stage
 	@echo "部署后把返回的 Runtime ARN 写进 API 侧环境："
 	@echo "  CAMPUSPATH_AGENT_RUNTIME=agentcore   AGENTCORE_RUNTIME_ARN=arn:aws:bedrock-agentcore:..."
 	@echo "（ARN 缺席时 autodetect_model() 返回 None，依赖模型的端点照旧 503，不会退回本地 Bedrock）"
+
+# 部署两个独立的新 Cloud Run 服务（campuspath-api-strands / campuspath-web-strands），
+# 不碰现役 campuspath-api / campuspath-web（Google 赛评审中）。真会建资源、花钱，
+# 先跑 `DRY_RUN=1 bash infra/deploy_strands.sh all` 看一遍要执行的命令。
+.PHONY: deploy-strands
+deploy-strands:
+	bash infra/deploy_strands.sh all
 
 .PHONY: contracts
 contracts:
