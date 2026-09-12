@@ -638,7 +638,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <p class="lead">两个平面之间的每一次数据交换都由<strong>数据契约类型</strong>定形。</p>
         <figure class="figure">
           <div class="figure-scroll"><svg role="img" xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <title>CampusPath architecture — two planes, contract-first, Vertex-only</title>
+  <title>CampusPath architecture — two planes, contract-first, Strands Agents</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a4a4a"/>
@@ -668,7 +668,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <rect width="1600" height="960" fill="#ffffff"/>
   <text x="32" y="38" class="h1">CampusPath — architecture</text>
-  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.42.0</text>
+  <text x="32" y="58" class="ts">Two planes, contract-first. The semantic plane calls a model only via a Strands Agent (Bedrock default, Vertex optional); zero-LLM services own everything reproducible. Sep 2026 · contracts 1.43.0</text>
 
   <!-- ============ CLIENTS (x 32–312) ============ -->
   <rect x="32" y="84" width="280" height="270" class="zone"/>
@@ -712,9 +712,9 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ SEMANTIC PLANE (x 344–724) ============ -->
   <rect x="344" y="260" width="380" height="428" class="zone zone-sem"/>
-  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Google GenAI SDK)</text>
-  <text x="358" y="298" class="ts">The only code allowed to call a model. “Vertex only” and “Gemini ≥ 3.5”</text>
-  <text x="358" y="311" class="ts">are asserted in the client constructor, not in documentation.</text>
+  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Strands Agents SDK)</text>
+  <text x="358" y="298" class="ts">The only code that may call a model — every call is a Strands Agent</text>
+  <text x="358" y="311" class="ts">invocation, gated by hooks, not by prompt instructions.</text>
 
   <rect x="358" y="322" width="352" height="48" class="box"/>
   <text x="368" y="340" class="h3">A0 Orchestrator</text>
@@ -778,18 +778,18 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ GOOGLE CLOUD (x 1208–1568) ============ -->
   <rect x="1208" y="84" width="360" height="604" class="zone zone-gcp"/>
-  <text x="1222" y="106" class="h2">GOOGLE CLOUD · one project, one billing account</text>
+  <text x="1222" y="106" class="h2">AWS + GOOGLE CLOUD · model, runtime, deployment</text>
 
   <rect x="1222" y="118" width="332" height="70" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="136" class="h3">Vertex AI · gemini-3.5-flash</text>
-  <text x="1232" y="152" class="ts">global endpoint · thinking_level MINIMAL / LOW</text>
-  <text x="1232" y="166" class="ts">Google Search grounding for live job postings</text>
-  <text x="1232" y="180" class="ts">ADC only — no API keys exist anywhere in the system</text>
+  <text x="1232" y="136" class="h3">Amazon Bedrock · Nova Pro</text>
+  <text x="1232" y="152" class="ts">us-east-1, in-region (AWS free-plan constraint)</text>
+  <text x="1232" y="166" class="ts">Vertex Gemini alt backend, keeps Search grounding</text>
+  <text x="1232" y="180" class="ts">IAM only — no API keys anywhere in the system</text>
 
   <rect x="1222" y="198" width="332" height="56" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="216" class="h3">Vertex AI Agent Engine (us-central1)</text>
-  <text x="1232" y="232" class="ts">ADK mirrors of A0 and A4 · CI asserts their routing</text>
-  <text x="1232" y="246" class="ts">table equals the local one · status light in the web UI</text>
+  <text x="1232" y="216" class="h3">Bedrock AgentCore Runtime</text>
+  <text x="1232" y="232" class="ts">entrypoint agents/cloud/agentcore_app.py</text>
+  <text x="1232" y="246" class="ts">hosts A0 Orchestrator + A4 Scout · IAM SigV4 auth</text>
 
   <rect x="1222" y="264" width="332" height="56" class="box" stroke="#3b6fc9"/>
   <text x="1232" y="282" class="h3">Cloud Scheduler → Cloud Run Job</text>
@@ -857,7 +857,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <!-- lanes below the planes -->
   <!-- lane 1: model calls -->
   <path d="M 536 688 L 536 712 L 1584 712 L 1584 153 L 1554 153" class="edge"/>
-  <text x="548" y="708" class="lbl">A1–A5 model calls → Vertex AI only (assert_vertex_only at construction)</text>
+  <text x="548" y="708" class="lbl">A1–A5 model calls → a Strands Agent (Bedrock default, Vertex optional)</text>
   <!-- lane 2: untrusted text -> A4 -->
   <path d="M 1222 512 L 1200 512 L 1200 730 L 340 730 L 340 576 L 358 576" class="edge-dash" stroke="#b3412a" marker-end="url(#arrow-red)"/>
   <text x="548" y="726" class="lbl" fill="#b3412a">untrusted external text → A4 only, as user-role data; never into a system prompt</text>
@@ -877,7 +877,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <text x="48" y="908" class="ts">Verification: make check (all suites + zero-LLM AST scans + harness self-test) · make eval = 13 BLOCKER metrics at zero violations + 12 TARGET metrics, machine-judged · 23 pages under browser gates (contrast, alignment, structure).</text>
 </svg>
 </div>
-          <figcaption>系统架构（2026-08 版）：左为两个门户，中间是编排层与两个平面，右为 Google Cloud 与数据源；红色边框与虚线是六条红线在图上的落点。可横向滚动查看。</figcaption>
+          <figcaption>系统架构（2026-09 版）：左为两个门户，中间是编排层与两个平面——语义平面经 <strong>Strands Agents SDK</strong> 调用 <strong>Amazon Bedrock · Nova Pro</strong>（Vertex Gemini 保留为备选后端），右为 <strong>Bedrock AgentCore Runtime</strong>、Google Cloud 与数据源；红色边框与虚线是六条红线在图上的落点。可横向滚动查看。</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
@@ -887,8 +887,8 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         </div>
         <div class="cards">
           <article class="card">
-            <h3>Google 生态里的位置</h3>
-            <p>模型只有一个出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代际下限在构造时检查）；编排与抽取两个 Agent 另有 ADK 镜像，可按需部署到 Vertex AI Agent Engine（演示间隙关停省额度）；Cloud Run 跑学生 App、API 与每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 <strong>Firestore</strong>、冷启动回读；每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 <strong>Cloud Trace</strong>；Moodle 沙箱通过自研<strong>只读 MCP</strong> 接入；密钥在 Secret Manager。</p>
+            <h3>运行在哪里</h3>
+            <p>模型只有一个出口：<strong>Amazon Bedrock · Nova Pro via Strands Agents SDK</strong>（区域内 `amazon.nova-pro-v1:0`，2026-09 起默认后端）；六个语义 Agent 统一经由 <strong>Strands Agents SDK</strong>（`Agent` + 工具白名单 hook + 提示词卫生 hook）调用模型，部署跑在 <strong>Bedrock AgentCore Runtime</strong> 上；Vertex Gemini 3.5（代际下限在构造时检查）保留作为可切换的备选后端；Cloud Run 跑学生 App、API 与每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 <strong>Firestore</strong>、冷启动回读；每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 <strong>Cloud Trace</strong>；Moodle 沙箱通过自研<strong>只读 MCP</strong> 接入；密钥在 Secret Manager。</p>
           </article>
           <article class="card">
             <h3>模型可以换（架构承诺）</h3>
@@ -1292,7 +1292,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <p class="lead">兩個平面之間的每一次數據交換都由<strong>數據契約類型</strong>定形。</p>
         <figure class="figure">
           <div class="figure-scroll"><svg role="img" xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <title>CampusPath architecture — two planes, contract-first, Vertex-only</title>
+  <title>CampusPath architecture — two planes, contract-first, Strands Agents</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a4a4a"/>
@@ -1322,7 +1322,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <rect width="1600" height="960" fill="#ffffff"/>
   <text x="32" y="38" class="h1">CampusPath — architecture</text>
-  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.42.0</text>
+  <text x="32" y="58" class="ts">Two planes, contract-first. The semantic plane calls a model only via a Strands Agent (Bedrock default, Vertex optional); zero-LLM services own everything reproducible. Sep 2026 · contracts 1.43.0</text>
 
   <!-- ============ CLIENTS (x 32–312) ============ -->
   <rect x="32" y="84" width="280" height="270" class="zone"/>
@@ -1366,9 +1366,9 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ SEMANTIC PLANE (x 344–724) ============ -->
   <rect x="344" y="260" width="380" height="428" class="zone zone-sem"/>
-  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Google GenAI SDK)</text>
-  <text x="358" y="298" class="ts">The only code allowed to call a model. “Vertex only” and “Gemini ≥ 3.5”</text>
-  <text x="358" y="311" class="ts">are asserted in the client constructor, not in documentation.</text>
+  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Strands Agents SDK)</text>
+  <text x="358" y="298" class="ts">The only code that may call a model — every call is a Strands Agent</text>
+  <text x="358" y="311" class="ts">invocation, gated by hooks, not by prompt instructions.</text>
 
   <rect x="358" y="322" width="352" height="48" class="box"/>
   <text x="368" y="340" class="h3">A0 Orchestrator</text>
@@ -1432,18 +1432,18 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ GOOGLE CLOUD (x 1208–1568) ============ -->
   <rect x="1208" y="84" width="360" height="604" class="zone zone-gcp"/>
-  <text x="1222" y="106" class="h2">GOOGLE CLOUD · one project, one billing account</text>
+  <text x="1222" y="106" class="h2">AWS + GOOGLE CLOUD · model, runtime, deployment</text>
 
   <rect x="1222" y="118" width="332" height="70" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="136" class="h3">Vertex AI · gemini-3.5-flash</text>
-  <text x="1232" y="152" class="ts">global endpoint · thinking_level MINIMAL / LOW</text>
-  <text x="1232" y="166" class="ts">Google Search grounding for live job postings</text>
-  <text x="1232" y="180" class="ts">ADC only — no API keys exist anywhere in the system</text>
+  <text x="1232" y="136" class="h3">Amazon Bedrock · Nova Pro</text>
+  <text x="1232" y="152" class="ts">us-east-1, in-region (AWS free-plan constraint)</text>
+  <text x="1232" y="166" class="ts">Vertex Gemini alt backend, keeps Search grounding</text>
+  <text x="1232" y="180" class="ts">IAM only — no API keys anywhere in the system</text>
 
   <rect x="1222" y="198" width="332" height="56" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="216" class="h3">Vertex AI Agent Engine (us-central1)</text>
-  <text x="1232" y="232" class="ts">ADK mirrors of A0 and A4 · CI asserts their routing</text>
-  <text x="1232" y="246" class="ts">table equals the local one · status light in the web UI</text>
+  <text x="1232" y="216" class="h3">Bedrock AgentCore Runtime</text>
+  <text x="1232" y="232" class="ts">entrypoint agents/cloud/agentcore_app.py</text>
+  <text x="1232" y="246" class="ts">hosts A0 Orchestrator + A4 Scout · IAM SigV4 auth</text>
 
   <rect x="1222" y="264" width="332" height="56" class="box" stroke="#3b6fc9"/>
   <text x="1232" y="282" class="h3">Cloud Scheduler → Cloud Run Job</text>
@@ -1511,7 +1511,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <!-- lanes below the planes -->
   <!-- lane 1: model calls -->
   <path d="M 536 688 L 536 712 L 1584 712 L 1584 153 L 1554 153" class="edge"/>
-  <text x="548" y="708" class="lbl">A1–A5 model calls → Vertex AI only (assert_vertex_only at construction)</text>
+  <text x="548" y="708" class="lbl">A1–A5 model calls → a Strands Agent (Bedrock default, Vertex optional)</text>
   <!-- lane 2: untrusted text -> A4 -->
   <path d="M 1222 512 L 1200 512 L 1200 730 L 340 730 L 340 576 L 358 576" class="edge-dash" stroke="#b3412a" marker-end="url(#arrow-red)"/>
   <text x="548" y="726" class="lbl" fill="#b3412a">untrusted external text → A4 only, as user-role data; never into a system prompt</text>
@@ -1531,7 +1531,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <text x="48" y="908" class="ts">Verification: make check (all suites + zero-LLM AST scans + harness self-test) · make eval = 13 BLOCKER metrics at zero violations + 12 TARGET metrics, machine-judged · 23 pages under browser gates (contrast, alignment, structure).</text>
 </svg>
 </div>
-          <figcaption>系統架構（2026-08 版）：左為兩個門户，中間是編排層與兩個平面，右為 Google Cloud 與數據源；紅色邊框與虛線是六條紅線在圖上的落點。可橫向滾動查看。</figcaption>
+          <figcaption>系統架構（2026-09 版）：左為兩個門户，中間是編排層與兩個平面——語義平面經 <strong>Strands Agents SDK</strong> 調用 <strong>Amazon Bedrock · Nova Pro</strong>（Vertex Gemini 保留為備選後端），右為 <strong>Bedrock AgentCore Runtime</strong>、Google Cloud 與數據源；紅色邊框與虛線是六條紅線在圖上的落點。可橫向滾動查看。</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
@@ -1541,8 +1541,8 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         </div>
         <div class="cards">
           <article class="card">
-            <h3>Google 生態裏的位置</h3>
-            <p>模型只有一個出口：<strong>Gemini 3.5 Flash via Vertex AI</strong>（GenAI SDK，代際下限在構造時檢查）；編排與抽取兩個 Agent 另有 ADK 鏡像，可按需部署到 Vertex AI Agent Engine（演示間隙關停省額度）；Cloud Run 跑學生 App、API 與每日巡檢的 Cloud Run Job（Cloud Scheduler 觸發）；全部可變狀態檢查點到 <strong>Firestore</strong>、冷啓動回讀；每次模型調用、工具調用、修復循環都是一條 OpenTelemetry span 進 <strong>Cloud Trace</strong>；Moodle 沙箱通過自研<strong>只讀 MCP</strong> 接入；密鑰在 Secret Manager。</p>
+            <h3>運行在哪裏</h3>
+            <p>模型只有一個出口：<strong>Amazon Bedrock · Nova Pro via Strands Agents SDK</strong>（區域內 `amazon.nova-pro-v1:0`，2026-09 起默認後端）；六個語義 Agent 統一經由 <strong>Strands Agents SDK</strong>（`Agent` + 工具白名單 hook + 提示詞衞生 hook）調用模型，部署跑在 <strong>Bedrock AgentCore Runtime</strong> 上；Vertex Gemini 3.5（代際下限在構造時檢查）保留作為可切換的備選後端；Cloud Run 跑學生 App、API 與每日巡檢的 Cloud Run Job（Cloud Scheduler 觸發）；全部可變狀態檢查點到 <strong>Firestore</strong>、冷啓動回讀；每次模型調用、工具調用、修復循環都是一條 OpenTelemetry span 進 <strong>Cloud Trace</strong>；Moodle 沙箱通過自研<strong>只讀 MCP</strong> 接入；密鑰在 Secret Manager。</p>
           </article>
           <article class="card">
             <h3>模型可以換（架構承諾）</h3>
@@ -1946,7 +1946,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         <p class="lead">Every exchange between the two planes is shaped by a <strong>data contract type</strong>.</p>
         <figure class="figure">
           <div class="figure-scroll"><svg role="img" xmlns="http://www.w3.org/2000/svg" width="1600" height="960" viewBox="0 0 1600 960" font-family="Inter, 'Helvetica Neue', Helvetica, Arial, sans-serif">
-  <title>CampusPath architecture — two planes, contract-first, Vertex-only</title>
+  <title>CampusPath architecture — two planes, contract-first, Strands Agents</title>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#4a4a4a"/>
@@ -1976,7 +1976,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <rect width="1600" height="960" fill="#ffffff"/>
   <text x="32" y="38" class="h1">CampusPath — architecture</text>
-  <text x="32" y="58" class="ts">Two planes, contract-first. Only the semantic plane may call a model, and only through Vertex AI. Everything that must be reproducible lives in zero-LLM services. Aug 2026 · contracts 1.42.0</text>
+  <text x="32" y="58" class="ts">Two planes, contract-first. The semantic plane calls a model only via a Strands Agent (Bedrock default, Vertex optional); zero-LLM services own everything reproducible. Sep 2026 · contracts 1.43.0</text>
 
   <!-- ============ CLIENTS (x 32–312) ============ -->
   <rect x="32" y="84" width="280" height="270" class="zone"/>
@@ -2020,9 +2020,9 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ SEMANTIC PLANE (x 344–724) ============ -->
   <rect x="344" y="260" width="380" height="428" class="zone zone-sem"/>
-  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Google GenAI SDK)</text>
-  <text x="358" y="298" class="ts">The only code allowed to call a model. “Vertex only” and “Gemini ≥ 3.5”</text>
-  <text x="358" y="311" class="ts">are asserted in the client constructor, not in documentation.</text>
+  <text x="358" y="282" class="h2">SEMANTIC PLANE · agents/ (Strands Agents SDK)</text>
+  <text x="358" y="298" class="ts">The only code that may call a model — every call is a Strands Agent</text>
+  <text x="358" y="311" class="ts">invocation, gated by hooks, not by prompt instructions.</text>
 
   <rect x="358" y="322" width="352" height="48" class="box"/>
   <text x="368" y="340" class="h3">A0 Orchestrator</text>
@@ -2086,18 +2086,18 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
 
   <!-- ============ GOOGLE CLOUD (x 1208–1568) ============ -->
   <rect x="1208" y="84" width="360" height="604" class="zone zone-gcp"/>
-  <text x="1222" y="106" class="h2">GOOGLE CLOUD · one project, one billing account</text>
+  <text x="1222" y="106" class="h2">AWS + GOOGLE CLOUD · model, runtime, deployment</text>
 
   <rect x="1222" y="118" width="332" height="70" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="136" class="h3">Vertex AI · gemini-3.5-flash</text>
-  <text x="1232" y="152" class="ts">global endpoint · thinking_level MINIMAL / LOW</text>
-  <text x="1232" y="166" class="ts">Google Search grounding for live job postings</text>
-  <text x="1232" y="180" class="ts">ADC only — no API keys exist anywhere in the system</text>
+  <text x="1232" y="136" class="h3">Amazon Bedrock · Nova Pro</text>
+  <text x="1232" y="152" class="ts">us-east-1, in-region (AWS free-plan constraint)</text>
+  <text x="1232" y="166" class="ts">Vertex Gemini alt backend, keeps Search grounding</text>
+  <text x="1232" y="180" class="ts">IAM only — no API keys anywhere in the system</text>
 
   <rect x="1222" y="198" width="332" height="56" class="box" stroke="#3b6fc9"/>
-  <text x="1232" y="216" class="h3">Vertex AI Agent Engine (us-central1)</text>
-  <text x="1232" y="232" class="ts">ADK mirrors of A0 and A4 · CI asserts their routing</text>
-  <text x="1232" y="246" class="ts">table equals the local one · status light in the web UI</text>
+  <text x="1232" y="216" class="h3">Bedrock AgentCore Runtime</text>
+  <text x="1232" y="232" class="ts">entrypoint agents/cloud/agentcore_app.py</text>
+  <text x="1232" y="246" class="ts">hosts A0 Orchestrator + A4 Scout · IAM SigV4 auth</text>
 
   <rect x="1222" y="264" width="332" height="56" class="box" stroke="#3b6fc9"/>
   <text x="1232" y="282" class="h3">Cloud Scheduler → Cloud Run Job</text>
@@ -2165,7 +2165,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <!-- lanes below the planes -->
   <!-- lane 1: model calls -->
   <path d="M 536 688 L 536 712 L 1584 712 L 1584 153 L 1554 153" class="edge"/>
-  <text x="548" y="708" class="lbl">A1–A5 model calls → Vertex AI only (assert_vertex_only at construction)</text>
+  <text x="548" y="708" class="lbl">A1–A5 model calls → a Strands Agent (Bedrock default, Vertex optional)</text>
   <!-- lane 2: untrusted text -> A4 -->
   <path d="M 1222 512 L 1200 512 L 1200 730 L 340 730 L 340 576 L 358 576" class="edge-dash" stroke="#b3412a" marker-end="url(#arrow-red)"/>
   <text x="548" y="726" class="lbl" fill="#b3412a">untrusted external text → A4 only, as user-role data; never into a system prompt</text>
@@ -2185,7 +2185,7 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
   <text x="48" y="908" class="ts">Verification: make check (all suites + zero-LLM AST scans + harness self-test) · make eval = 13 BLOCKER metrics at zero violations + 12 TARGET metrics, machine-judged · 23 pages under browser gates (contrast, alignment, structure).</text>
 </svg>
 </div>
-          <figcaption>System architecture (Aug 2026): the two portals on the left, the orchestration layer and the two planes in the middle, Google Cloud and data sources on the right. Red borders and dashed edges are where the six red lines land. Scroll sideways on small screens.</figcaption>
+          <figcaption>System architecture (Sep 2026): the two portals on the left, the orchestration layer and the two planes in the middle — the semantic plane calls <strong>Amazon Bedrock · Nova Pro</strong> through the <strong>Strands Agents SDK</strong> (Vertex Gemini kept as an alternate backend) — <strong>Bedrock AgentCore Runtime</strong>, Google Cloud and data sources on the right. Red borders and dashed edges are where the six red lines land. Scroll sideways on small screens.</figcaption>
         </figure>
         <div class="table-wrap">
           <table>
@@ -2195,8 +2195,8 @@ td.ours,th.ours{border-inline-start:2px solid var(--accent)}
         </div>
         <div class="cards">
           <article class="card">
-            <h3>Where it sits in Google's stack</h3>
-            <p>One model exit: <strong>Gemini 3.5 Flash via Vertex AI</strong> (GenAI SDK, with the generation floor asserted at construction). The orchestration and extraction agents also ship as ADK mirrors for Vertex AI Agent Engine, deployed on demand and switched off between demos; Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); all mutable state is checkpointed to <strong>Firestore</strong> and restored on cold start; every model call, tool call and repair round is an OpenTelemetry span in <strong>Cloud Trace</strong>; the Moodle sandbox connects through a <strong>read-only MCP</strong> we built; secrets live in Secret Manager.</p>
+            <h3>Where it runs</h3>
+            <p>One model exit: <strong>Amazon Bedrock · Nova Pro via the Strands Agents SDK</strong> (in-region `amazon.nova-pro-v1:0`, the default backend since Sep 2026). All six semantic agents call the model through the <strong>Strands Agents SDK</strong> (an `Agent` plus a tool-whitelist hook and a prompt-hygiene hook), deployed on <strong>Bedrock AgentCore Runtime</strong>; Vertex Gemini 3.5 (generation floor asserted at construction) remains as a switchable alternate backend; Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); all mutable state is checkpointed to <strong>Firestore</strong> and restored on cold start; every model call, tool call and repair round is an OpenTelemetry span in <strong>Cloud Trace</strong>; the Moodle sandbox connects through a <strong>read-only MCP</strong> we built; secrets live in Secret Manager.</p>
           </article>
           <article class="card">
             <h3>The model is replaceable (an architectural commitment)</h3>

@@ -387,8 +387,9 @@ export const zhHans = {
       ],
       figure: {
         caption:
-          "系统架构（2026-08 版）：左为两个门户，中间是编排层与两个平面，右为 Google Cloud 与数据源；" +
-          "红色边框与虚线是六条红线在图上的落点。可横向滚动查看。",
+          "系统架构（2026-09 版）：左为两个门户，中间是编排层与两个平面——语义平面经 **Strands Agents SDK** " +
+          "调用 **Amazon Bedrock · Nova Pro**（Vertex Gemini 保留为备选后端），右为 **Bedrock AgentCore Runtime**、" +
+          "Google Cloud 与数据源；红色边框与虚线是六条红线在图上的落点。可横向滚动查看。",
       },
       table: {
         head: ["#", "六条架构红线：每条都有对应的自动化测试，测试不过构建就失败"],
@@ -403,10 +404,12 @@ export const zhHans = {
       },
       cards: [
         {
-          title: "Google 生态里的位置",
+          title: "运行在哪里",
           body:
-            "模型只有一个出口：**Gemini 3.5 Flash via Vertex AI**（GenAI SDK，代际下限在构造时检查）；" +
-            "编排与抽取两个 Agent 另有 ADK 镜像，可按需部署到 Vertex AI Agent Engine（演示间隙关停省额度）；Cloud Run 跑学生 App、API 与" +
+            "模型只有一个出口：**Amazon Bedrock · Nova Pro via Strands Agents SDK**（区域内 " +
+            "`amazon.nova-pro-v1:0`，2026-09 起默认后端）；六个语义 Agent 统一经由 **Strands Agents SDK**" +
+            "（`Agent` + 工具白名单 hook + 提示词卫生 hook）调用模型，部署跑在 **Bedrock AgentCore Runtime** 上；" +
+            "Vertex Gemini 3.5（代际下限在构造时检查）保留作为可切换的备选后端；Cloud Run 跑学生 App、API 与" +
             "每日巡检的 Cloud Run Job（Cloud Scheduler 触发）；全部可变状态检查点到 **Firestore**、冷启动回读；" +
             "每次模型调用、工具调用、修复循环都是一条 OpenTelemetry span 进 **Cloud Trace**；" +
             "Moodle 沙箱通过自研**只读 MCP** 接入；密钥在 Secret Manager。",
@@ -900,9 +903,11 @@ export const en = {
       ],
       figure: {
         caption:
-          "System architecture (Aug 2026): the two portals on the left, the orchestration layer and the two planes " +
-          "in the middle, Google Cloud and data sources on the right. Red borders and dashed edges are where the six " +
-          "red lines land. Scroll sideways on small screens.",
+          "System architecture (Sep 2026): the two portals on the left, the orchestration layer and the two planes " +
+          "in the middle — the semantic plane calls **Amazon Bedrock · Nova Pro** through the **Strands Agents SDK** " +
+          "(Vertex Gemini kept as an alternate backend) — **Bedrock AgentCore Runtime**, Google Cloud and data " +
+          "sources on the right. Red borders and dashed edges are where the six red lines land. Scroll sideways on " +
+          "small screens.",
       },
       table: {
         head: ["#", "Six architectural red lines — each has a test, and a failing test fails the build"],
@@ -917,14 +922,17 @@ export const en = {
       },
       cards: [
         {
-          title: "Where it sits in Google's stack",
+          title: "Where it runs",
           body:
-            "One model exit: **Gemini 3.5 Flash via Vertex AI** (GenAI SDK, with the generation floor asserted at " +
-            "construction). The orchestration and extraction agents also ship as ADK mirrors for Vertex AI Agent Engine, deployed on demand and switched off between demos; " +
-            "Cloud Run serves the student app, the API and the daily source-sweep Job (triggered by Cloud Scheduler); " +
-            "all mutable state is checkpointed to **Firestore** and restored on cold start; every model call, tool " +
-            "call and repair round is an OpenTelemetry span in **Cloud Trace**; the Moodle sandbox connects through a " +
-            "**read-only MCP** we built; secrets live in Secret Manager.",
+            "One model exit: **Amazon Bedrock · Nova Pro via the Strands Agents SDK** (in-region " +
+            "`amazon.nova-pro-v1:0`, the default backend since Sep 2026). All six semantic agents call the model " +
+            "through the **Strands Agents SDK** (an `Agent` plus a tool-whitelist hook and a prompt-hygiene hook), " +
+            "deployed on **Bedrock AgentCore Runtime**; Vertex Gemini 3.5 (generation floor asserted at " +
+            "construction) remains as a switchable alternate backend; Cloud Run serves the student app, the API " +
+            "and the daily source-sweep Job (triggered by Cloud Scheduler); all mutable state is checkpointed to " +
+            "**Firestore** and restored on cold start; every model call, tool call and repair round is an " +
+            "OpenTelemetry span in **Cloud Trace**; the Moodle sandbox connects through a **read-only MCP** we " +
+            "built; secrets live in Secret Manager.",
         },
         {
           title: "The model is replaceable (an architectural commitment)",
