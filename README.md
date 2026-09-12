@@ -9,8 +9,8 @@ Stack: **Strands Agents SDK** · **Amazon Bedrock (Nova Pro)** · **Bedrock Agen
 
 | | |
 |---|---|
-| Live demo | <!-- TODO(user): live URL --> — this submission stands up new Cloud Run services independent of the earlier Google Cloud hackathon deployment (see §8) |
-| API (OpenAPI) | <!-- TODO(user): live URL --> |
+| Live demo | https://campuspath-web-strands-786160486093.asia-east2.run.app (passcode is printed on `/landing`) — new Cloud Run services independent of the earlier Google Cloud hackathon deployment (see §8) |
+| API (OpenAPI) | https://campuspath-api-strands-786160486093.asia-east2.run.app/docs · agent registry: `GET /v1/ops/agents` (header `X-CampusPath-Role: career_center_admin`) reports `runtime=agentcore`, `backend=bedrock` |
 | Architecture | [`docs/hackathon/architecture.svg`](docs/hackathon/architecture.svg) |
 | Devpost write-up | [`docs/hackathon/devpost-agents-for-humans.md`](docs/hackathon/devpost-agents-for-humans.md) (project story, "Built with" tags, video shot list) |
 | Demo video | ≤ 5:00; shot list in the Devpost write-up above. <!-- TODO(user): YouTube link once recorded --> |
@@ -118,25 +118,16 @@ CAMPUSPATH_MODEL_BACKEND=bedrock CAMPUSPATH_AGENT_RUNTIME=agentcore \
   make api
 ```
 
-<!-- TODO(user): P3 (docs/plans/hackathon-agents-for-humans-2026-09-12.md) was landing concurrently with
-this documentation pass — confirm `make agentcore-stage`/`agentcore-deploy` still match the repository and
-fill in a real runtime ARN once deployed. -->
+Deployed 2026-09-12 with `agentcore deploy --yes` (CDK bootstrap + CodeZip remote build; no local Docker needed). The runtime reports `READY`; `agentcore invoke` and the API's remote client both round-trip through Amazon Bedrock Nova Pro. Warm invocations take under a second; the first invocation of a new session takes ~10 s (microVM start).
 
 **Cloud Run** (FastAPI + Next.js, independent of the earlier Google Cloud hackathon's live services — see §8):
 
 ```bash
-# API — Bedrock is the default backend; Vertex remains available via CAMPUSPATH_MODEL_BACKEND=vertex
-gcloud run deploy campuspath-api-strands --source . --region <gcp-region> \
-  --update-env-vars CAMPUSPATH_MODEL_BACKEND=bedrock,CAMPUSPATH_AGENT_RUNTIME=agentcore,AGENTCORE_RUNTIME_ARN=<runtime-arn>,AWS_REGION=us-east-1,CAMPUSPATH_CHECKPOINT=firestore:strands \
-  --max-instances 1
-
-# Web (ships the generated contract types into the image)
-cd apps/web && rm -rf .contracts-generated && cp -r ../../contracts/generated .contracts-generated
-gcloud run deploy campuspath-web-strands --source . --region <gcp-region> \
-  --update-env-vars CAMPUSPATH_API_ORIGIN=<api url>,APP_ORIGIN=<web url>,AUTH_SECRET=<random>,CAMPUSPATH_DEMO_PASSCODE=<passcode>
+# One script does secrets → API → web → status (dry run: DRY_RUN=1). It refuses to touch any other service name.
+AWS_PROFILE=campuspath AGENTCORE_RUNTIME_ARN=<runtime-arn-from-agentcore-deploy> make deploy-strands
 ```
 
-<!-- TODO(user): pick the GCP region for these two independent services and fill in the runtime ARN -->
+The API container gets `CAMPUSPATH_MODEL_BACKEND=bedrock`, `CAMPUSPATH_AGENT_RUNTIME=agentcore`, the runtime ARN, `AWS_REGION=us-east-1`, `CAMPUSPATH_CHECKPOINT=firestore:strands` (its own Firestore collection), `CAMPUSPATH_TRACE=gcp`, and the AWS access key pair from Secret Manager. The web container only needs the API origin. Region asia-east2, `--max-instances 1` (the checkpoint writer is process-local).
 
 ## 7. Verification & honesty
 
