@@ -85,3 +85,6 @@ infra/agentcore/app/campuspath/.venv/
 infra/agentcore/agentcore/.cli/
 infra/agentcore/agentcore/.env.local
 infra/agentcore/agentcore/cdk/cdk.out/
+infra/agentcore/agentcore/cdk/node_modules/
+infra/agentcore/agentcore/cdk/cdk.out/
+infra/agentcore/agentcore/.cli/
