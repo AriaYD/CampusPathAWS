@@ -44,6 +44,8 @@ def test_registry_mirrors_governance_tables(client):
 
 
 def test_registry_reports_model_backend_and_floor(client, monkeypatch):
+    # 代际门槛与 vertex_only 只在 Vertex 后端下有意义，所以显式选它。
+    monkeypatch.setenv("CAMPUSPATH_MODEL_BACKEND", "vertex")
     monkeypatch.setenv("GOOGLE_GENAI_USE_VERTEXAI", "TRUE")
     body = client.get("/v1/ops/agents", headers=ADMIN).json()
     model = body["model_backend"]
@@ -51,6 +53,70 @@ def test_registry_reports_model_backend_and_floor(client, monkeypatch):
     assert model["default_model"].startswith("gemini-3.5")
     assert model["generation_floor"] == "3.5"
     assert model["vertex_only"] is True
+
+
+def test_registry_reports_strands_runtime_with_a_scripted_model():
+    """Strands 迁移后注册表要说清"跑在什么运行时/后端上"——桩也不例外。
+
+    桩模型同样走完整 Strands 事件循环，所以 runtime/sdk_version 必须是真的，
+    不是"因为是测试所以填 unknown"。
+    """
+    from campuspath_agents.model import ScriptedModel, strands_version
+
+    client = TestClient(create_app(Deps("full", model=ScriptedModel({}))))
+    model = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert model["available"] is True
+    assert model["runtime"] == "strands"
+    assert model["backend"] == "scripted"
+    assert model["sdk_version"] == strands_version() and model["sdk_version"]
+    assert model["sdk_version"] != "unknown"
+    assert model["tool_rejections_last_call"] == 0
+    assert model["last_usage"] is None            # 还没调用过
+
+
+def test_registry_reports_env_default_backend_when_no_model(client, monkeypatch):
+    """没有可用后端时，backend 报的是**环境会选的那个**，不是 None——
+    否则运维看到 available=false 却无从判断"该配 AWS 还是 Google"。"""
+    from campuspath_agents.strands_models import BACKEND_ENV
+
+    monkeypatch.delenv(BACKEND_ENV, raising=False)
+    body = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert body["available"] is False
+    assert body["backend"] == "bedrock"          # 默认后端
+    assert body["runtime"] == "strands"
+    assert body["tool_rejections_last_call"] == 0
+
+    monkeypatch.setenv(BACKEND_ENV, "vertex")
+    body = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert body["backend"] == "vertex"
+
+
+def test_registry_survives_a_bedrock_backend_without_google_env(monkeypatch):
+    """Bedrock 形态下机器上可能一个 Google 环境变量都没有——注册表不许炸，
+    且 location 报 Bedrock 区域、vertex_only 为假。"""
+    for name in ("GOOGLE_GENAI_USE_VERTEXAI", "GOOGLE_CLOUD_PROJECT",
+                 "GOOGLE_CLOUD_LOCATION", "GOOGLE_API_KEY", "GEMINI_API_KEY"):  # ai-studio-denylist
+        monkeypatch.delenv(name, raising=False)
+
+    class _FakeBedrock:
+        backend = "bedrock"
+        runtime = "strands"
+        model = "amazon.nova-pro-v1:0"
+        region = "us-east-1"
+        last_model_version = None
+        last_usage = {"inputTokens": 12, "outputTokens": 3}
+        last_rejected_tools = (("read_student_state", "not in whitelist"),)
+
+    client = TestClient(create_app(Deps("full", model=_FakeBedrock())))
+    got = client.get("/v1/ops/agents", headers=ADMIN)
+    assert got.status_code == 200, got.text
+    model = got.json()["model_backend"]
+    assert model["backend"] == "bedrock"
+    assert model["default_model"] == "amazon.nova-pro-v1:0"
+    assert model["location"] == "us-east-1"
+    assert model["vertex_only"] is False
+    assert model["last_usage"] == {"inputTokens": 12, "outputTokens": 3}
+    assert model["tool_rejections_last_call"] == 1
 
 
 def test_registry_reports_checkpoint_and_trace_status(client):

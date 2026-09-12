@@ -49,6 +49,9 @@ MODEL_SDK_DISTRIBUTIONS = frozenset(
         "anthropic",
         "litellm",
         "transformers",
+        "strands-agents",         # AWS Strands Agents SDK——编排层（agents/）专用
+        "strands-agents-tools",
+        "bedrock-agentcore",      # Amazon Bedrock AgentCore 运行时
     }
 )
 
@@ -59,6 +62,8 @@ MODEL_ENDPOINT_HOSTS = frozenset(
         "generativelanguage.googleapis.com",   # ai-studio-denylist
         "api.openai.com",
         "api.anthropic.com",
+        "bedrock-runtime.",     # 如 bedrock-runtime.us-east-1.amazonaws.com
+        "bedrock-agentcore.",   # 如 bedrock-agentcore.us-east-1.amazonaws.com
     }
 )
 

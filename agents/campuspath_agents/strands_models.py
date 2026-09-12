@@ -12,7 +12,7 @@ Agent 事件循环、hooks、工具调度、追踪都由 Strands 负责，本包
 三种后端实现同一个 Strands ``Model`` 接口，Agent 代码不知道自己在跟谁说话。
 
 钱的规则不变：Vertex 后端构造前经 :func:`campuspath_agents.vertex.assert_vertex_only`
-把关；**禁止** ``GeminiModel(client_args={"api_key": ...})``——那是 AI Studio，直扣个人卡。
+把关；**禁止** ``GeminiModel(client_args={"api_key": ...})``——那是 AI Studio，直扣个人卡。  # ai-studio-denylist
 """
 
 from __future__ import annotations
@@ -38,9 +38,11 @@ BACKEND_VERTEX = "vertex"
 BACKEND_SCRIPTED = "scripted"
 BACKENDS = frozenset({BACKEND_BEDROCK, BACKEND_VERTEX})
 
-#: Bedrock 模型 ID（跨区域推理配置）。可用 ``BEDROCK_MODEL_ID`` 覆盖。
+#: Bedrock 模型 ID。**区域内** ID，不带 ``us.`` 跨区域前缀：AWS 免费计划账户
+#: "Global / Geographic cross-Region inference are not supported"（2026-09-12 官方文档），
+#: 跨区域 ID 在免费计划上直接被拒。可用 ``BEDROCK_MODEL_ID`` 覆盖。
 BEDROCK_MODEL_ENV = "BEDROCK_MODEL_ID"
-DEFAULT_BEDROCK_MODEL = "us.amazon.nova-pro-v1:0"
+DEFAULT_BEDROCK_MODEL = "amazon.nova-pro-v1:0"
 BEDROCK_REGION_ENV = "AWS_REGION"
 DEFAULT_BEDROCK_REGION = "us-east-1"
 

@@ -261,17 +261,20 @@ _SWEEP_DELAY = 0.2
 def _autodetect_model():
     """环境允许就接真模型，否则返回 None（依赖它的端点照旧 503）。
 
-    **不接受"差不多能跑"**：``VertexModel`` 的构造函数会调
-    ``assert_vertex_only()``，环境里但凡有一个 API key、或者
-    ``GOOGLE_GENAI_USE_VERTEXAI`` 没开，它就抛异常——那种情况下
-    宁可整个端点 503，也不能让请求默默走上 AI Studio 那条计费路径。
-    构造失败在这里被吞掉是**故意**的：它意味着"没有可用后端"，
-    不是"出错了"，两者对调用方的含义不同。
+    选后端这件事只有一处逻辑——``campuspath_agents.model.autodetect_model()``
+    （按 ``CAMPUSPATH_MODEL_BACKEND`` 选 Bedrock / Vertex，并各自验证凭据）。
+    API 层再抄一份只会在两边不同步时说谎。
+
+    **不接受"差不多能跑"**：Vertex 后端构造时会调 ``assert_vertex_only()``，
+    环境里但凡有一个 API key、或者 ``GOOGLE_GENAI_USE_VERTEXAI`` 没开，
+    它就抛异常——那种情况下宁可整个端点 503，也不能让请求默默走上
+    AI Studio 那条计费路径。构造失败被吞掉是**故意**的：它意味着
+    "没有可用后端"，不是"出错了"，两者对调用方的含义不同。
     """
     try:
-        from campuspath_agents.model import VertexModel
+        from campuspath_agents.model import autodetect_model
 
-        return VertexModel()
+        return autodetect_model()
     except Exception:
         return None
 
@@ -279,7 +282,8 @@ def _autodetect_model():
 class Deps:
     """服务实例与数据。生产环境换 Firestore 后端，接口不变。
 
-    ``model`` 为 None 表示**没有可用的模型后端**（例如没配 ADC）。
+    ``model`` 为 None 表示**没有可用的模型后端**（例如既没有 AWS 凭据，
+    也没有 Vertex 的 ADC）。
     依赖模型的端点此时返回 **503**，不是 501——两者含义不同：
     501 是"还没做"，503 是"做了，但它依赖的东西现在不可用"。
     把两者混为一谈，会让"还剩多少没做"这个数字失去意义。
@@ -4041,7 +4045,10 @@ def create_app(deps: Deps | None = None) -> FastAPI:
     @implements("GET", "/ops/agents", response_model=AgentRegistry)
     def agent_registry() -> AgentRegistry:
         """P4（2026-08-24）：注册表从契约治理表**派生**，模型/检查点/trace 三项是运行时实测。"""
-        from campuspath_agents.model import DEFAULT_MODEL, MIN_GEMINI_GENERATION, resolve_model
+        from campuspath_agents.model import (
+            DEFAULT_MODEL, MIN_GEMINI_GENERATION, RUNTIME, resolve_model, strands_version,
+        )
+        from campuspath_agents.strands_models import BACKEND_VERTEX, resolve_backend
         from campuspath_agents.vertex import check_environment
         from campuspath_contracts.agents import (
             AGENT_RUNTIME, AGENT_TOOL_WHITELIST, AGENT_WRITE_DOMAINS, FORBIDDEN_TOOL_PATTERNS,
@@ -4072,14 +4079,34 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             default_model = resolve_model()
         except Exception:  # noqa: BLE001 —— 环境覆盖了一个不合格的型号，也如实报默认值
             default_model = DEFAULT_MODEL
+        # 后端：有模型就报它自己的；没有就报**环境会选的那个**——
+        # available=false 时运维还得知道该去配 AWS 凭据还是 ADC。
+        try:
+            env_backend = resolve_backend()
+        except Exception:  # noqa: BLE001 —— 环境写了个不认识的后端名，如实报 None
+            env_backend = None
+        backend = getattr(deps.model, "backend", None) or env_backend
+        # generation_floor / location / vertex_only 只对 Vertex 后端有意义。
+        # Bedrock 形态下机器上可能一个 Google 环境变量都没有，check_environment()
+        # 会报一堆"问题"——那不是问题，是根本没在走那条路。
+        is_vertex = backend == BACKEND_VERTEX
         model_backend = ModelBackendStatus(
             available=deps.model is not None,
             default_model=getattr(deps.model, "model", None) or default_model,
             last_model_version=getattr(deps.model, "last_model_version", None),
+            runtime=getattr(deps.model, "runtime", RUNTIME),
+            backend=backend,
+            sdk_version=strands_version(),
+            last_usage=getattr(deps.model, "last_usage", None),
+            tool_rejections_last_call=len(getattr(deps.model, "last_rejected_tools", ())),
             generation_floor=".".join(str(x) for x in MIN_GEMINI_GENERATION),
-            location=os.environ.get("GOOGLE_CLOUD_LOCATION") or None,
-            vertex_only=not check_environment() if deps.model is not None else
-            os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower() in {"1", "true", "yes", "on"},
+            location=(os.environ.get("GOOGLE_CLOUD_LOCATION") or None) if is_vertex
+            else getattr(deps.model, "region", None),
+            vertex_only=is_vertex and (
+                not check_environment() if deps.model is not None else
+                os.environ.get("GOOGLE_GENAI_USE_VERTEXAI", "").lower()
+                in {"1", "true", "yes", "on"}
+            ),
         )
         persister = getattr(deps, "checkpoint", None)
         if persister is None:
@@ -4792,7 +4819,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             raise HTTPException(503, {
                 "error": "model_backend_unavailable",
                 "detail": (
-                    "本端点需要模型后端。配好 Vertex（见 .env.example）并提供 ADC 后可用。"
+                    "本端点需要模型后端：Amazon Bedrock（AWS 凭据 + "
+                    "CAMPUSPATH_MODEL_BACKEND=bedrock）或 Vertex AI（ADC，见 .env.example）。"
                     "这不是「未实现」——结构与契约已就位，缺的是运行时依赖。"
                 ),
             })
@@ -5728,7 +5756,7 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             raise HTTPException(404, {"error": "unknown_goal", "detail": goal_id})
         if deps.model is None:
             raise HTTPException(503, {"error": "model_backend_unavailable",
-                                      "detail": "现场拆解需要模型后端（Vertex ADC）"})
+                                      "detail": "现场拆解需要模型后端（Bedrock 或 Vertex）"})
         key = (student_id, goal_id)
         now = datetime.now(timezone.utc)
         day_key = (student_id, now.date().isoformat())

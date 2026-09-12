@@ -6,10 +6,15 @@
 
 已知会失败的样例：``gemini-2.5-flash`` 是迁移前的默认值，它必须被拒绝；
 这条测试红过（迁移前），才说明门槛真的在起作用。
+
+2026-09-12（Agents for Humans Hackathon）起主后端换成 **Amazon Bedrock**，
+代际门槛只管 Vertex 那条备用路径；云端镜像改由本文件末尾的
+"不许 import google / MODEL_ID 必须是 Bedrock 默认值" 两条守着。
 """
 
 from __future__ import annotations
 
+import ast
 import importlib.util
 import pathlib
 import sys
@@ -24,6 +29,7 @@ from campuspath_agents.model import (
     assert_model_generation,
     gemini_generation,
 )
+from campuspath_agents.strands_models import DEFAULT_BEDROCK_MODEL
 
 VERTEX_ENV = {
     "GOOGLE_GENAI_USE_VERTEXAI": "TRUE",
@@ -109,15 +115,52 @@ def _load_cloud_module(name: str, rel: str):
     return module
 
 
-@pytest.mark.parametrize(
-    "rel", ["orchestrator_agent/agent.py", "opportunity_scout_agent/agent.py"]
-)
-def test_cloud_mirrors_meet_floor(rel):
-    """Agent Engine 镜像是独立打包的，本地门槛管不到它——所以这里单独断言。"""
-    pytest.importorskip("google.adk")
+CLOUD_MIRRORS = ["orchestrator_agent/agent.py", "opportunity_scout_agent/agent.py"]
+
+
+def _import_roots(rel: str) -> set[str]:
+    """镜像源码里出现的所有顶层 import 名。
+
+    比"跑一遍看 sys.modules"更硬：模块里任何一条 ``import google…``
+    都会被看见，哪怕它藏在函数体里、哪怕运行时那条分支没被走到。
+    """
+    source = (pathlib.Path(__file__).resolve().parents[1] / "cloud" / rel).read_text()
+    roots: set[str] = set()
+    for node in ast.walk(ast.parse(source)):
+        if isinstance(node, ast.Import):
+            roots.update(alias.name.split(".")[0] for alias in node.names)
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            roots.add(node.module.split(".")[0])
+    return roots
+
+
+@pytest.mark.parametrize("rel", CLOUD_MIRRORS)
+def test_cloud_mirrors_are_strands_on_bedrock_not_google(rel, monkeypatch):
+    """云端镜像在 2026-09-12 迁到 Strands + Bedrock：整条链路走 AWS。
+
+    已知会失败的样例是**迁移前那两个文件**——它们 ``from google.adk.agents
+    import Agent``，这条断言会当场红。
+    """
+    monkeypatch.delenv("BEDROCK_MODEL_ID", raising=False)
+    roots = _import_roots(rel)
+    assert "google" not in roots, f"{rel} 仍在 import google.*；镜像必须整条走 AWS"
+    assert {"strands"} <= roots
+
     cloud = _load_cloud_module(f"gen_{rel.split('/')[0]}", rel)
-    assert gemini_generation(cloud.MODEL_ID) >= MIN_GEMINI_GENERATION
-    assert cloud.root_agent.model.model == cloud.MODEL_ID
-    # 3.5-flash 只在 global 端点可用；镜像必须自己钉住 location，不能靠运行时区域
-    assert cloud.root_agent.model.client_kwargs["location"] == "global"
-    assert cloud.root_agent.model.client_kwargs["vertexai"] is True
+    assert cloud.MODEL_ID == DEFAULT_BEDROCK_MODEL
+    assert cloud.root_agent.model.config["model_id"] == cloud.MODEL_ID
+    # 模块对象里也不该留下任何 google 包的引用（import 之外的拿法同样算）
+    leaked = sorted(
+        name for name, value in vars(cloud).items()
+        if (getattr(value, "__module__", "") or "").split(".")[0] == "google"
+        or (getattr(value, "__name__", "") or "").split(".")[0] == "google"
+    )
+    assert leaked == [], f"{rel} 的模块命名空间里有 google 对象：{leaked}"
+
+
+@pytest.mark.parametrize("rel", CLOUD_MIRRORS)
+def test_cloud_mirror_model_id_follows_the_env(rel, monkeypatch):
+    """对照组：``BEDROCK_MODEL_ID`` 是真的生效的覆盖，不是摆设。"""
+    monkeypatch.setenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
+    cloud = _load_cloud_module(f"env_{rel.split('/')[0]}", rel)
+    assert cloud.MODEL_ID == "us.amazon.nova-lite-v1:0"

@@ -1,21 +1,26 @@
 [project]
 name = "campuspath-agents"
 version = "1.0.0"
-description = "A0–A5 Agent 层：工具白名单强制、Workflow 构件、Vertex-only 运行时守卫（WP6）"
+description = "A0–A5 Agent 层：AWS Strands Agents SDK 运行时、工具白名单强制、Workflow 构件、Bedrock 默认/Vertex 备选的模型后端守卫"
 requires-python = ">=3.12"
 dependencies = [
     "campuspath-contracts",
     "campuspath-rules",
     "campuspath-capacity",
+    "strands-agents[gemini,otel]>=1.55",
+    "boto3>=1.40",
+    "bedrock-agentcore>=1.9",
 ]
 
 # 这一层**会**调用模型，因此不在零 LLM 名单里。
-# 但它必须走 Vertex：campuspath_agents.vertex 在构造 Agent 前做运行时断言，
-# 因为后端是由环境变量选的，源码扫描看不见。
+# 每次模型调用都是一次 Strands Agent 调用（编排层）；模型后端由环境变量选
+# （CAMPUSPATH_MODEL_BACKEND=bedrock|vertex，默认 bedrock）。走 Vertex 时
+# campuspath_agents.vertex 在构造 Agent 前做运行时断言——因为后端是由环境
+# 变量选的，源码扫描看不见。
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
-adk = ["google-adk>=2.5"]
+adk = ["google-adk>=2.5"]   # legacy：Strands 迁移前的运行时，保留供回退
 
 [build-system]
 requires = ["hatchling"]

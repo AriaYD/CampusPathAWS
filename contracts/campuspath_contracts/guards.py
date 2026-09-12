@@ -192,6 +192,9 @@ MODEL_SDK_MODULES = frozenset(
         "anthropic",
         "litellm",
         "transformers",
+        "strands",                    # AWS Strands Agents SDK——编排层（agents/）专用，确定性服务禁止
+        "strands_tools",
+        "bedrock_agentcore",          # Amazon Bedrock AgentCore 运行时
     }
 )
 
@@ -233,6 +236,14 @@ AI_STUDIO_ONLY_MARKERS = frozenset(
 DUAL_BACKEND_CLIENT_MARKER = "genai.Client("
 VERTEX_BACKEND_MARKER = "vertexai=True"
 
+#: Strands 的 ``GeminiModel(client_args={...})`` 是另一条通往 AI Studio 的暗道：       ai-studio-denylist
+#: 那个字典会整个透传给底层 ``genai.Client(**client_args)``，                          ai-studio-denylist
+#: 塞进认证字段效果就等同于直传 key 给 ``genai.Client(...)``——                          ai-studio-denylist
+#: 而 ``GeminiModel(client=genai.Client(vertexai=True, ...))`` 这种显式传 client
+#: 的写法是正当的（走上面 DUAL_BACKEND_CLIENT_MARKER 那条判定）。
+CLIENT_ARGS_MARKER = "client_args"          # ai-studio-denylist
+CLIENT_ARGS_API_KEY_TERM = "api_key"
+
 #: 同行标注这个词即视为正当引用（禁用词表、拦截器自身的测试样例）。
 DENYLIST_MARKER = "ai-studio-denylist"
 
@@ -240,12 +251,15 @@ DENYLIST_MARKER = "ai-studio-denylist"
 def ai_studio_violations(source: str, *, proximity_lines: int = 3) -> list[str]:
     """扫描一段源码，返回走 AI Studio 路径的证据。
 
-    三类命中：
+    四类命中：
 
     1. 只属于 AI Studio 的包名或端点；
     2. API key 环境变量（那是 AI Studio 的认证方式）；
     3. ``genai.Client(`` 附近 ``proximity_lines`` 行内看不到 ``vertexai=True``
        —— 双后端 SDK 默认走 AI Studio，**没写就是走错了**。
+    4. ``client_args`` 附近 ``proximity_lines`` 行内出现认证字段         ai-studio-denylist
+       —— Strands GeminiModel 把该字典整个透传给底层 genai 客户端，      ai-studio-denylist
+       塞进认证字段效果等同于直传 key 给它，即走 AI Studio。            ai-studio-denylist
 
     带 ``ai-studio-denylist`` 同行标注的行一律放行：禁用词表本身要能提到这些串。
     """
@@ -266,5 +280,12 @@ def ai_studio_violations(source: str, *, proximity_lines: int = 3) -> list[str]:
                 hits.append(
                     f"{index}: {DUAL_BACKEND_CLIENT_MARKER} 附近 {proximity_lines} 行内没有 "
                     f"{VERTEX_BACKEND_MARKER}——双后端 SDK 默认走 AI Studio"
+                )
+        if CLIENT_ARGS_MARKER in line:
+            window = "\n".join(lines[index - 1 : index - 1 + proximity_lines])
+            if CLIENT_ARGS_API_KEY_TERM in window:
+                hits.append(
+                    f"{index}: {CLIENT_ARGS_MARKER} 附近 {proximity_lines} 行内出现 "
+                    f"{CLIENT_ARGS_API_KEY_TERM}——透传给底层 genai 客户端等于走 AI Studio"
                 )
     return hits

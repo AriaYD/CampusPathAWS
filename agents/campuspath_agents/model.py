@@ -276,7 +276,11 @@ class BedrockModelClient(StrandsModelClient):
         strands_model = build_bedrock_model(model_id, region)
         super().__init__(strands_model, backend=BACKEND_BEDROCK,
                          model_id=strands_model.config["model_id"])
-        self.region = strands_model.config.get("region_name")
+        #: ``BedrockConfig`` 不留 region——问**已经建好的 boto 客户端**要，
+        #: 拿到的才是真正会被调用的区域（而不是我们以为传进去的那个）。
+        meta = getattr(getattr(strands_model, "client", None), "meta", None)
+        self.region = getattr(meta, "region_name", None) or strands_model.config.get(
+            "region_name")
 
 
 class VertexModel(StrandsModelClient):

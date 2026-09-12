@@ -83,3 +83,12 @@ plan item** — that proves provenance, not compliance. The third layer checks w
 - Data contract types do not rank anything. Scores are only allowed to appear on A5's output types
   (`MatchResult`, `CoursePlan`).
 - Adding or changing a field must be accompanied by bumping `CONTRACTS_VERSION` and running `make contracts`.
+
+## Version history
+
+The single record of `CONTRACTS_VERSION` (`campuspath_contracts/common.py`).
+
+| Version | Date | Change |
+|---|---|---|
+| 1.43.0 | 2026-09-12 | Strands migration: `ModelBackendStatus` gains `runtime` / `backend` / `sdk_version` / `last_usage` / `tool_rejections_last_call`; `generation_floor` / `location` / `vertex_only` stay but only mean anything on the vertex backend (on bedrock `location` is the Bedrock region and `vertex_only` is false) |
+| 1.42.0 | 2026-08-24 | Observability + agent registry: `AgentRegistry` / `ModelBackendStatus` / `CheckpointStatus` / `TraceExportStatus` / `RecentSpan` |

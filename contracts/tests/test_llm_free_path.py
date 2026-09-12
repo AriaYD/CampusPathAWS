@@ -21,6 +21,12 @@ from campuspath_contracts.guards import (
     ai_studio_violations,
     imported_model_sdks,
 )
+from campuspath_contracts.llm_free import (
+    MODEL_ENDPOINT_HOSTS,
+    MODEL_SDK_DISTRIBUTIONS,
+    dynamic_access_violations,
+    source_import_violations,
+)
 
 #: 契约包中承担确定性判定的模块。这些是 Rules / Capacity / Composer 直接依赖的。
 DETERMINISTIC_MODULES = (
@@ -67,6 +73,38 @@ def test_deterministic_modules_have_no_sdk_in_their_globals(module_name):
         if getattr(value, "__name__", "")
     }
     assert imported_model_sdks(referenced) == set()
+
+
+def test_scanner_catches_synthetic_strands_import(tmp_path):
+    """H5：Strands（编排层 agents/ 专用 SDK）import 必须被静态 import 扫描拦截。
+
+    确定性服务本身不 import strands（Agent 层才用），但扫描器要能在
+    ``campuspath_action`` 这类零 LLM 包不小心引入它时立刻报错。
+    """
+    bad_file = tmp_path / "sneaky_orchestrator.py"
+    bad_file.write_text("import strands\nfrom strands import Agent\n")
+    offenders = source_import_violations(tmp_path)
+    assert any("strands" in offender for offender in offenders), offenders
+
+
+def test_scanner_catches_synthetic_strands_agents_distribution():
+    """H5：``strands-agents`` / ``strands-agents-tools`` / ``bedrock-agentcore``
+    必须在依赖树扫描的禁用发行名集合里——这是它们被 declared_dependency_violations
+    捕获的前提。"""
+    assert "strands-agents" in MODEL_SDK_DISTRIBUTIONS
+    assert "strands-agents-tools" in MODEL_SDK_DISTRIBUTIONS
+    assert "bedrock-agentcore" in MODEL_SDK_DISTRIBUTIONS
+
+
+def test_scanner_catches_bedrock_runtime_endpoint(tmp_path):
+    """H5：绕开 SDK 直接对 Bedrock Runtime 端点发裸 HTTP 同样要被拦截。"""
+    bad_file = tmp_path / "sneaky_http.py"
+    bad_file.write_text(
+        'URL = "https://bedrock-runtime.us-east-1.amazonaws.com/model/invoke"\n'
+    )
+    offenders = dynamic_access_violations(tmp_path)
+    assert any("bedrock-runtime" in offender for offender in offenders), offenders
+    assert any("bedrock-runtime." in host for host in MODEL_ENDPOINT_HOSTS)
 
 
 def test_ai_studio_path_is_in_the_banned_list():

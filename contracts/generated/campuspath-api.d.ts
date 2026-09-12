@@ -4859,6 +4859,11 @@ export interface components {
         ModelBackendStatus: {
             /** Available */
             available: boolean;
+            /**
+             * Backend
+             * @default null
+             */
+            backend: string | null;
             /** Default Model */
             default_model: string;
             /** Generation Floor */
@@ -4869,10 +4874,32 @@ export interface components {
              */
             last_model_version: string | null;
             /**
+             * Last Usage
+             * @default null
+             */
+            last_usage: {
+                [key: string]: number;
+            } | null;
+            /**
              * Location
              * @default null
              */
             location: string | null;
+            /**
+             * Runtime
+             * @default strands
+             */
+            runtime: string;
+            /**
+             * Sdk Version
+             * @default null
+             */
+            sdk_version: string | null;
+            /**
+             * Tool Rejections Last Call
+             * @default 0
+             */
+            tool_rejections_last_call: number;
             /** Vertex Only */
             vertex_only: boolean;
         };

@@ -183,6 +183,18 @@
           "title": "Available",
           "type": "boolean"
         },
+        "backend": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Backend"
+        },
         "default_model": {
           "title": "Default Model",
           "type": "string"
@@ -203,6 +215,21 @@
           "default": null,
           "title": "Last Model Version"
         },
+        "last_usage": {
+          "anyOf": [
+            {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Usage"
+        },
         "location": {
           "anyOf": [
             {
@@ -214,6 +241,28 @@
           ],
           "default": null,
           "title": "Location"
+        },
+        "runtime": {
+          "default": "strands",
+          "title": "Runtime",
+          "type": "string"
+        },
+        "sdk_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sdk Version"
+        },
+        "tool_rejections_last_call": {
+          "default": 0,
+          "title": "Tool Rejections Last Call",
+          "type": "integer"
         },
         "vertex_only": {
           "title": "Vertex Only",

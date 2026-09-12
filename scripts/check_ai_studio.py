@@ -42,6 +42,12 @@ _PROBES: tuple[tuple[str, str, bool], ...] = (
     ("双后端 SDK 同行指定 Vertex", "c = genai.Client(vertexai=True, project=P)\n", False),
     ("正当的禁用词表", 'B = ("google.generativeai",)  # ai-studio-denylist\n', False),      # ai-studio-denylist
     ("无关代码", "from vertexai import init\ninit(project=P)\n", False),
+    ("Strands GeminiModel 塞 client_args api_key", 'm = GeminiModel(client_args={"api_key": k})\n', True),  # ai-studio-denylist
+    (
+        "Strands GeminiModel 显式传 Vertex client",
+        "m = GeminiModel(client=genai.Client(vertexai=True, project=P))\n",
+        False,
+    ),
 )
 
 

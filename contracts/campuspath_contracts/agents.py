@@ -321,6 +321,19 @@ class ModelBackendStatus(CampusPathModel):
     default_model: str
     #: 最近一次响应报告的 model_version（线上核对"真的在跑 3.5"）
     last_model_version: str | None = None
+    #: Agent 运行时。2026-09-12 起每次模型调用都是一次 Strands ``Agent`` 调用。
+    runtime: str = "strands"
+    #: 模型后端：``bedrock`` / ``vertex`` / ``scripted``。
+    #: ``available=false`` 时报的是**环境会选的那个**——运维据此知道该配哪套凭据。
+    backend: str | None = None
+    #: Strands Agents SDK 版本（实测 ``importlib.metadata``，不是文档抄录）。
+    sdk_version: str | None = None
+    #: 最近一次调用的 token 用量（Strands ``accumulated_usage``）。
+    last_usage: dict[str, int] | None = None
+    #: 最近一次调用被白名单 hook 拦下的工具数。>0 = 拦截真的在生效。
+    tool_rejections_last_call: int = 0
+    #: 以下三项只对 vertex 后端有意义；bedrock 下 ``location`` 是 Bedrock 区域、
+    #: ``vertex_only`` 恒为 false。
     generation_floor: str
     location: str | None = None
     vertex_only: bool

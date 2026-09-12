@@ -27,7 +27,7 @@ from typing import Callable, Protocol
 from campuspath_contracts.common import LocalizedText
 from campuspath_contracts.goals import Goal, RequirementFacet
 
-from .model import ModelRequest
+from .model import GroundingUnavailable, ModelRequest
 
 #: 与 seed/compile_employment_pack.py 同源的词表与判据——两条流水线不许漂移。
 try:
@@ -226,9 +226,17 @@ def run_live_market_research(
 ) -> LiveResearchOutcome:
     progress(8, f"检索「{goal.target_name}」的在招 JD…",
              f"Searching open JDs for “{goal.target_name}”…")
-    raw = model.generate_grounded(ModelRequest(
-        purpose=f"jd-search:{goal.goal_id}",
-        system=SEARCH_PROMPT, data=(goal.target_name,)))
+    try:
+        raw = model.generate_grounded(ModelRequest(
+            purpose=f"jd-search:{goal.goal_id}",
+            system=SEARCH_PROMPT, data=(goal.target_name,)))
+    except GroundingUnavailable as exc:
+        # Bedrock 等后端没有接地检索工具。这不是"研究失败"，是"这条流水线
+        # 在当前后端上跑不了"——但对学生而言结果一样：这次采不到。
+        # 当成同一类如实失败，前端已有的"没采到"文案照旧适用。
+        raise LiveResearchEmpty(
+            "current model backend has no grounded search"
+        ) from exc
     postings = _parse_postings(raw, cap=max_companies)
     if not postings:
         raise LiveResearchEmpty("接地搜索没有返回可用的在招 JD 列表")
