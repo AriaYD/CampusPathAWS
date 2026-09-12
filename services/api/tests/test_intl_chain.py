@@ -368,3 +368,132 @@ def test_runtime_control_pathway_is_gone(client, deps):
     r = admin(client)("POST", "/v1/ops/agent-runtime", json={"action": "stop"})
     assert r.status_code in (403, 404, 405), r.status_code
     assert admin(client)("GET", "/v1/ops/agent-runtime").status_code == 200
+
+
+# ── 4b. 状态灯：Strands 部署探测 Bedrock AgentCore（2026-09-12）────────
+
+
+class _FakeAgentCoreControl:
+    """假的 ``bedrock-agentcore-control`` 客户端（不触网）。"""
+
+    def __init__(self, *, status: str | None = None, raises: Exception | None = None):
+        self.status = status
+        self.raises = raises
+        self.calls: list[str] = []
+
+    def get_agent_runtime(self, *, agentRuntimeId: str):   # noqa: N803 —— boto 的参数名
+        self.calls.append(agentRuntimeId)
+        if self.raises is not None:
+            raise self.raises
+        return {
+            "agentRuntimeId": agentRuntimeId,
+            "agentRuntimeName": "campuspath_campuspath_semantic",
+            "agentRuntimeVersion": "1",
+            "status": self.status,
+        }
+
+
+_AGENTCORE_ARN = (
+    "arn:aws:bedrock-agentcore:us-east-1:000000000000:"
+    "runtime/campuspath_campuspath_semantic-zfXkBtG5mt"
+)
+
+
+@pytest.fixture()
+def agentcore_env(monkeypatch):
+    """选中 AgentCore 运行时的环境（ARN 是假的，客户端也是假的）。"""
+    monkeypatch.setenv("CAMPUSPATH_AGENT_RUNTIME", "agentcore")
+    monkeypatch.setenv("AGENTCORE_RUNTIME_ARN", _AGENTCORE_ARN)
+    monkeypatch.setenv("AWS_REGION", "us-east-1")
+
+
+def _install_fake_boto(monkeypatch, fake, *, seen: list | None = None):
+    import boto3
+
+    def _client(service_name, **kwargs):
+        if seen is not None:
+            seen.append((service_name, kwargs.get("region_name")))
+        assert service_name == "bedrock-agentcore-control", service_name
+        return fake
+
+    monkeypatch.setattr(boto3, "client", _client)
+
+
+def _reset_runtime_cache(deps):
+    from datetime import datetime as _dt, timezone as _tz
+    deps.runtime_status_cache = (_dt.min.replace(tzinfo=_tz.utc), None)
+
+
+def test_agentcore_ready_lights_green(client, deps, monkeypatch, agentcore_env):
+    """READY → running，且 runtimes 报的是 **AgentCore 的**运行时名。
+
+    2026-09-12 实录缺陷：状态灯去数 Vertex ``reasoningEngines``，AgentCore
+    READY 时顶栏却写「Agent runtime stopped」。
+    """
+    seen: list = []
+    _install_fake_boto(monkeypatch, _FakeAgentCoreControl(status="READY"), seen=seen)
+    deps.runtime_script_path = None
+    _reset_runtime_cache(deps)
+
+    body = admin(client)("GET", "/v1/ops/agent-runtime").json()
+    assert body["state"] == "running"
+    assert body["progress"] == 100
+    assert body["runtimes"] == [
+        "Bedrock AgentCore Runtime · campuspath_campuspath_semantic (v1)"]
+    assert seen == [("bedrock-agentcore-control", "us-east-1")]
+
+
+def test_agentcore_updating_is_starting_and_failed_is_stopped(
+        client, deps, monkeypatch, agentcore_env):
+    """H5 反向：UPDATING → starting；CREATE_FAILED（权威的"不能用"）→ stopped。"""
+    _install_fake_boto(monkeypatch, _FakeAgentCoreControl(status="UPDATING"))
+    deps.runtime_script_path = None
+    _reset_runtime_cache(deps)
+    assert admin(client)("GET", "/v1/ops/agent-runtime").json()["state"] == "starting"
+
+    _install_fake_boto(monkeypatch, _FakeAgentCoreControl(status="CREATE_FAILED"))
+    _reset_runtime_cache(deps)
+    assert admin(client)("GET", "/v1/ops/agent-runtime").json()["state"] == "stopped"
+
+
+def test_agentcore_probe_failure_is_unknown_not_stopped(
+        client, deps, monkeypatch, agentcore_env):
+    """控制面调用失败（无权限 / 网络）→ unknown，**不冒充 stopped**，也不 500。"""
+    _install_fake_boto(monkeypatch,
+                       _FakeAgentCoreControl(raises=RuntimeError("AccessDenied")))
+    deps.runtime_script_path = None
+    _reset_runtime_cache(deps)
+    r = admin(client)("GET", "/v1/ops/agent-runtime")
+    assert r.status_code == 200
+    assert r.json()["state"] == "unknown"
+
+    # status 字段缺席（控制面换了形状）同样是 unknown
+    _install_fake_boto(monkeypatch, _FakeAgentCoreControl(status=None))
+    _reset_runtime_cache(deps)
+    assert admin(client)("GET", "/v1/ops/agent-runtime").json()["state"] == "unknown"
+
+
+def test_non_agentcore_path_never_touches_agentcore(client, deps, monkeypatch):
+    """H5 反向：没选 agentcore（vertex / local）时这条分支根本不存在——
+    boto3 一次都不许被调，状态仍由脚本 / Vertex REST 回退给出。"""
+    monkeypatch.delenv("CAMPUSPATH_AGENT_RUNTIME", raising=False)
+    monkeypatch.setenv("AGENTCORE_RUNTIME_ARN", _AGENTCORE_ARN)   # 光有 ARN 不算选中
+
+    import boto3
+
+    def _forbidden(*a, **k):
+        raise AssertionError("没选 agentcore 时不许碰 AgentCore 控制面")
+
+    monkeypatch.setattr(boto3, "client", _forbidden)
+    deps.runtime_script_path = None
+    deps.runtime_rest_fn = lambda: ("campuspath-orchestrator",)
+    _reset_runtime_cache(deps)
+    body = admin(client)("GET", "/v1/ops/agent-runtime").json()
+    assert body["state"] == "running"
+    assert body["runtimes"] == ["campuspath-orchestrator"]
+
+    # 选了 agentcore 却没 ARN → 同样交回原路径（不 unknown、不碰 boto3）
+    monkeypatch.setenv("CAMPUSPATH_AGENT_RUNTIME", "agentcore")
+    monkeypatch.delenv("AGENTCORE_RUNTIME_ARN", raising=False)
+    _reset_runtime_cache(deps)
+    assert admin(client)("GET", "/v1/ops/agent-runtime").json()["state"] == "running"

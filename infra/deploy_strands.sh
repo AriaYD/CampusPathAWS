@@ -42,6 +42,20 @@ assert_not_forbidden() {
   esac
 }
 
+# ── 演示口令：唯一真相是公开落地页印的那个 ──────────────────────────
+# 2026-09-12 演示实录踩到的坑：本脚本默认发 `CampusPathStrandsDemo!`，而
+# campuspath-web-strands 自己的 /landing 页面印着 `OceanMeetsTheSky!`
+# （docs/landing/content.mjs）。评委照页面输入 → 被自己的门挡在外面。
+# 所以默认值不再写死在脚本里，而是**部署时从落地页现读**；读不到就失败，
+# 不猜、不退回旧字面量（猜错的代价就是上面那一行）。
+LANDING_CONTENT="docs/landing/content.mjs"
+
+landing_passcode() {
+  local value=""
+  value=$(sed -n 's/^export const PASSCODE = "\(.*\)";$/\1/p' "$LANDING_CONTENT" 2>/dev/null | head -1) || true
+  printf '%s' "$value"
+}
+
 # ── 打印后执行 / 只打印不执行 ────────────────────────────────────────
 # 真正执行时用 `set -x` 把展开后的确切命令打到 stderr 再跑；
 # DRY_RUN=1 时只打印一行等价预览，不落地任何一次 gcloud 调用。
@@ -273,7 +287,17 @@ cmd_web() {
       auth_secret=$(openssl rand -hex 32)
     fi
   fi
-  local passcode="${CAMPUSPATH_DEMO_PASSCODE:-CampusPathStrandsDemo!}"
+  local passcode="${CAMPUSPATH_DEMO_PASSCODE:-}"
+  if [ -z "$passcode" ]; then
+    passcode=$(landing_passcode)
+    if [ -z "$passcode" ]; then
+      bad "没能从 ${LANDING_CONTENT} 读出 PASSCODE —— 落地页印的口令才是评委会输入的那个；显式设 CAMPUSPATH_DEMO_PASSCODE 或修好该文件"
+      exit 1
+    fi
+    ok "口令取自 ${LANDING_CONTENT}（与公开落地页印的一致；值不打印）"
+  else
+    ok "口令取自 CAMPUSPATH_DEMO_PASSCODE（值不打印）——请确认与落地页印的一致"
+  fi
 
   xrun_web_env_update "$web_url" "$auth_secret" "$passcode"
 }
@@ -337,7 +361,8 @@ CampusPath Strands 独立部署脚本
   AGENTCORE_RUNTIME_ARN     CAMPUSPATH_AGENT_RUNTIME != local 时必填
   API_SERVICE_ACCOUNT       覆盖自动探测的 API 服务账户（默认读现役 campuspath-api 用的那个）
   WEB_AUTH_SECRET           覆盖自动生成（openssl rand -hex 32）的 web AUTH_SECRET
-  CAMPUSPATH_DEMO_PASSCODE  web 登录口令（默认占位值，建议自定义）
+  CAMPUSPATH_DEMO_PASSCODE  web 登录口令（不设则现读 docs/landing/content.mjs 里
+                            落地页印的 PASSCODE；读不到就失败，不猜）
   DRY_RUN=1                 只打印命令，不执行任何 gcloud 调用
 
 安全护栏：

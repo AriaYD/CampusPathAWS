@@ -3944,14 +3944,80 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         script = Path(__file__).resolve().parents[3] / "infra" / "agent_engine.sh"
         return script if script.exists() else None
 
+    #: AgentCore 控制面的 ``status`` → 状态灯。缺席的取值（``CREATE_FAILED`` /
+    #: ``UPDATE_FAILED`` / ``DELETING`` / ``DELETE_FAILED``…）一律 stopped：
+    #: 拿到了权威回答且它不是"能用"，这不是"看不见"。
+    _AGENTCORE_LIGHT = {
+        "READY": "running",
+        "CREATING": "starting",
+        "UPDATING": "starting",
+    }
+
+    def _agentcore_runtime_probe() -> tuple[str, tuple[str, ...]] | None:
+        """Strands 部署（2026-09-12）：语义平面在 **Bedrock AgentCore Runtime**，
+        不在 Vertex Agent Engine。选了 agentcore 就必须问 AgentCore 控制面——
+        否则状态灯去数 ``reasoningEngines``，一个也数不到，于是把 READY 的
+        运行时报成 "stopped"（2026-09-12 演示实录实锤：顶栏说谎）。
+
+        返回 ``None`` = 本环境没选 agentcore（或没给 ARN），交回原有
+        脚本 / Vertex REST 探测，vertex 与 local 两条路径行为一字不变。
+        任何失败 → ``unknown``，绝不冒充 stopped（同 2026-08-02 审计裁定）。
+        """
+        if (os.environ.get("CAMPUSPATH_AGENT_RUNTIME") or "").strip().lower() != "agentcore":
+            return None
+        arn = (os.environ.get("AGENTCORE_RUNTIME_ARN") or "").strip()
+        if not arn or "runtime/" not in arn:
+            return None
+        runtime_id = arn.rsplit("runtime/", 1)[-1].strip()
+        if not runtime_id:
+            return "unknown", ()
+        # region：显式 AWS_REGION 优先，否则从 ARN 第 4 段取（ARN 自带真相）
+        parts = arn.split(":")
+        region = (os.environ.get("AWS_REGION") or "").strip() or (
+            parts[3] if len(parts) > 4 else "") or "us-east-1"
+        try:
+            import boto3  # noqa: PLC0415
+            from botocore.config import Config  # noqa: PLC0415
+
+            # 冷启动时这条探测是**同步**的（顶栏 30s 轮询，首个请求要等它），
+            # 所以超时写死在这里，而不是吃 botocore 默认的 60s。
+            client = boto3.client(
+                "bedrock-agentcore-control", region_name=region,
+                config=Config(connect_timeout=3, read_timeout=5,
+                              retries={"max_attempts": 2, "mode": "standard"}),
+            )
+            info = client.get_agent_runtime(agentRuntimeId=runtime_id)
+        except Exception:
+            return "unknown", ()
+        status = str((info or {}).get("status") or "").strip().upper()
+        if not status:
+            return "unknown", ()
+        state = _AGENTCORE_LIGHT.get(status, "stopped")
+        # 契约映射（不动 AgentRuntimeStatus 版本）：``runtimes`` 原本装
+        # Vertex ReasoningEngine 的 displayName，这里装同一语义的
+        # "这个环境里跑着的运行时叫什么"——平台名 · 运行时名 (v版本)。
+        name = str((info or {}).get("agentRuntimeName") or runtime_id)
+        version = str((info or {}).get("agentRuntimeVersion") or "").strip()
+        label = f"Bedrock AgentCore Runtime · {name}"
+        if version:
+            label = f"{label} (v{version})"
+        return state, (label,)
+
     def _runtime_probe() -> tuple[str, tuple[str, ...]]:
         """status 子命令 → (running|stopped|unknown, display_names)。
 
         **探测不到 ≠ 已停止**：云端容器没有 infra/adk 时引擎可能正在别处运行
         （2026-08-02 审计实锤：两个引擎运行中，这里却报 stopped，顶栏按钮说谎）。
         脚本缺失或执行失败一律 unknown，如实承认"本环境看不见"。
+
+        **agentcore 优先**（2026-09-12）：选了 AgentCore 时运行时根本不在
+        Vertex 那边，问 adk 脚本或 reasoningEngines 只会得到错误答案。
         """
         import subprocess
+
+        agentcore = _agentcore_runtime_probe()
+        if agentcore is not None:
+            return agentcore
 
         def _rest_fallback() -> tuple[str, tuple[str, ...]]:
             rest = deps.runtime_rest_fn
@@ -4090,6 +4156,24 @@ def create_app(deps: Deps | None = None) -> FastAPI:
         # Bedrock 形态下机器上可能一个 Google 环境变量都没有，check_environment()
         # 会报一堆"问题"——那不是问题，是根本没在走那条路。
         is_vertex = backend == BACKEND_VERTEX
+        # 没有后端时**说出为什么**：autodetect_model() 把构造失败当成
+        # "没有可用后端"吞掉了，那个理由只剩这一处能报出来。
+        # getattr 取默认值：LAST_AUTODETECT_ERROR 是 agents 侧后加的，
+        # 它还没落地时这里报 None，而不是 AttributeError。
+        from campuspath_agents import model as _agent_model
+        unavailable_reason = (
+            getattr(_agent_model, "LAST_AUTODETECT_ERROR", None)
+            if deps.model is None else None
+        )
+        # 工具循环在哪一侧跑（F13）。看的是**客户端有哪个方法**，不是它自称什么：
+        # remote = AgentCore Runtime 里跑完整事件循环；local = 本进程；
+        # 两个都没有 = 该后端只有纯文本路径，A4 会退回 generate()。
+        if hasattr(deps.model, "extract_opportunity"):
+            tool_loop = "remote"
+        elif hasattr(deps.model, "run_agent"):
+            tool_loop = "local"
+        else:
+            tool_loop = "text_only"
         model_backend = ModelBackendStatus(
             available=deps.model is not None,
             default_model=getattr(deps.model, "model", None) or default_model,
@@ -4099,6 +4183,8 @@ def create_app(deps: Deps | None = None) -> FastAPI:
             sdk_version=strands_version(),
             last_usage=getattr(deps.model, "last_usage", None),
             tool_rejections_last_call=len(getattr(deps.model, "last_rejected_tools", ())),
+            unavailable_reason=unavailable_reason,
+            tool_loop=tool_loop,
             generation_floor=".".join(str(x) for x in MIN_GEMINI_GENERATION),
             location=(os.environ.get("GOOGLE_CLOUD_LOCATION") or None) if is_vertex
             else getattr(deps.model, "region", None),

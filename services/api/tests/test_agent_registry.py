@@ -185,3 +185,72 @@ def test_model_unavailable_503_names_all_three_ways_to_get_a_backend(client):
     detail = body["detail"]
     assert "AgentCore" in detail and "AGENTCORE_RUNTIME_ARN" in detail
     assert "Bedrock" in detail and "Vertex" in detail
+
+
+# --------------------------------------------------------------------------
+# F9 / F13：注册表要说出"为什么没有后端"与"工具循环在哪一侧跑"
+# --------------------------------------------------------------------------
+
+
+def test_registry_reports_why_the_backend_is_unavailable(client, monkeypatch):
+    """已知会失败的样例：``available=false`` 而不说原因。
+
+    运维看到的只有一个 false，而真相（"选了 agentcore 却没给 ARN" /
+    "AWS 凭据链是空的"）在 ``autodetect_model()`` 里被 ``except Exception``
+    吞掉了。注册表必须把它端出来。
+    """
+    from campuspath_agents import model as agent_model
+
+    monkeypatch.setattr(agent_model, "LAST_AUTODETECT_ERROR",
+                        "agentcore 已选中但 AGENTCORE_RUNTIME_ARN 为空", raising=False)
+    body = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert body["available"] is False
+    assert body["unavailable_reason"] == "agentcore 已选中但 AGENTCORE_RUNTIME_ARN 为空"
+
+
+def test_unavailable_reason_is_absent_when_a_backend_is_available(monkeypatch):
+    """对照组：有后端时不许报一条陈年的探测失败——那会指错方向。"""
+    from campuspath_agents import model as agent_model
+    from campuspath_agents.model import ScriptedModel
+
+    monkeypatch.setattr(agent_model, "LAST_AUTODETECT_ERROR", "陈年旧账", raising=False)
+    client = TestClient(create_app(Deps("full", model=ScriptedModel({}))))
+    body = client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]
+    assert body["available"] is True
+    assert body["unavailable_reason"] is None
+
+
+def test_registry_reports_where_the_tool_loop_runs():
+    """F13：A4 的工具循环在哪一侧跑，是运维分诊的第二格。
+
+    ``local`` = 工具是本进程的闭包（能读库、能写草稿）；
+    ``remote`` = 整个事件循环在 AgentCore Runtime 里；
+    ``text_only`` = 这个后端根本没有带工具的路径，A4 退回纯文本。
+    """
+    from campuspath_agents.model import ScriptedModel
+
+    class _RemoteExtract:
+        backend = "bedrock"
+        runtime = "agentcore"
+        model = "amazon.nova-pro-v1:0"
+        region = "us-east-1"
+
+        def extract_opportunity(self, *a, **k):  # pragma: no cover - 只看有没有
+            raise NotImplementedError
+
+    class _TextOnly:
+        backend = "bedrock"
+        runtime = "agentcore"
+        model = "amazon.nova-pro-v1:0"
+        region = "us-east-1"
+
+        def generate(self, request):  # pragma: no cover
+            return ""
+
+    def _loop(model):
+        client = TestClient(create_app(Deps("full", model=model)))
+        return client.get("/v1/ops/agents", headers=ADMIN).json()["model_backend"]["tool_loop"]
+
+    assert _loop(ScriptedModel({})) == "local"       # StrandsModelClient.run_agent
+    assert _loop(_RemoteExtract()) == "remote"
+    assert _loop(_TextOnly()) == "text_only"

@@ -115,10 +115,17 @@ function RuntimeToggle() {
   const running = status.state === "running";
   // 状态灯（2026-08-03 用户需求）：绿 = 引擎运行中 = 正在按小时计费；
   // 灰 = 已停止。
+  // 2026-09-12：后端在 Strands 部署上报的是 AgentCore 控制面的真实运行时名
+  //（`Bedrock AgentCore Runtime · <name> (v<n>)`），Vertex 部署上仍是
+  // ReasoningEngine 的 displayName——同一个契约字段，这里只负责把它挂进
+  // tooltip，不硬编码任何云厂商名字。
+  const names = (status.runtimes ?? []).filter(Boolean);
+  const hint = t(running ? "runtime.light.running" : "runtime.light.stopped");
   return (
     <span
       data-runtime-light={status.state}
-      title={t(running ? "runtime.light.running" : "runtime.light.stopped")}
+      data-runtime-names={names.join(", ") || undefined}
+      title={names.length ? `${hint} — ${names.join(", ")}` : hint}
       className="t-meta inline-flex items-center gap-1.5 text-fg-muted"
     >
       <span
