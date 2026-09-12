@@ -65,6 +65,49 @@ class ToolBelt:
     def call_log(self) -> tuple[ToolCall, ...]:
         return tuple(self._log)
 
+    def reject(self, name: str, detail: str) -> None:
+        """记一次被拒的调用（Strands hook 在执行前拦下的那种）。"""
+        with span("agent.tool", **{"campuspath.agent": self.agent.value,
+                                   "gen_ai.tool.name": name,
+                                   "campuspath.tool.accepted": False}):
+            self._log.append(ToolCall(self.agent, name, False, detail))
+
+    def as_strands_tools(self, specs: dict[str, dict[str, Any]] | None = None) -> list[Any]:
+        """把已装备的工具封装成 Strands ``AgentTool``。
+
+        每个封装体执行时仍经 :meth:`call`——白名单在**三处**生效：
+        注册时、Strands ``BeforeToolCallEvent`` hook、以及这里的每次调用。
+        ``specs`` 给出工具的描述与输入 schema；没给的用最宽松的对象 schema。
+        """
+        import json as _json  # noqa: PLC0415
+
+        from strands.tools.tools import PythonAgentTool  # noqa: PLC0415
+
+        specs = specs or {}
+        tools: list[Any] = []
+        for name in sorted(self._tools):
+            spec = specs.get(name) or {}
+            tool_spec = {
+                "name": name,
+                "description": spec.get("description") or f"CampusPath 工具 {name}",
+                "inputSchema": {"json": spec.get(
+                    "schema", {"type": "object", "properties": {}, "additionalProperties": True}
+                )},
+            }
+
+            def _run(tool_use, _name=name, **kwargs):
+                try:
+                    payload = self.call(_name, **(tool_use.get("input") or {}))
+                    return {"toolUseId": tool_use["toolUseId"], "status": "success",
+                            "content": [{"text": _json.dumps(payload, ensure_ascii=False,
+                                                              default=str)}]}
+                except ToolPermissionError as exc:
+                    return {"toolUseId": tool_use["toolUseId"], "status": "error",
+                            "content": [{"text": str(exc)}]}
+
+            tools.append(PythonAgentTool(name, tool_spec, _run))
+        return tools
+
     def call(self, name: str, /, **kwargs: Any) -> Any:
         """调用一个工具。**每次都重新查白名单**，不信任注册时的判断。
 
