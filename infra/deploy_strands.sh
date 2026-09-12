@@ -198,7 +198,7 @@ cmd_api() {
   # --set-secrets 一次性声明这个服务全部的密钥挂载：CHECKIN_SECRET 是
   # 复制现役 campuspath-api 已有的挂法（infra/bootstrap.sh 建的密钥容器，
   # 值人工注入），另外两个是新 Bedrock 凭据。
-  xrun gcloud run deploy "$API_SERVICE" \
+  xrun gcloud run deploy "$API_SERVICE" --allow-unauthenticated \
     --image="$image" \
     --project="$PROJECT_ID" \
     --region="$APP_REGION" \
@@ -243,7 +243,7 @@ cmd_web() {
 
   xrun gcloud builds submit --tag "$image" --project="$PROJECT_ID" apps/web
 
-  xrun gcloud run deploy "$WEB_SERVICE" \
+  xrun gcloud run deploy "$WEB_SERVICE" --allow-unauthenticated \
     --image="$image" \
     --project="$PROJECT_ID" \
     --region="$APP_REGION" \
