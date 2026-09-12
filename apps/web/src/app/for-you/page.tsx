@@ -23,8 +23,8 @@ import {
  * 唯一被允许做取舍的那个 Agent（A5）的输出。
  *
  * 排序与资格判定零模型（确定性加权和 + Rules 凭据），模型只写理由文案；
- * 因此没有 Vertex 后端时 `/matches` **不会 503**——照常返回排序结果，
- * 理由退回规则生成的兜底文案（2026-08-02 审计修正：此前这里写"会 503"是错的）。
+ * 因此没有模型后端时（Strands/Bedrock 或 Vertex 均未就绪）`/matches` **不会 503**——
+ * 照常返回排序结果，理由退回规则生成的兜底文案（2026-08-02 审计修正：此前这里写"会 503"是错的）。
  */
 /** 契约里的 EligibilityStateName 只有这四个值（opportunity.py）。
  *  `needs_confirmation` 必须映到 unknown 而**不是** not_met——

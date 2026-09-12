@@ -97,7 +97,7 @@ export class ApiError extends Error {
     super(message);
     this.name = "ApiError";
   }
-  /** 服务端做完了，但它依赖的东西现在不可用（例如没有 ADC 的 Vertex 后端）。 */
+  /** 服务端做完了，但它依赖的东西现在不可用（例如 Bedrock 凭据缺失，或没有 ADC 的 Vertex 后端）。 */
   get isUnavailable() {
     return this.status === 503;
   }
@@ -289,7 +289,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify(edit),
     }),
-  /** Demo 运行时状态/启停（F1，2026-08-02）：Vertex Agent Engine 顶栏控制 */
+  /** Demo 运行时状态/启停（F1，2026-08-02）：顶栏 Agent 运行时状态灯（原 Vertex Agent Engine 探测，
+   *  2026-09-12 起后端迁移到 Strands + Bedrock AgentCore Runtime；数据路径与端点不变，仅前端文案泛化）。 */
   agentRuntime: () =>
     request<Schemas["AgentRuntimeStatus"]>("/v1/ops/agent-runtime"),
   /** 现场 AI 拆解（A4，2026-08-02）：服务端后台任务，切页/关页不中断 */

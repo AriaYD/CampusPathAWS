@@ -82,9 +82,11 @@ function InstitutionRoleSwitch() {
   );
 }
 
-/** F1（2026-08-02 用户裁定）：demo 顶栏一键启停 Vertex Agent Engine。
- * 运行时按小时计费——这颗按钮的意义就是「演示前启动、演示完关闭」。
- * 任务在服务端跑（切页不中断）；环境不可控（云端容器无 adk）时按钮不出现。 */
+/** F1（2026-08-02 用户裁定）：demo 顶栏一键启停 Agent 运行时（当时为 Vertex Agent Engine）。
+ * 运行时按用量计费——这颗按钮的意义就是「演示前启动、演示完关闭」。
+ * 任务在服务端跑（切页不中断）；环境不可控（云端容器无 adk）时按钮不出现。
+ * 2026-09-12 起后端迁移到 Strands + Bedrock AgentCore Runtime；本组件读的
+ * `GET /v1/ops/agent-runtime` 数据路径未变，label 已泛化为不绑定具体云厂商。 */
 function RuntimeToggle() {
   // 2026-08-04 用户裁定：**控制按钮整体撤除**——测试网站的用户不该有
   // 机会启停 Cloud Run 运行时；顶栏只留只读状态灯（GET 探测）。
@@ -108,7 +110,7 @@ function RuntimeToggle() {
   }, []);
 
   // unknown = 后端如实承认"本环境探测不到运行时"——灯不显示。
-  // 2026-08-03 起云端探测走 Vertex REST 回退，线上通常能给出真值。
+  // 2026-08-03 起云端探测走 REST 回退（探测目标随后端迁移而变），线上通常能给出真值。
   if (!status || status.state === "unknown") return null;
   const running = status.state === "running";
   // 状态灯（2026-08-03 用户需求）：绿 = 引擎运行中 = 正在按小时计费；
