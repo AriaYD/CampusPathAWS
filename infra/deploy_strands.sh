@@ -108,6 +108,12 @@ resolve_api_service_account() {
 
 # ── secrets：AWS 凭据 → Secret Manager ───────────────────────────────
 cmd_secrets() {
+  # 守门：AWS_PROFILE 指向的身份若挂着 AdministratorAccess，拒绝把它的长期密钥推进公网服务。
+  if command -v aws >/dev/null 2>&1; then
+    if aws iam list-attached-user-policies --user-name "$(aws sts get-caller-identity --query 'Arn' --output text 2>/dev/null | sed 's#.*/##')" --output text 2>/dev/null | grep -q AdministratorAccess; then
+      bad "AWS_PROFILE=${AWS_PROFILE:-default} 是管理员身份——不把管理员长期密钥推进 Cloud Run。用最小权限用户 campuspath-runtime-invoker 的 profile。"; exit 1
+    fi
+  fi
   step "secrets：AWS 凭据 → Secret Manager"
   local profile="${AWS_PROFILE:-campuspath}"
   local access_key="" secret_key=""
@@ -363,7 +369,10 @@ main() {
       cmd_status
       ;;
     all)
-      cmd_secrets
+      # 2026-09-12 起 Secret Manager 里存的是最小权限用户 campuspath-runtime-invoker
+      # 的密钥（v2），不是管理员 profile 的。默认不再覆盖；确需轮换时 WITH_SECRETS=1。
+      if [ "${WITH_SECRETS:-0}" = "1" ]; then cmd_secrets; else
+        echo "[skip] secrets：沿用 Secret Manager 现有版本（最小权限 invoker）；轮换用 WITH_SECRETS=1"; fi
       cmd_api
       cmd_web
       cmd_status
