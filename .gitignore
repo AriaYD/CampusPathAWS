@@ -71,3 +71,7 @@ seed/raw/hkust_catalog/_cache/
 # 评测产物：每次跑都会重生成，且 report.md 带时间戳
 eval/results/
 seed/raw/hkust_programs/_cache/
+
+# AWS 控制台下载的访问密钥 CSV（绝不入库）
+*accessKeys*.csv
+*_accessKeys.csv
