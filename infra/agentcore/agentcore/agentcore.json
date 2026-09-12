@@ -14,7 +14,7 @@
       "build": "CodeZip",
       "entrypoint": "main.py",
       "codeLocation": "app/campuspath/",
-      "runtimeVersion": "PYTHON_3_14",
+      "runtimeVersion": "PYTHON_3_12",
       "networkMode": "PUBLIC",
       "protocol": "HTTP",
       "instrumentation": { "enableOtel": true }

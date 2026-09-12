@@ -755,6 +755,9 @@ class OpportunityAgent(AgentBase):
     def __post_init__(self) -> None:
         super().__post_init__()
         self.last_emitted = None
+        #: 上一次抽取里被白名单拦下的工具 [(name, reason)]。
+        #: 取自**那次调用的返回值**，不是客户端属性——客户端是并发共用的。
+        self.last_rejected_tools: tuple[tuple[str, str], ...] = ()
         self._source_id: str | None = None
         self._raw_content: str = ""
 
@@ -783,6 +786,7 @@ class OpportunityAgent(AgentBase):
     ) -> OpportunityDraft:
         self._source_id, self._raw_content = source_id, raw_content
         self.last_emitted = None
+        self.last_rejected_tools = ()
         self._equip_defaults()
         # 外部内容作为数据块传入。system 里只有指令，没有一个字来自来源。
         request = ModelRequest(
@@ -791,11 +795,23 @@ class OpportunityAgent(AgentBase):
             purpose=f"extract:{source_id}",
             agent=self.agent_id,
         )
+        remote = getattr(self.model, "extract_opportunity", None)
         run = getattr(self.model, "run_agent", None)
-        if run is None:                      # 非 Strands 的测试替身：退回纯文本路径
+        if remote is not None:
+            # 语义平面在 AgentCore 上：工具循环在**那一侧**跑完，
+            # 回来的 ``emitted`` 才是模型真的提议过的字段。
+            reply = remote(request, source_id=source_id, raw_content=raw_content)
+            emitted = reply.get("emitted")
+            self.last_emitted = dict(emitted) if isinstance(emitted, dict) else None
+            self.last_rejected_tools = tuple(reply.get("rejected_tools") or ())
+        elif run is None:                    # 非 Strands 的测试替身：退回纯文本路径
             self.model.generate(request)
         else:
-            run(request, tools=self.belt.as_strands_tools(A4_TOOL_SPECS), belt=self.belt)
+            outcome = run(request, tools=self.belt.as_strands_tools(A4_TOOL_SPECS),
+                          belt=self.belt)
+            #: 被拒工具从**这次调用的返回值**取：客户端上的 ``last_rejected_tools``
+            #: 会被并发的另一次调用覆盖。
+            self.last_rejected_tools = tuple(getattr(outcome, "rejected_tools", ()))
         return OpportunityDraft(
             draft_id=draft_id, source_id=source_id,
             extracted=extracted, provenance=provenance,

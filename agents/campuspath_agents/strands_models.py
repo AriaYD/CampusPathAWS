@@ -119,10 +119,19 @@ class ScriptedStrandsModel(Model):
 
     * ``str`` —— 作为一段文本回复；
     * ``{"tool": 名字, "input": {...}}`` —— 发起一次工具调用；工具结果回来后
-      的下一轮回 ``"done"``（或剧本里 ``f"{purpose}#after_tool"`` 的值）。
+      按顺序查 ``f"{purpose}#after:{工具名}"`` → ``f"{purpose}#after_tool"`` → ``"done"``。
+      按工具名分开是因为一次调用里可能有两个工具，两条后续不该混成一条。
 
     未预设的 purpose **抛异常**，不返回空串——空串会让 Agent 走进
     "模型没说话"的分支，而测试作者以为自己测的是正常路径。
+
+    **保真度**：剧本要调的工具必须真的在 ``tool_specs`` 里（真模型只看得见
+    spec 列表）。不在就抛 ``KeyError`` ——否则 spec 写坏、工具压根没进 Strands
+    注册表时，"A4 能调 emit_opportunity_draft"这类测试会照样绿。
+    例外要**显式声明** ``"unlisted": True``：那是在模拟"模型幻觉出一个没装备的
+    工具名"（A4 被劫持后试图 ``publish_opportunity`` 就是这种形状）。
+    ``tool_specs`` 本身为空时不检查——那时 Agent 一个工具都没有，
+    任何工具调用都只能是幻觉。
     """
 
     def __init__(self, script: dict[str, Any] | None = None) -> None:
@@ -130,6 +139,8 @@ class ScriptedStrandsModel(Model):
         self.seen: list[str] = []
         #: ``structured_output`` 拿不到 invocation_state，调用方先把 purpose 放这里。
         self.pending_purpose: str | None = None
+        #: toolUseId → 工具名。工具结果里只有 id，没有名字。
+        self._tool_uses: dict[str, str] = {}
 
     # Strands Model 接口 ---------------------------------------------------
     def update_config(self, **model_config: Any) -> None:  # noqa: D102
@@ -159,13 +170,21 @@ class ScriptedStrandsModel(Model):
         self.seen.append(purpose)
         answer = self._answer_for(purpose)
         last = messages[-1] if messages else {"content": []}
-        if any("toolResult" in block for block in last.get("content", [])):
-            answer = self.script.get(f"{purpose}#after_tool", "done")
+        called = self._tool_called_in(last)
+        if called is not None:
+            answer = self.script.get(
+                f"{purpose}#after:{called}",
+                self.script.get(f"{purpose}#after_tool", "done"))
 
         yield {"messageStart": {"role": "assistant"}}
         if isinstance(answer, dict) and "tool" in answer:
+            name = answer["tool"]
+            self._assert_tool_is_visible(name, tool_specs, unlisted=bool(
+                answer.get("unlisted")))
+            tool_use_id = f"scripted-{len(self.seen)}"
+            self._tool_uses[tool_use_id] = name
             yield {"contentBlockStart": {"start": {"toolUse": {
-                "toolUseId": f"scripted-{len(self.seen)}", "name": answer["tool"]}}}}
+                "toolUseId": tool_use_id, "name": name}}}}
             yield {"contentBlockDelta": {"delta": {"toolUse": {
                 "input": json.dumps(answer.get("input", {}), ensure_ascii=False)}}}}
             yield {"contentBlockStop": {}}
@@ -179,6 +198,32 @@ class ScriptedStrandsModel(Model):
             "usage": {"inputTokens": 0, "outputTokens": 0, "totalTokens": 0},
             "metrics": {"latencyMs": 0},
         }}
+
+    def _tool_called_in(self, message: dict[str, Any]) -> str | None:
+        """上一条消息里的工具结果属于哪个工具。没有工具结果就返回 None。"""
+        for block in message.get("content", []) or []:
+            result = block.get("toolResult") if isinstance(block, dict) else None
+            if result is None:
+                continue
+            return self._tool_uses.get(str(result.get("toolUseId")), "")
+        return None
+
+    def _assert_tool_is_visible(self, name: str, tool_specs: list[ToolSpec] | None, *,
+                                unlisted: bool) -> None:
+        """剧本要调的工具，真模型看得见吗？
+
+        真模型只能从 ``tool_specs`` 里挑名字。剧本要是调了一个不在里面的工具，
+        要么是 spec 配错了（真跑起来这条路径根本不存在），要么是在**故意**模拟
+        幻觉——后者必须写明 ``unlisted``。
+        """
+        if unlisted or not tool_specs:
+            return
+        visible = {str(spec.get("name")) for spec in tool_specs}
+        if name not in visible:
+            raise KeyError(
+                f"剧本要调 {name!r}，但它不在 tool_specs 里（可见的是 {sorted(visible)}）。"
+                "要么把工具装备上，要么在剧本里写 \"unlisted\": True 声明这是模拟幻觉"
+            )
 
     async def structured_output(  # noqa: D102
         self, output_model: type[T], prompt: Messages, system_prompt: str | None = None,

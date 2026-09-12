@@ -37,9 +37,10 @@ if [ -n "$DIFF" ]; then
   check() {
     local pattern="${1:-}" label="${2:-未命名}" hit
     [ -z "$pattern" ] && return 0
-    hit=$(echo "$DIFF" | grep -iE -- "$pattern" | head -3 || true)
+    # 测试里的"已知会失败样例"（假私钥头、假 AKIA）以 known-bad-sample 标记放行
+    hit=$(echo "$DIFF" | grep -v 'known-bad-sample' | grep -iE -- "$pattern" | head -3 || true)
     if [ -n "$hit" ]; then
-      block "疑似 $label："
+      block "疑似 ${label}："
       echo "$hit" | sed 's/^/    /' | cut -c1-110
     fi
   }

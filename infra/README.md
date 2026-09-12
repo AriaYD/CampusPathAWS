@@ -119,3 +119,16 @@ and `/v1/ops/agents` are taken from the actual routes in
 - **The Vertex region is measured, not asserted.** `VERTEX_LOCATION` in `config.sh` is only a default;
   `verify.sh` queries the API for the real value at runtime. Which models a region supports changes over time,
   so hardcoding it in the docs would eventually go stale.
+- **The AgentCore Runtime trusts the system prompt in the payload.** (Noted 2026-09-12; not fixed in that pass.)
+  Whatever arrives as `request.system` goes straight into the model's system slot. The only thing backing that is
+  deployment configuration: `invoke_agent_runtime` is IAM-gated, and the sole caller is the Cloud Run service account.
+  So "the system prompt only ever comes from instructions written in this repo" is guaranteed by *configuration*,
+  not by *shape* — add a second caller, or leak that credential, and it stops holding. The real fix is to move the six
+  system prompts into the Runtime and let the payload carry only `purpose` plus data blocks, so that splicing external
+  content into the system prompt becomes impossible at the protocol level. There is a matching TODO in the entrypoint
+  (`agents/cloud/agentcore_app.py::_checked_request`).
+  The half that *is* done: every payload field is type-checked and capped at 32 KiB per block (`MAX_FIELD_BYTES`),
+  and anything out of bounds comes back as `{"error": ...}` instead of raising.
+- **The staged bundle must be verified on Python 3.12.** `agentcore.json` declares `runtimeVersion: PYTHON_3_12`, and
+  `verify_staged.py` prints the interpreter it ran on and fails when that is not 3.12.x (escape hatch:
+  `CAMPUSPATH_STAGED_PY_OK=1`). A green run on 3.14 proves something about a different environment.

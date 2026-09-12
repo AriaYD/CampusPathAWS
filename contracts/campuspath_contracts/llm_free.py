@@ -28,6 +28,8 @@ from .guards import MODEL_SDK_MODULES, imported_model_sdks
 __all__ = [
     "MODEL_SDK_DISTRIBUTIONS",
     "MODEL_ENDPOINT_HOSTS",
+    "MODEL_AWS_SERVICE_PREFIXES",
+    "boto_model_service",
     "declared_dependency_violations",
     "source_import_violations",
     "dynamic_access_violations",
@@ -56,18 +58,33 @@ MODEL_SDK_DISTRIBUTIONS = frozenset(
 )
 
 #: 绕开 SDK 直接发请求同样是"接触模型"。
+#:
+#: 两个 Bedrock 条目**不带尾点**（2026-09-12 修）：带尾点时只有完整主机名
+#: （``bedrock-runtime.us-east-1.amazonaws.com``）会被命中，而
+#: ``boto3.client("bedrock-runtime")`` 里那个**服务名**没有点——
+#: 审查实测：整条 boto3 路径因此从四层里一层不落地穿过去。
 MODEL_ENDPOINT_HOSTS = frozenset(
     {
         "aiplatform.googleapis.com",
         "generativelanguage.googleapis.com",   # ai-studio-denylist
         "api.openai.com",
         "api.anthropic.com",
-        "bedrock-runtime.",     # 如 bedrock-runtime.us-east-1.amazonaws.com
-        "bedrock-agentcore.",   # 如 bedrock-agentcore.us-east-1.amazonaws.com
+        "bedrock-runtime",      # 含 bedrock-runtime.us-east-1.amazonaws.com
+        "bedrock-agentcore",    # 含 bedrock-agentcore.us-east-1.amazonaws.com
     }
 )
 
 _DYNAMIC_IMPORTERS = {"import_module", "__import__"}
+
+#: 用 boto3 直连模型服务：``boto3.client("bedrock-runtime")`` /
+#: ``boto3.Session(...).client("bedrock-agentcore")``。前三层全部放行——
+#: ``boto3`` 不是模型 SDK（S3、DynamoDB 都用它），源码里也没有任何禁用 import。
+#: **第一个字符串实参**才是判定依据：它是 AWS 服务名。
+BOTO_CLIENT_FACTORIES = ("client",)
+
+#: 以此开头的 AWS 服务名 = 模型服务。``bedrock``（控制面）、
+#: ``bedrock-runtime``（推理）、``bedrock-agentcore``（Runtime/Gateway）全在内。
+MODEL_AWS_SERVICE_PREFIXES = ("bedrock",)
 
 
 def declared_dependency_violations(distribution: str) -> list[str]:
@@ -112,6 +129,30 @@ def source_import_violations(root: pathlib.Path) -> list[str]:
     return offenders
 
 
+def boto_model_service(node: ast.Call) -> str | None:
+    """这次 ``Call`` 是不是在建一个**模型服务**的 boto 客户端？是就返回服务名。
+
+    命中两种写法（两者的 ``func`` 都是 ``Attribute(attr="client")``）::
+
+        boto3.client("bedrock-runtime", region_name=...)
+        boto3.Session(...).client("bedrock-agentcore")
+
+    只看**第一个字符串字面量实参**（位置或 ``service_name=``）。不是字面量就
+    不判——这里宁可漏判也不误判：``session.client(name)`` 里的 ``name``
+    十有八九是 S3。真正的兜底在第 1/2 层（依赖树与运行时 import）。
+    """
+    func = node.func
+    if not isinstance(func, ast.Attribute) or func.attr not in BOTO_CLIENT_FACTORIES:
+        return None
+    candidates = list(node.args[:1])
+    candidates += [kw.value for kw in node.keywords if kw.arg == "service_name"]
+    for arg in candidates:
+        if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+            if arg.value.startswith(MODEL_AWS_SERVICE_PREFIXES):
+                return arg.value
+    return None
+
+
 def dynamic_access_violations(root: pathlib.Path) -> list[str]:
     """惰性导入与裸 HTTP。
 
@@ -119,6 +160,10 @@ def dynamic_access_violations(root: pathlib.Path) -> list[str]:
     ``importlib.import_module("vertexai.generative_models")``，
     或者直接 ``urllib.request`` POST 到 aiplatform 端点，
     前三层**全部**放行。
+
+    2026-09-12 再补一条（F5）：``boto3.client("bedrock-runtime")`` 连这一层
+    原来也穿得过去——主机模式带尾点，而服务名里没有点。见
+    :func:`boto_model_service`。
     """
     offenders: list[str] = []
     for path in sorted(root.rglob("*.py")):
@@ -139,6 +184,11 @@ def dynamic_access_violations(root: pathlib.Path) -> list[str]:
         for node in ast.walk(tree):
             if not isinstance(node, ast.Call):
                 continue
+            service = boto_model_service(node)
+            if service is not None:
+                offenders.append(
+                    f"{path.name}:{node.lineno} boto 客户端直连模型服务 {service}"
+                )
             func = node.func
             name = (
                 func.attr if isinstance(func, ast.Attribute)

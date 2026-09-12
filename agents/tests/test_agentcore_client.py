@@ -80,8 +80,6 @@ def test_generate_sends_the_model_request_shape_and_returns_the_text():
     }}
     assert (model.backend, model.runtime) == ("bedrock", "agentcore")
     assert model.region == "us-east-1"
-    assert model.system_prompts() == ["你是 A5"]
-    assert [c.purpose for c in model.calls] == ["pathway:S1"]
 
 
 def test_payload_is_bytes_not_a_dict():
@@ -102,10 +100,37 @@ def test_no_agent_means_no_agent_key_value_not_a_fabricated_one():
 # --------------------------------------------------------------------------
 
 
-def test_session_id_is_long_enough_and_stable_per_purpose_prefix():
-    assert len(session_id_for("pathway:S1")) >= 33
-    assert session_id_for("pathway:S1") == session_id_for("pathway:S2")
-    assert session_id_for("pathway:S1") != session_id_for("extract:SRC-1")
+def test_session_id_is_long_enough_and_scoped_to_the_subject():
+    """已知会失败的样例：只按第一段分会话 —— **全校学生共用一个 AgentCore 会话**。
+
+    AgentCore 会话是有状态的：同一个 ``runtimeSessionId`` 下的调用会看到彼此的
+    上下文。``reflect:STU-A`` 与 ``reflect:STU-B`` 落在同一会话上，等于把
+    A 的反思暴露给 B 的那次调用。所以第二段**像 ID**（带数字或大写的代号）
+    时必须进 key；第三段（变体名之类）不进——同一学生的三套强度共享冷启动。
+    """
+    table = {
+        "reflect:STU-A": "reflect:STU-B",              # 不同学生 → 不同会话
+        "a5-pathway:STU-A": "a5-pathway:STU-B",
+        "skill_tags:COMP4211": "skill_tags:COMP2011",
+        "extract:SRC-1": "extract:SRC-2",
+    }
+    for left, right in table.items():
+        assert session_id_for(left) != session_id_for(right), left
+        assert len(session_id_for(left)) >= 33
+
+    # 同一学生的不同变体（第三段）仍共用会话
+    assert session_id_for("a5-pathway:STU-A:balanced") == session_id_for(
+        "a5-pathway:STU-A:intense")
+    assert session_id_for("a5-pathway:STU-A:balanced") == session_id_for("a5-pathway:STU-A")
+
+    # 第二段不像 ID（纯小写词）时只按第一段分 —— 不为措辞制造无谓的冷启动
+    assert session_id_for("compose:balanced") == session_id_for("compose:relaxed")
+
+    # 不同类别之间永远不串味
+    assert session_id_for("reflect:STU-A") != session_id_for("a5-pathway:STU-A")
+
+    # 稳定：同一个 purpose 反复问到同一个 ID
+    assert session_id_for("reflect:STU-A") == session_id_for("reflect:STU-A")
 
 
 def test_session_id_without_a_purpose_is_random_but_still_long_enough():
@@ -116,10 +141,12 @@ def test_session_id_without_a_purpose_is_random_but_still_long_enough():
 
 def test_generate_uses_the_purpose_scoped_session_id():
     model = _client()
-    model.generate(ModelRequest(system="s", purpose="pathway:S1"))
-    model.generate(ModelRequest(system="s", purpose="pathway:S2"))
+    model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-A:balanced"))
+    model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-A:intense"))
+    model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-B:balanced"))
     ids = [c["runtimeSessionId"] for c in model.client.calls]
-    assert ids[0] == ids[1] == session_id_for("pathway:S1")
+    assert ids[0] == ids[1] == session_id_for("a5-pathway:STU-A")
+    assert ids[2] != ids[0]
     assert all(len(i) >= 33 for i in ids)
 
 
@@ -252,3 +279,199 @@ def test_local_runtime_is_still_the_default(aws_credentials, monkeypatch):
     picked = autodetect_model({AGENT_RUNTIME_ENV: RUNTIME_AGENTCORE,
                                RUNTIME_ARN_ENV: ARN, "AWS_REGION": "us-east-1"})
     assert isinstance(picked, AgentCoreModelClient)
+
+
+# --------------------------------------------------------------------------
+# 7. 客户端不留存请求（F1）
+# --------------------------------------------------------------------------
+
+
+def test_the_client_retains_no_request_text():
+    """已知会失败的样例：``self.calls`` 把每段学生原文留在 API 进程里。
+
+    这条边界的全部价值是"本地留下的东西尽可能少"。把请求存成列表等于
+    在本地又建了一份副本——而且是永不回收的那种。
+    """
+    def _deep_text(obj, depth: int = 0) -> str:
+        if depth > 5:
+            return ""
+        if isinstance(obj, str):
+            return obj
+        if isinstance(obj, dict):
+            return "".join(_deep_text(k, depth + 1) + _deep_text(v, depth + 1)
+                           for k, v in obj.items())
+        if isinstance(obj, (list, tuple, set, frozenset)):
+            return "".join(_deep_text(x, depth + 1) for x in obj)
+        if hasattr(obj, "__dict__"):
+            return "".join(_deep_text(v, depth + 1) for v in vars(obj).values())
+        return ""
+
+    secret = "学生反思原文-ZZ-9137-不可留存"
+    model = _client()
+    for _ in range(3):
+        model.generate(ModelRequest(system="s", data=(secret,), purpose="p"))
+
+    # 假 boto 客户端会记下 payload（那是测试替身的事），只看客户端自己
+    state = {k: v for k, v in vars(model).items() if k != "_client"}
+    assert secret not in _deep_text(state)
+    assert not hasattr(model, "calls")
+
+
+# --------------------------------------------------------------------------
+# 8. boto 配置：超时与重试（F4）
+# --------------------------------------------------------------------------
+
+
+def test_boto_client_is_built_with_bounded_timeouts_and_no_retries(monkeypatch):
+    """已知会失败的样例：默认 botocore 配置（legacy 重试）。
+
+    ``invoke_agent_runtime`` 是**按调用计费**的。botocore 默认 legacy 重试模式
+    会在读超时后自动重发——一次 A5 取舍因此可能被真的跑两遍，钱付两次，
+    而调用方只看到一次失败。read_timeout 60s 也短于 AgentCore 的冷启动 + 多轮工具循环。
+    """
+    import boto3
+
+    captured: dict = {}
+
+    def _fake_client(service, **kwargs):
+        captured["service"] = service
+        captured.update(kwargs)
+        return FakeAgentCoreClient()
+
+    monkeypatch.setattr(boto3, "client", _fake_client)
+    model = AgentCoreModelClient(ARN, region="us-east-1")
+    assert model.client is not None
+
+    config = captured["config"]
+    assert captured["service"] == "bedrock-agentcore"
+    assert config.connect_timeout == 5
+    assert config.read_timeout == 180
+    assert config.retries == {"max_attempts": 1, "mode": "standard"}
+
+
+def test_read_timeout_is_configurable_from_the_environment(monkeypatch):
+    import boto3
+
+    captured: dict = {}
+
+    def _fake_client(service, **kwargs):
+        captured.update(kwargs)
+        return FakeAgentCoreClient()
+
+    monkeypatch.setattr(boto3, "client", _fake_client)
+    model = AgentCoreModelClient(ARN, region="us-east-1",
+                                 env={"AGENTCORE_READ_TIMEOUT": "45"})
+    assert model.client is not None
+    assert captured["config"].read_timeout == 45
+
+
+def test_a_non_200_status_code_raises_instead_of_parsing_the_body():
+    """已知会失败的样例：runtime 回 500 但带一段 JSON 体。"""
+    from campuspath_agents.agentcore_client import AgentCoreInvocationFailed
+
+    class _Failing(FakeAgentCoreClient):
+        def invoke_agent_runtime(self, **kwargs):
+            self.calls.append(kwargs)
+            return {"statusCode": 500, "response": io.BytesIO(
+                json.dumps({"result": "不该被当成答案"}).encode())}
+
+    model = AgentCoreModelClient(ARN, region="us-east-1", client=_Failing())
+    with pytest.raises(AgentCoreInvocationFailed) as exc:
+        model.generate(ModelRequest(system="s", purpose="p"))
+    assert "500" in str(exc.value)
+
+
+def test_a_read_timeout_raises_a_clear_failure_not_a_botocore_traceback():
+    from botocore.exceptions import ReadTimeoutError
+
+    from campuspath_agents.agentcore_client import AgentCoreInvocationFailed
+
+    class _Timeout(FakeAgentCoreClient):
+        def invoke_agent_runtime(self, **kwargs):
+            self.calls.append(kwargs)
+            raise ReadTimeoutError(endpoint_url="https://bedrock-agentcore.invalid")
+
+    model = AgentCoreModelClient(ARN, region="us-east-1", client=_Timeout())
+    with pytest.raises(AgentCoreInvocationFailed) as exc:
+        model.generate(ModelRequest(system="s", purpose="p"))
+    assert "AgentCore" in str(exc.value)
+
+
+# --------------------------------------------------------------------------
+# 9. A4 的工具循环也能过网线（F13）
+# --------------------------------------------------------------------------
+
+
+def test_extract_opportunity_sends_the_source_and_returns_the_emitted_fields():
+    model = _client({
+        "result": "草稿已产出，等待人工审核。",
+        "usage": {"inputTokens": 300, "outputTokens": 40},
+        "rejected_tools": [["publish_opportunity", "不在 A4 白名单"]],
+        "model": "amazon.nova-pro-v1:0",
+        "emitted": {"title": "产品实践工作坊", "category": "workshop"},
+    })
+    reply = model.extract_opportunity(
+        ModelRequest(system="你是 A4", data=("工作坊详情……",),
+                     purpose="extract:SRC-club", agent=AgentId.A4_OPPORTUNITY),
+        source_id="SRC-club", raw_content="工作坊详情……")
+
+    payload = json.loads(model.client.calls[0]["payload"].decode())
+    assert payload["kind"] == "extract"
+    assert payload["source_id"] == "SRC-club"
+    assert payload["raw_content"] == "工作坊详情……"
+    assert payload["request"] == {"system": "你是 A4", "data": ["工作坊详情……"],
+                                  "purpose": "extract:SRC-club", "agent": "A4"}
+    assert reply["emitted"] == {"title": "产品实践工作坊", "category": "workshop"}
+    assert reply["result"] == "草稿已产出，等待人工审核。"
+    assert reply["rejected_tools"] == (("publish_opportunity", "不在 A4 白名单"),)
+    assert model.last_usage == {"inputTokens": 300, "outputTokens": 40}
+
+
+def test_extract_opportunity_without_an_emitted_draft_reports_none():
+    model = _client({"result": "读完了，没有可抽取的机会。"})
+    reply = model.extract_opportunity(
+        ModelRequest(system="s", data=("x",), purpose="extract:SRC-1",
+                     agent=AgentId.A4_OPPORTUNITY),
+        source_id="SRC-1", raw_content="x")
+    assert reply["emitted"] is None
+
+
+def test_a4_over_agentcore_keeps_its_tool_loop():
+    """已知会失败的样例：A4 走 AgentCore 时退回纯 ``generate``。
+
+    退回纯文本路径意味着模型**没有工具**：``emit_opportunity_draft`` 不会被调用，
+    ``last_emitted`` 永远是 None，审核队列里那条"模型提议了什么"的证据就没了。
+    """
+    from campuspath_agents.roster import OpportunityAgent
+    from campuspath_agents.tools import ToolBelt
+    from campuspath_contracts.common import Provenance
+    from campuspath_contracts.opportunity import (
+        Opportunity,
+        OpportunityType,
+        PublicationStatus,
+    )
+
+    from datetime import datetime, timezone
+
+    model = _client({
+        "result": "草稿已产出。",
+        "emitted": {"title": "产品实践工作坊", "category": "workshop"},
+        "rejected_tools": [["publish_opportunity", "不在 A4 白名单"]],
+    })
+    provenance = Provenance(source="hkust_ugcourse", parser_version="t/1",
+                            retrieved_at=datetime(2026, 9, 12, tzinfo=timezone.utc))
+    extracted = Opportunity(
+        opportunity_id="OPP-1", type=OpportunityType.WORKSHOP, title="产品实践工作坊",
+        organizer="合成社团（Demo）", official_url="https://example.invalid/w",
+        source_id="SRC-club", provenance=provenance,
+        publication_status=PublicationStatus.DRAFT)
+
+    a4 = OpportunityAgent(AgentId.A4_OPPORTUNITY,
+                          ToolBelt(AgentId.A4_OPPORTUNITY), model)
+    draft = a4.extract_draft("SRC-club", "工作坊详情……", extracted,
+                             draft_id="D-1", provenance=provenance)
+
+    assert json.loads(model.client.calls[0]["payload"].decode())["kind"] == "extract"
+    assert a4.last_emitted == {"title": "产品实践工作坊", "category": "workshop"}
+    assert [n for n, _ in a4.last_rejected_tools] == ["publish_opportunity"]
+    assert draft.extracted.publication_status is PublicationStatus.DRAFT

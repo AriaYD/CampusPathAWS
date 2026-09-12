@@ -4896,10 +4896,20 @@ export interface components {
              */
             sdk_version: string | null;
             /**
+             * Tool Loop
+             * @default text_only
+             */
+            tool_loop: string;
+            /**
              * Tool Rejections Last Call
              * @default 0
              */
             tool_rejections_last_call: number;
+            /**
+             * Unavailable Reason
+             * @default null
+             */
+            unavailable_reason: string | null;
             /** Vertex Only */
             vertex_only: boolean;
         };

@@ -25,10 +25,58 @@ test_whitelist_hook_cancels_a_tool_the_model_can_actually_reach`` 守着——
 from __future__ import annotations
 
 import json
+import os
 import pathlib
+import re
 import sys
 
 HERE = pathlib.Path.cwd().resolve()
+
+#: ``agentcore.json`` 里声明的运行时版本（CodeZip 上去之后云上用的那个解释器）。
+#: 本脚本**必须在同一个小版本上跑**，否则它证明的是另一份环境：
+#: 3.12 上装得起来的 wheel，3.14 上未必有；`from __future__` 之外的语法差异
+#: 同样不会在这里显形。找不到清单（公开导出裁掉了 infra/）时退回下面这个常量。
+RUNTIME_VERSION_FALLBACK = "PYTHON_3_12"
+
+#: 明知在跑别的解释器、仍要让本脚本继续的逃生口（例如临时验证 3.13 的兼容性）。
+OVERRIDE_ENV = "CAMPUSPATH_STAGED_PY_OK"
+
+
+def declared_runtime_version() -> str:
+    """从 ``agentcore.json`` 读 ``runtimeVersion``——**不重抄一遍**。
+
+    打包目录在 ``infra/agentcore/app/campuspath``，清单在
+    ``infra/agentcore/agentcore/agentcore.json``；两者都在本仓里，
+    所以这条检查同时是一道**漂移守卫**：改了清单没改这里（或反过来）会红。
+    """
+    manifest = HERE.parents[1] / "agentcore" / "agentcore.json"
+    try:
+        spec = json.loads(manifest.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return RUNTIME_VERSION_FALLBACK
+    for runtime in spec.get("runtimes", ()):
+        version = runtime.get("runtimeVersion")
+        if version:
+            return str(version)
+    return RUNTIME_VERSION_FALLBACK
+
+
+DECLARED = declared_runtime_version()
+_match = re.fullmatch(r"PYTHON_(\d+)_(\d+)", DECLARED)
+if _match is None:
+    raise SystemExit(f"FAIL agentcore.json 的 runtimeVersion 认不出来：{DECLARED!r}")
+EXPECTED = (int(_match.group(1)), int(_match.group(2)))
+ACTUAL = sys.version_info[:2]
+
+#: **先报再判**：这行必须在任何失败之前打出来，否则出错时看不见"用哪个解释器验的"。
+print(f"staged python={sys.version.split()[0]}  agentcore.json runtimeVersion={DECLARED}")
+
+if ACTUAL != EXPECTED and os.environ.get(OVERRIDE_ENV) != "1":
+    raise SystemExit(
+        f"FAIL 本机解释器是 {ACTUAL[0]}.{ACTUAL[1]}，而这份 zip 会在 {DECLARED} 上跑。"
+        f"这样验出来的是另一份环境（wheel 可用性、语法、stdlib 都可能不同）。"
+        f"用 3.12 重跑，或明知故犯时设 {OVERRIDE_ENV}=1。"
+    )
 
 import main  # noqa: E402  —— 打包目录里的 entrypoint
 
@@ -67,5 +115,5 @@ if not out.get("rejected_tools") or out["rejected_tools"][0][0] != "publish_oppo
 if main.invoke({"kind": "nope"}).get("error") != "unknown_kind":
     raise SystemExit("FAIL 不认识的 kind 必须被拒，不能落到默认分支")
 
-print(f"OK  staged app  python={sys.version.split()[0]}  "
+print(f"OK  staged app  python={sys.version.split()[0]} (= {DECLARED})  "
       f"{json.dumps(out, ensure_ascii=False)}")

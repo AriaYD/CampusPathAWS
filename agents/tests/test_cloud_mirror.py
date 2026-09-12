@@ -56,3 +56,48 @@ def test_cloud_scout_cannot_publish():
     assert draft["publication_status"] == "draft"
     assert draft["category"] == "event"
     assert draft["signup_hint"] == "未提供"
+
+
+def test_cloud_mirrors_build_a_fresh_agent_each_call():
+    """F3：两个镜像模块都必须给出工厂，而不是只有一个模块级实例。
+
+    已知会失败的样例是**这条改之前的两个文件**：只有 ``root_agent``，
+    ``invoke()`` 每次调的都是同一个对象，``messages`` 跨调用累积。
+    """
+    for name, rel in (("f3_orchestrator", "orchestrator_agent/agent.py"),
+                      ("f3_scout", "opportunity_scout_agent/agent.py")):
+        cloud = _load_cloud_module(name, rel)
+        first, second = cloud.build_agent(), cloud.build_agent()
+        assert first is not second, f"{rel} 的 build_agent 返回了同一个实例"
+        assert first.messages == [] and second.messages == []
+        assert cloud.root_agent is not None          # 兼容入口仍在
+
+
+def test_the_runtime_extract_path_uses_the_same_names_as_roster():
+    """镜像守卫：AgentCore 入口的 ``kind="extract"`` 跑的是 ``extract_draft``
+    的前半段（后半段要契约对象，线上送不过来）。它靠这几个名字与 roster 对齐——
+    roster 改了名，这条先红，而不是云上第一次抽取时才红。
+    """
+    from campuspath_agents.roster import (
+        A4_SYSTEM_PROMPT, A4_TOOL_SPECS, OpportunityAgent,
+    )
+
+    from campuspath_agents.model import ScriptedModel
+    from campuspath_agents.tools import belt_for
+    from campuspath_contracts.common import AgentId
+
+    assert set(A4_TOOL_SPECS) == {"read_source", "emit_opportunity_draft"}
+    assert A4_SYSTEM_PROMPT.strip()
+
+    agent = OpportunityAgent(
+        agent_id=AgentId.A4_OPPORTUNITY,
+        belt=belt_for(AgentId.A4_OPPORTUNITY, {}),
+        model=ScriptedModel({}),
+    )
+    for attribute in ("_source_id", "_raw_content", "last_emitted"):
+        assert hasattr(agent, attribute), attribute
+    agent._equip_defaults()
+    assert agent.belt.available == {"read_source", "emit_opportunity_draft"}
+
+    app = _load_cloud_module("mirror_agentcore_app", "agentcore_app.py")
+    assert app.KIND_EXTRACT in app.KNOWN_KINDS

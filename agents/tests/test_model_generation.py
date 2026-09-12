@@ -145,6 +145,9 @@ def test_cloud_mirrors_are_strands_on_bedrock_not_google(rel, monkeypatch):
     roots = _import_roots(rel)
     assert "google" not in roots, f"{rel} 仍在 import google.*；镜像必须整条走 AWS"
     assert {"strands"} <= roots
+    # F3 起两个镜像都 import 本仓的 hooks/契约——**打包脚本必须把它们带上**，
+    # 否则云上第一次调用时才会 ImportError。
+    assert {"campuspath_agents", "campuspath_contracts"} <= roots
 
     cloud = _load_cloud_module(f"gen_{rel.split('/')[0]}", rel)
     assert cloud.MODEL_ID == DEFAULT_BEDROCK_MODEL
@@ -164,3 +167,18 @@ def test_cloud_mirror_model_id_follows_the_env(rel, monkeypatch):
     monkeypatch.setenv("BEDROCK_MODEL_ID", "us.amazon.nova-lite-v1:0")
     cloud = _load_cloud_module(f"env_{rel.split('/')[0]}", rel)
     assert cloud.MODEL_ID == "us.amazon.nova-lite-v1:0"
+
+
+def test_the_staging_script_vendors_what_the_mirrors_import():
+    """镜像 import 了 ``campuspath_agents`` / ``campuspath_contracts``，
+    而 AgentCore 的 CodeZip 只上传打包目录——打包脚本必须把这两个包复制进去。
+
+    已知会失败的样例：把 ``agents/campuspath_agents`` 那一行从 PAIRS 里删掉，
+    ``make agentcore-stage`` 的自检会在 import 时炸；这条测试让它更早红。
+    """
+    script = (pathlib.Path(__file__).resolve().parents[2]
+              / "scripts" / "agentcore_stage.sh").read_text(encoding="utf-8")
+    for pair in ("agents/campuspath_agents:campuspath_agents",
+                 "contracts/campuspath_contracts:campuspath_contracts",
+                 "agents/cloud:campuspath_cloud"):
+        assert pair in script, f"打包脚本没有 vendoring {pair}"

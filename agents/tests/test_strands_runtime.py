@@ -112,7 +112,11 @@ def test_whitelist_hook_cancels_non_whitelisted_tool_calls(spans):
     belt = ToolBelt(AgentId.A4_OPPORTUNITY)
     belt.register("read_source", lambda **kw: {"content": "x"})
     model = ScriptedModel({
-        "probe": {"tool": "publish_opportunity", "input": {"id": "OPP-1"}},
+        # ``unlisted``：这个工具**不在** tool_specs 里——模拟被劫持的模型幻觉出
+        # 一个它没被装备的工具名。没有这个声明，剧本桩会当成"spec 写坏了"而抛
+        # KeyError（见 test_scripted_tool_call_must_exist_in_the_tool_specs）。
+        "probe": {"tool": "publish_opportunity", "input": {"id": "OPP-1"},
+                  "unlisted": True},
         "probe#after_tool": "我没有发布权。",
     })
     request = ModelRequest(system="s", data=("d",), purpose="probe",
@@ -398,7 +402,8 @@ def test_a4_read_source_tool_returns_the_raw_content():
 def test_a4_publishing_attempt_is_rejected_and_the_draft_stays_a_draft():
     """已知会失败的样例：被劫持的 A4 试图发布——最坏结果仍只是一条草稿。"""
     model = ScriptedModel({
-        "extract:SRC-club": {"tool": "publish_opportunity", "input": {"id": "OPP-1"}},
+        "extract:SRC-club": {"tool": "publish_opportunity", "input": {"id": "OPP-1"},
+                             "unlisted": True},      # A4 的工具带里没有它
         "extract:SRC-club#after_tool": "我没有发布权。",
     })
     a4 = _a4(model)
@@ -446,3 +451,302 @@ def test_a4_falls_back_to_plain_generate_for_a_non_strands_model():
     assert model.requests[0].data == ("原文",)
     assert "原文" not in model.requests[0].system
     assert a4.last_emitted is None
+
+
+# --------------------------------------------------------------------------
+# 7. 生产客户端不留存请求（F1）
+# --------------------------------------------------------------------------
+
+
+def _deep_text(obj, depth: int = 0) -> str:
+    """把一个对象里**所有能摸到的字符串**摊平——用来证明某段文本没被留住。"""
+    if depth > 5:
+        return ""
+    if isinstance(obj, str):
+        return obj
+    if isinstance(obj, dict):
+        return "".join(_deep_text(k, depth + 1) + _deep_text(v, depth + 1)
+                       for k, v in obj.items())
+    if isinstance(obj, (list, tuple, set, frozenset)):
+        return "".join(_deep_text(x, depth + 1) for x in obj)
+    if hasattr(obj, "__dict__"):
+        return "".join(_deep_text(v, depth + 1) for v in vars(obj).values())
+    return ""
+
+
+def test_production_client_retains_no_request_text_after_repeated_calls():
+    """已知会失败的样例：基类把每个 ModelRequest 存进 ``calls``。
+
+    那意味着一个长命 API 进程里，**每一段学生原文**都常驻内存直到进程退出
+    （还会跟着任何异常 repr 出去）。桩需要留痕是测试的需要，生产不需要。
+    """
+    from campuspath_agents.model import StrandsModelClient
+
+    secret = "学生反思原文-ZZ-9137-不可留存"
+    model = StrandsModelClient(ScriptedStrandsModel({"probe": "ok"}),
+                               backend="bedrock", model_id="x")
+    for _ in range(3):
+        model.generate(ModelRequest(system="s", data=(secret,), purpose="probe"))
+
+    assert secret not in _deep_text(model)
+    assert not hasattr(model, "calls")
+
+
+def test_scripted_model_still_records_calls_for_the_tests_that_need_them():
+    """对照组：桩仍然留痕——否则上面那条"修复"只是把测试能力删了。"""
+    model = ScriptedModel({"probe": "ok"})
+    model.generate(ModelRequest(system="你是助手", data=("d",), purpose="probe"))
+    assert [c.purpose for c in model.calls] == ["probe"]
+    assert model.system_prompts() == ["你是助手"]
+
+
+# --------------------------------------------------------------------------
+# 8. 并发：被拒工具随调用回来，不挂在客户端上（F2）
+# --------------------------------------------------------------------------
+
+
+def test_run_agent_returns_the_outcome_of_this_invocation_not_shared_state():
+    """已知会失败的样例：两个线程共用一个客户端，A 的拒绝被 B 覆盖掉。
+
+    ``_whitelist_hook`` / ``last_rejected_tools`` 是**每客户端**一份的；
+    API 进程里同一个客户端会被并发请求共用。这里用一个闸门把交错固定下来：
+    A 进了模型就停住，等 B 整轮跑完再继续——旧实现里 A 的 ``_record``
+    读到的是 B 的 hook，A 的那条拒绝凭空消失。
+    """
+    import asyncio
+    import threading
+
+    started = threading.Event()
+    release = threading.Event()
+
+    class _Gated(ScriptedStrandsModel):
+        async def stream(self, *args, **kwargs):
+            purpose = (kwargs.get("invocation_state") or {}).get("purpose")
+            if purpose == "gated":
+                started.set()
+                while not release.is_set():          # 不阻塞循环线程
+                    await asyncio.sleep(0.005)
+            async for event in super().stream(*args, **kwargs):
+                yield event
+
+    from campuspath_agents.model import StrandsModelClient
+
+    model = StrandsModelClient(
+        _Gated({
+            "gated": {"tool": "publish_opportunity", "input": {"id": "OPP-1"},
+                      "unlisted": True},
+            "gated#after_tool": "我没有发布权。",
+            "plain": "ok",
+        }),
+        backend="scripted", model_id="scripted")
+
+    outcomes: dict[str, object] = {}
+
+    def _a():
+        outcomes["a"] = model.run_agent(
+            ModelRequest(system="s", data=("d",), purpose="gated",
+                         agent=AgentId.A4_OPPORTUNITY),
+            tools=[], belt=ToolBelt(AgentId.A4_OPPORTUNITY))
+
+    thread = threading.Thread(target=_a)
+    thread.start()
+    assert started.wait(5), "被闸门挡住的那次调用没有进入模型"
+    outcomes["b"] = model.run_agent(
+        ModelRequest(system="s", data=("d",), purpose="plain",
+                     agent=AgentId.A2_ACADEMIC))
+    release.set()
+    thread.join(10)
+
+    assert [n for n, _ in outcomes["a"].rejected_tools] == ["publish_opportunity"]
+    assert outcomes["b"].rejected_tools == ()
+    assert outcomes["a"].model_id == "scripted"
+    assert str(outcomes["b"].result).strip() == "ok"
+
+
+def test_generate_still_returns_plain_text():
+    """``generate()`` 的签名不能因为 run_agent 换返回类型而变。"""
+    model = ScriptedModel({"probe": "hi"})
+    assert model.generate(ModelRequest(system="s", purpose="probe")) == "hi"
+
+
+def test_tools_without_an_agent_are_refused(spans):
+    """已知会失败的样例：带工具却不声明 agent —— 白名单 hook 根本不会挂上。"""
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    belt.register("read_source", lambda **kw: {"content": "x"})
+    model = ScriptedModel({"probe": "ok"})
+    with pytest.raises(ValueError, match="agent"):
+        model.run_agent(ModelRequest(system="s", data=("d",), purpose="probe"),
+                        tools=belt.as_strands_tools(), belt=belt)
+
+
+# --------------------------------------------------------------------------
+# 9. 提示词卫生：字段名只在 JSON 键位上算凭据（F10）
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("leak", [
+    "ya29.a0AfH6SMBxxxxxxxxxxxxxxxxxxxxxxxxxxxx",          # Google OAuth 访问令牌
+    '{"calendar_token": "<redacted>"}',                     # JSON 键位上的字段名
+    "{'access_token': 'abc'}",                              # 单引号键位
+    "https://example.invalid/cb?access_token=abcdefg",      # query 形态
+    "AKIAIOSFODNN7EXAMPLE",                                 # AWS 访问密钥 ID
+    "-----BEGIN RSA PRIVATE KEY-----\nMIIEow==\n",          # 私钥块  known-bad-sample
+    "Authorization: Bearer abcdefghijklmnopqrstuvwxyz0123",
+])
+def test_prompt_hygiene_blocks_value_shaped_and_json_keyed_credentials(leak):
+    model = ScriptedModel({"probe": "永远到不了这里"})
+    with pytest.raises(CredentialLeakBlocked):
+        model.generate(ModelRequest(system="s", data=(leak,), purpose="probe"))
+    assert model.strands_model.seen == []
+
+
+@pytest.mark.parametrize("ordinary", [
+    "OAuth 2.0 工作坊：access_token vs refresh_token 有什么区别？",
+    "OAuth 2.0 workshop: access_token vs refresh_token",
+    "课程大纲提到 calendar_token 这个术语，但不给任何值。",
+])
+def test_prompt_hygiene_lets_a4_scraped_text_about_tokens_through(ordinary):
+    """已知会失败的样例（反向）：裸字段名出现在散文里 —— 拦它等于把 A4 关掉。
+
+    A4 读的是社团公告、工作坊介绍这类外部文本；"access_token" 作为**话题词**
+    出现是正常的。守卫要拦的是**值**（ya29./Bearer/AKIA/私钥）与**键位**
+    （``"access_token":``），不是这个词本身。
+    """
+    model = ScriptedModel({"probe": "ok"})
+    assert model.generate(
+        ModelRequest(system="s", data=(ordinary,), purpose="probe")) == "ok"
+
+
+def test_prompt_hygiene_also_scans_tool_results():
+    """工具回来的内容同样进上下文——凭据从这条路进去一样要被拦下。"""
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    token = "ya29." + "a" * 40
+    belt.register("read_source", lambda **kw: {"content": token})
+    model = ScriptedModel({
+        "probe": {"tool": "read_source", "input": {}},
+        "probe#after_tool": "不该走到这里",
+    })
+    with pytest.raises(CredentialLeakBlocked):
+        model.run_agent(ModelRequest(system="s", data=("d",), purpose="probe",
+                                     agent=AgentId.A4_OPPORTUNITY),
+                        tools=belt.as_strands_tools(), belt=belt)
+
+
+# --------------------------------------------------------------------------
+# 10. 剧本桩的保真度（F12）
+# --------------------------------------------------------------------------
+
+
+def test_scripted_tool_call_must_exist_in_the_tool_specs():
+    """已知会失败的样例：剧本调一个**没装备**的工具名，而且没声明是幻觉。
+
+    没有这道检查，"A4 能调 emit_opportunity_draft"这类测试会在 spec 写坏、
+    工具根本没进 Strands 注册表时**照样绿**——模型侧压根不看 tool_specs。
+    """
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    belt.register("read_source", lambda **kw: {"content": "x"})
+    model = ScriptedModel({
+        "probe": {"tool": "emit_opportunity_draft", "input": {}},
+        "probe#after_tool": "done",
+    })
+    with pytest.raises(KeyError, match="emit_opportunity_draft"):
+        model.run_agent(ModelRequest(system="s", data=("d",), purpose="probe",
+                                     agent=AgentId.A4_OPPORTUNITY),
+                        tools=belt.as_strands_tools(), belt=belt)
+
+
+def test_scripted_unlisted_tool_call_is_allowed_when_declared():
+    """对照组：显式声明 ``unlisted`` 就是在模拟"模型幻觉出一个工具名"。"""
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    belt.register("read_source", lambda **kw: {"content": "x"})
+    model = ScriptedModel({
+        "probe": {"tool": "publish_opportunity", "input": {}, "unlisted": True},
+        "probe#after_tool": "我没有发布权。",
+    })
+    outcome = model.run_agent(
+        ModelRequest(system="s", data=("d",), purpose="probe",
+                     agent=AgentId.A4_OPPORTUNITY),
+        tools=belt.as_strands_tools(), belt=belt)
+    assert [n for n, _ in outcome.rejected_tools] == ["publish_opportunity"]
+
+
+def test_scripted_after_answer_is_keyed_on_the_tool_that_was_called():
+    """两个工具两条后续：``#after:<tool>`` 精确到工具，``#after_tool`` 兜底。"""
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    belt.register("read_source", lambda **kw: {"content": "原文"})
+    model = ScriptedModel({
+        "probe": {"tool": "read_source", "input": {}},
+        "probe#after:read_source": "读到了原文。",
+        "probe#after_tool": "兜底答案（不该被选中）",
+    })
+    outcome = model.run_agent(
+        ModelRequest(system="s", data=("d",), purpose="probe",
+                     agent=AgentId.A4_OPPORTUNITY),
+        tools=belt.as_strands_tools(), belt=belt)
+    assert str(outcome.result).strip() == "读到了原文。"
+
+
+def test_scripted_after_answer_falls_back_to_after_tool():
+    belt = ToolBelt(AgentId.A4_OPPORTUNITY)
+    belt.register("read_source", lambda **kw: {"content": "原文"})
+    model = ScriptedModel({
+        "probe": {"tool": "read_source", "input": {}},
+        "probe#after_tool": "兜底答案",
+    })
+    outcome = model.run_agent(
+        ModelRequest(system="s", data=("d",), purpose="probe",
+                     agent=AgentId.A4_OPPORTUNITY),
+        tools=belt.as_strands_tools(), belt=belt)
+    assert str(outcome.result).strip() == "兜底答案"
+
+
+# --------------------------------------------------------------------------
+# 11. autodetect 失败要出声（F9）
+# --------------------------------------------------------------------------
+
+
+def test_autodetect_failure_is_logged_and_recorded_not_swallowed(monkeypatch, caplog):
+    """已知会失败的样例：Bedrock 客户端构造抛异常。
+
+    旧实现 ``except Exception: return None`` —— 运维看到的只有"端点 503"，
+    没有任何一行说明是凭据过期、区域不对还是 SDK 版本不合。
+    """
+    import logging
+
+    from campuspath_agents import model as model_module
+
+    def _boom(*args, **kwargs):
+        raise RuntimeError("BEDROCK-CTOR-BOOM")
+
+    monkeypatch.setattr(model_module, "BedrockModelClient", _boom)
+    monkeypatch.setattr(model_module, "LAST_AUTODETECT_ERROR", None, raising=False)
+
+    import boto3
+
+    class _Session:
+        def __init__(self, **kwargs) -> None:
+            pass
+
+        def get_credentials(self):
+            return object()
+
+    monkeypatch.setattr(boto3, "Session", _Session)
+
+    with caplog.at_level(logging.WARNING, logger="campuspath_agents.model"):
+        assert autodetect_model({BACKEND_ENV: "bedrock", "AWS_REGION": "us-east-1"}) is None
+
+    assert "BEDROCK-CTOR-BOOM" in model_module.LAST_AUTODETECT_ERROR
+    assert any("BEDROCK-CTOR-BOOM" in r.getMessage() for r in caplog.records)
+
+
+def test_a4_reads_its_rejections_from_the_invocation_it_made():
+    """A4 拿被拒工具要从**这次调用的返回值**拿，不是从共用的客户端属性拿。"""
+    model = ScriptedModel({
+        "extract:SRC-club": {"tool": "publish_opportunity", "input": {"id": "OPP-1"},
+                             "unlisted": True},
+        "extract:SRC-club#after_tool": "我没有发布权。",
+    })
+    a4 = _a4(model)
+    a4.extract_draft("SRC-club", "原文", _opportunity("OPP-1"),
+                     draft_id="D-1", provenance=_provenance())
+    assert [n for n, _ in a4.last_rejected_tools] == ["publish_opportunity"]

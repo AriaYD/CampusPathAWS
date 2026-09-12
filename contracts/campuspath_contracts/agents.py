@@ -49,8 +49,12 @@ A4_TOOL_WHITELIST = frozenset({"read_source", "emit_opportunity_draft"})
 
 AGENT_TOOL_WHITELIST: dict[AgentId, frozenset[str]] = {
     AgentId.A0_ORCHESTRATOR: frozenset(
+        # ``route_intent`` = 查 A0 自己的确定性路由表（纯函数，读一张静态字典，
+        # 不读库、不外呼、不写任何域）。本地 A0 直接用 Python 查表，云端镜像
+        # 把它做成工具——白名单 hook 挂上之后，不在表里就等于**云端 A0 查不了
+        # 自己的路由表**，只能靠模型猜，而那正是 INSTRUCTION 里明令禁止的事。
         {"call_agent", "load_pack", "emit_response", "request_clarification",
-         "invoke_crisis_protocol"}
+         "invoke_crisis_protocol", "route_intent"}
     ),
     AgentId.A1_STUDENT_CONTEXT: frozenset(
         {"read_student_state", "emit_profile_proposal", "emit_memory_proposal",
@@ -332,6 +336,15 @@ class ModelBackendStatus(CampusPathModel):
     last_usage: dict[str, int] | None = None
     #: 最近一次调用被白名单 hook 拦下的工具数。>0 = 拦截真的在生效。
     tool_rejections_last_call: int = 0
+    #: ``available=false`` 时**为什么**没有后端（``autodetect_model()`` 吞掉的那个
+    #: 异常）。此前只有一个 false，而"选了 agentcore 却没给 ARN"与"AWS 凭据链是空的"
+    #: 要去的地方完全不同。有后端时恒为 None——不报陈年旧账。
+    unavailable_reason: str | None = None
+    #: A4 的**工具循环**在哪一侧跑（F13 可见性）：
+    #: ``local`` = 本进程的 Strands 事件循环，工具是能读库写草稿的闭包；
+    #: ``remote`` = 整个循环在 AgentCore Runtime 里（客户端有 ``extract_opportunity``）；
+    #: ``text_only`` = 该后端没有带工具的路径，A4 退回纯文本抽取。
+    tool_loop: str = "text_only"
     #: 以下三项只对 vertex 后端有意义；bedrock 下 ``location`` 是 Bedrock 区域、
     #: ``vertex_only`` 恒为 false。
     generation_floor: str

@@ -12,9 +12,13 @@
 """
 
 import os
+from typing import Any
 
 from strands import Agent, tool
 from strands.models import BedrockModel
+
+from campuspath_agents.hooks import PromptHygieneHook, ToolWhitelistHook
+from campuspath_contracts.common import AgentId
 
 #: 与本地 ``campuspath_agents.strands_models.DEFAULT_BEDROCK_MODEL`` 同值
 #: （``test_model_generation`` 断言两边一致）。镜像独立打包，不能 import 本仓，
@@ -77,11 +81,36 @@ INSTRUCTION = (
     "你没有发布权：产出只能是草稿，去向只有人工审核队列。回答用中文。"
 )
 
-root_agent = Agent(
-    name="campuspath_opportunity_scout",
-    model=MODEL,
-    description="CampusPath A4：从不可信外部原文抽取机会草稿（只产草稿，无发布权）",
-    system_prompt=INSTRUCTION,
-    tools=[emit_opportunity_draft_tool],
-    callback_handler=None,
-)
+#: 本 Agent 代表谁——hook 按它查白名单（A4 的白名单只有两个工具，架构第 4 条）。
+AGENT_ID = AgentId.A4_OPPORTUNITY
+
+
+def build_agent(model: Any = None) -> Agent:
+    """**每次调用都造一个新的** ``Agent``。
+
+    为什么是工厂而不是模块级单例（2026-09-12 F3）：Strands 的 ``Agent`` 把对话
+    历史留在自己的 ``messages`` 上。A4 处理的是**不可信外部原文**——一个进程级
+    实例被反复调用，等于把上一份来源的原文留在下一次抽取的上下文里：既是串味，
+    也把"提示词注入只能影响它自己那一次"变成了"能影响后面所有次"。
+
+    两个 hook 挂在这里，与本地 :class:`~campuspath_agents.roster.OpportunityAgent`
+    走的是同一份实现：提示词卫生（凭据形态出现即中止）与工具白名单
+    （每次工具调用前重查 ``AGENT_TOOL_WHITELIST[A4]``）。原文里写着"立即发布"
+    也没有用——``publish_*`` 在 A4 的禁止清单上，hook 会取消这次调用。
+
+    ``model`` 只给测试注入剧本桩用；生产不传，用模块级的 :data:`MODEL`。
+    """
+    return Agent(
+        name="campuspath_opportunity_scout",
+        model=model or MODEL,
+        description="CampusPath A4：从不可信外部原文抽取机会草稿（只产草稿，无发布权）",
+        system_prompt=INSTRUCTION,
+        tools=[emit_opportunity_draft_tool],
+        hooks=[PromptHygieneHook(), ToolWhitelistHook(AGENT_ID)],
+        callback_handler=None,
+    )
+
+
+#: 兼容用的模块级实例（旧 import 路径、Console 里手点一次）。
+#: **入口不用它**——``agentcore_app`` 每次调用都走 :func:`build_agent`。
+root_agent = build_agent()

@@ -6585,10 +6585,27 @@
             "default": null,
             "title": "Sdk Version"
           },
+          "tool_loop": {
+            "default": "text_only",
+            "title": "Tool Loop",
+            "type": "string"
+          },
           "tool_rejections_last_call": {
             "default": 0,
             "title": "Tool Rejections Last Call",
             "type": "integer"
+          },
+          "unavailable_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Unavailable Reason"
           },
           "vertex_only": {
             "title": "Vertex Only",
@@ -13429,7 +13446,7 @@
   "info": {
     "description": "契约先行：本文档由 campuspath_contracts.openapi 生成，是实现必须满足的合同，不是从实现反推的文档。",
     "title": "CampusPath API",
-    "version": "1.43.0"
+    "version": "1.44.0"
   },
   "openapi": "3.1.0",
   "paths": {

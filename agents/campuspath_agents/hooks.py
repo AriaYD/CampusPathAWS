@@ -80,28 +80,61 @@ class CredentialLeakBlocked(RuntimeError):
     """即将发给模型的上下文里出现了凭据形态的内容。"""
 
 
-#: 凭据形态。日历 token（Google OAuth ``ya29.``）、Bearer 头、刷新令牌、
-#: 以及契约里的字段名本身——字段名出现就说明有人把整个对象 dump 了进来。
-CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
+#: 凭据的**值**形态。这些在任何自由文本里出现都是凭据，没有第二种解释：
+#: Google OAuth 访问令牌、Authorization 头、AWS 访问密钥 ID、PEM 私钥块。
+CREDENTIAL_VALUE_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"ya29\.[A-Za-z0-9_\-]{20,}"),
     re.compile(r"\bBearer\s+[A-Za-z0-9_\-\.=]{20,}"),
-    re.compile(r"\brefresh_token\b"),
-    re.compile(r"\bcalendar_token\b"),
-    re.compile(r"\baccess_token\b"),
+    re.compile(r"\bAKIA[0-9A-Z]{16}\b"),
+    re.compile(r"-----BEGIN [A-Z ]*PRIVATE KEY-----"),
 )
+
+#: 契约里的凭据字段名。**只在键位上算数。**
+#:
+#: 以前这三个是裸词匹配（``\baccess_token\b``）。A4 读的是社团公告、
+#: 工作坊介绍这类外部文本，"OAuth 2.0 工作坊：access_token vs refresh_token"
+#: 是完全正常的一句话——裸词匹配会把整条 A4 链路拦死，而拦下来的东西里
+#: 一个凭据都没有。守卫会误伤到正常业务，就会被人绕过去，然后就没有守卫了。
+#:
+#: 键位形态才是"有人把整个对象 dump 进来了"的证据：``"access_token":``、
+#: ``'access_token':``、``access_token=``。JSON 转义后的 ``\"access_token\":``
+#: 也要认——hook 扫的是 ``json.dumps`` 之后的字符串。
+CREDENTIAL_FIELDS: tuple[str, ...] = ("access_token", "refresh_token", "calendar_token")
+
+CREDENTIAL_KEY_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
+    re.compile(rf"""(?:\\?["']{field}\\?["']\s*:|\b{field}\s*=)""")
+    for field in CREDENTIAL_FIELDS
+)
+
+CREDENTIAL_PATTERNS: tuple[re.Pattern[str], ...] = (
+    CREDENTIAL_VALUE_PATTERNS + CREDENTIAL_KEY_PATTERNS
+)
+
+
+#: ``json.dumps`` 把换行写成两个字符 ``\`` + ``n``。于是上下文里的
+#: ``"…指令>>>\nAKIA…"`` 在扫描字符串里长成 ``nAKIA`` —— ``\bAKIA`` 这类
+#: 词边界锚点就落空了（实测 2026-09-12：AKIA 样例没被拦下）。扫描前把这几个
+#: 转义序列还原成空白，锚点才落在它们该落的地方。
+_ESCAPED_WS_RE = re.compile(r"\\[nrt]")
 
 
 def find_credential_shapes(texts: Iterable[str]) -> list[str]:
     hits: list[str] = []
     for text in texts:
-        for pattern in CREDENTIAL_PATTERNS:
-            if pattern.search(text):
-                hits.append(pattern.pattern)
+        for candidate in (text, _ESCAPED_WS_RE.sub(" ", text)):
+            for pattern in CREDENTIAL_PATTERNS:
+                if pattern.search(candidate) and pattern.pattern not in hits:
+                    hits.append(pattern.pattern)
     return hits
 
 
 class PromptHygieneHook(HookProvider):
-    """模型调用前扫描全部消息与 system prompt；命中即抛，不发请求。"""
+    """模型调用前扫描全部消息与 system prompt；命中即抛，不发请求。
+
+    扫的是 ``agent.messages`` 的**全量** JSON dump——所以工具结果那一轮同样被扫：
+    凭据从 ``read_source`` 的返回值进上下文，和从 ``data`` 块进上下文，
+    在这里没有区别。
+    """
 
     def register_hooks(self, registry: HookRegistry, **kwargs) -> None:  # noqa: D102
         registry.add_callback(BeforeModelCallEvent, self._before)

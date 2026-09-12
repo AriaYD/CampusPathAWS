@@ -106,8 +106,13 @@ if [ -f .env ]; then
   else
     ok "CAMPUSPATH_MODEL_BACKEND=${BACKEND}（不走 Vertex，跳过 GOOGLE_GENAI_USE_VERTEXAI 核对）"
   fi
+  # **无条件 FAIL，不看后端**（2026-09-12 修）：降级过的那个版本里
+  # backend=bedrock 时它只是一条警告，而 CLAUDE.md 的禁令是绝对的——
+  # key 在环境里，任何一次 google-genai 调用都会直扣个人信用卡，
+  # 与这台机器当下选了哪个后端无关。计费账号/赠金那几条才是"只在走 Vertex
+  # 时才是钱的问题"，它们保持降级。
   if [ -n "${GOOGLE_API_KEY:-}${GEMINI_API_KEY:-}" ]; then   # ai-studio-denylist
-    bad_unless_vertex "环境里存在 API key——那是 AI Studio 的认证方式，赠金不覆盖"
+    bad "环境里存在 API key——那是 AI Studio 的认证方式，赠金不覆盖（与后端无关）"
   else
     ok "无 API key（Vertex 走 ADC）"
   fi

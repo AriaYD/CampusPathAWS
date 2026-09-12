@@ -104,7 +104,8 @@ def test_scanner_catches_bedrock_runtime_endpoint(tmp_path):
     )
     offenders = dynamic_access_violations(tmp_path)
     assert any("bedrock-runtime" in offender for offender in offenders), offenders
-    assert any("bedrock-runtime." in host for host in MODEL_ENDPOINT_HOSTS)
+    # 模式**不带尾点**：带尾点时 boto3.client("bedrock-runtime") 里那个服务名漏掉
+    assert "bedrock-runtime" in MODEL_ENDPOINT_HOSTS
 
 
 def test_ai_studio_path_is_in_the_banned_list():
@@ -145,3 +146,52 @@ def test_every_enforcement_point_uses_the_same_scanner():
         source = (repo / script).read_text(encoding="utf-8")
         assert "check_ai_studio.py" in source, f"{script} 没有走共用扫描器"
     assert "ai_studio_violations" in _p.Path(__file__).read_text(encoding="utf-8")
+
+
+def test_scanner_catches_a_boto3_bedrock_runtime_client(tmp_path):
+    """H5：F5 的已知会失败的样例——用 SDK 但不 import 模型 SDK。
+
+    ``boto3`` 本身不在禁用名单上（S3、Firestore 导出都用它），所以前三层
+    全部放行：没有 ``import strands``、没有 ``bedrock-runtime.`` 主机串、
+    依赖树里只有 ``boto3``。而这段代码**就是在调模型**。
+    """
+    bad_file = tmp_path / "sneaky_boto.py"
+    bad_file.write_text(
+        "import boto3\n"
+        'c = boto3.client("bedrock-runtime", region_name="us-east-1")\n'
+        'c.converse(modelId="amazon.nova-pro-v1:0", messages=[])\n'
+    )
+    offenders = dynamic_access_violations(tmp_path)
+    assert any("bedrock-runtime" in o for o in offenders), offenders
+
+
+def test_scanner_catches_a_bedrock_client_on_a_boto3_session(tmp_path):
+    """同一条路的另一种写法：``boto3.Session(...).client("bedrock-agentcore")``。"""
+    bad_file = tmp_path / "sneaky_session.py"
+    bad_file.write_text(
+        "import boto3\n"
+        "session = boto3.Session(region_name='us-east-1')\n"
+        'rt = session.client("bedrock-agentcore")\n'
+    )
+    offenders = dynamic_access_violations(tmp_path)
+    assert any("bedrock-agentcore" in o for o in offenders), offenders
+
+
+def test_scanner_does_not_flag_innocent_boto3_clients(tmp_path):
+    """对照组：S3 / Firestore 导出用的 boto 客户端不能被误判。"""
+    good_file = tmp_path / "fine_boto.py"
+    good_file.write_text(
+        "import boto3\n"
+        's3 = boto3.client("s3")\n'
+        'ddb = boto3.Session().client("dynamodb")\n'
+    )
+    assert dynamic_access_violations(tmp_path) == []
+
+
+def test_endpoint_hosts_match_without_the_trailing_dot(tmp_path):
+    """F5：主机模式此前带尾点，``bedrock-runtime`` 单独出现时漏掉。"""
+    bad_file = tmp_path / "sneaky_host.py"
+    bad_file.write_text('SERVICE = "bedrock-runtime"\nGW = "bedrock-agentcore"\n')
+    offenders = dynamic_access_violations(tmp_path)
+    assert any("bedrock-runtime" in o for o in offenders), offenders
+    assert any("bedrock-agentcore" in o for o in offenders), offenders

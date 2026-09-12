@@ -25,6 +25,7 @@ import dataclasses
 import hashlib
 import importlib.metadata
 import json
+import logging
 import os
 import re
 from collections.abc import Sequence
@@ -62,6 +63,12 @@ MIN_GEMINI_GENERATION = (3, 5)
 _GENERATION_RE = re.compile(r"gemini-(\d+)(?:\.(\d+))?")
 
 RUNTIME = "strands"
+
+LOGGER = logging.getLogger("campuspath_agents.model")
+
+#: :func:`autodetect_model` 最近一次**没能**接上后端的原因（接上了就是 None）。
+#: 端点 503 时运维要能一眼看出是凭据、区域还是 SDK 的问题——`/agents` 注册表读它。
+LAST_AUTODETECT_ERROR: str | None = None
 
 
 def strands_version() -> str:
@@ -142,9 +149,54 @@ class ModelRequest:
         return "\n".join(parts)
 
 
+def _unwrapped(call):
+    """跑一次 Strands 调用，把**卫生 hook 的异常原样抛出来**。
+
+    实测（2026-09-12）：``BeforeModelCallEvent`` 里抛的异常，在第一轮会原样冒出来，
+    但在工具结果之后的那一轮会被 Strands 包成 ``EventLoopException``。
+    于是"上下文里有凭据"这件事在两条路径上是**两个异常类型**——
+    调用方 ``except CredentialLeakBlocked`` 只挡得住其中一条。
+    这里把因果链里的 :class:`~.hooks.CredentialLeakBlocked` 挖回来重抛，
+    让这条边界只有一种响声。
+    """
+    from .hooks import CredentialLeakBlocked  # noqa: PLC0415
+
+    try:
+        return call()
+    except CredentialLeakBlocked:
+        raise
+    except Exception as exc:
+        cause = exc.__cause__ or exc.__context__
+        seen = 0
+        while cause is not None and seen < 8:
+            if isinstance(cause, CredentialLeakBlocked):
+                raise cause from exc
+            cause, seen = (cause.__cause__ or cause.__context__), seen + 1
+        raise
+
+
 @runtime_checkable
 class ModelClient(Protocol):
     def generate(self, request: ModelRequest) -> str: ...
+
+
+@dataclasses.dataclass(frozen=True)
+class InvocationOutcome:
+    """**一次**调用的全部证据。
+
+    以前这些挂在客户端上（``last_rejected_tools`` / ``last_usage``），
+    而同一个客户端会被 API 进程里的并发请求共用——A 的拒绝会被 B 的
+    下一次调用覆盖掉，于是"A4 试图发布被拦下"这条证据凭空消失。
+    证据跟着调用走，就不存在谁覆盖谁。
+    """
+
+    result: Any
+    rejected_tools: tuple[tuple[str, str], ...] = ()
+    usage: dict[str, int] | None = None
+    model_id: str = ""
+
+    def text(self) -> str:
+        return str(self.result).strip()
 
 
 class StrandsModelClient:
@@ -160,25 +212,43 @@ class StrandsModelClient:
         self.model = model_id
         self.runtime = RUNTIME
         self.last_model_version: str | None = None
+        #: **最近一次完成的**调用的用量 / 被拒工具。并发下它天然是"最后一个写的赢"——
+        #: 注册表用它做粗粒度运维展示可以，判断某次调用发生了什么必须看
+        #: :class:`InvocationOutcome`（:meth:`run_agent` 的返回值）。
         self.last_usage: dict[str, int] | None = None
-        self.calls: list[ModelRequest] = []
-        #: 最近一次调用被拒的工具 [(name, reason)]——测试与注册表看这里。
         self.last_rejected_tools: tuple[tuple[str, str], ...] = ()
+
+    def _note(self, request: ModelRequest) -> None:
+        """记下这次请求。**基类什么都不记。**
+
+        ``ModelRequest.data`` 里装的是学生反思、日历空档说明、抓来的公告原文。
+        把它们存进一个永不回收的列表，等于在一个长命进程里给每一段学生文本
+        建了份副本（异常 repr、堆转储都带得出去）。留痕是测试的需要——
+        :class:`ScriptedModel` 覆写这个方法，生产客户端不覆写。
+        """
+        return None
 
     # -- 构造 Agent ---------------------------------------------------------
     def build_agent(self, request: ModelRequest, *, tools: Sequence[Any] = (),
                     belt: Any = None) -> Any:
+        return self._build(request, tools=tools, belt=belt)[0]
+
+    def _build(self, request: ModelRequest, *, tools: Sequence[Any] = (),
+               belt: Any = None) -> tuple[Any, Any]:
+        """返回 ``(agent, whitelist_hook)``。**hook 是这次调用的局部变量**，
+        不挂在 ``self`` 上——挂上去就会被并发的另一次调用覆盖。
+        """
         from strands import Agent  # noqa: PLC0415
 
         from .hooks import PromptHygieneHook, ToolWhitelistHook  # noqa: PLC0415
 
         hooks: list[Any] = [PromptHygieneHook()]
-        self._whitelist_hook = None
+        whitelist_hook = None
         if request.agent is not None:
-            self._whitelist_hook = ToolWhitelistHook(request.agent, belt)
-            hooks.append(self._whitelist_hook)
+            whitelist_hook = ToolWhitelistHook(request.agent, belt)
+            hooks.append(whitelist_hook)
         agent_label = request.agent.value if request.agent is not None else "model"
-        return Agent(
+        agent = Agent(
             model=self.strands_model,
             system_prompt=request.system,
             tools=list(tools),
@@ -191,12 +261,20 @@ class StrandsModelClient:
                 "campuspath.backend": self.backend,
             },
         )
+        return agent, whitelist_hook
 
-    def _record(self, result: Any) -> None:
+    def _outcome(self, result: Any, hook: Any) -> InvocationOutcome:
         usage = dict(result.metrics.accumulated_usage or {})
-        self.last_usage = {k: int(v) for k, v in usage.items() if isinstance(v, (int, float))}
-        hook = getattr(self, "_whitelist_hook", None)
-        self.last_rejected_tools = tuple(hook.rejected) if hook is not None else ()
+        outcome = InvocationOutcome(
+            result=result,
+            rejected_tools=tuple(hook.rejected) if hook is not None else (),
+            usage={k: int(v) for k, v in usage.items() if isinstance(v, (int, float))},
+            model_id=self.model,
+        )
+        #: 注册表看的是"最近一次完成的调用"——并发下由最后写的那次决定。
+        self.last_usage = outcome.usage
+        self.last_rejected_tools = outcome.rejected_tools
+        return outcome
 
     def _span_attrs(self, request: ModelRequest, **extra: Any) -> dict[str, Any]:
         attrs = {
@@ -213,49 +291,58 @@ class StrandsModelClient:
 
     # -- 调用 -----------------------------------------------------------------
     def run_agent(self, request: ModelRequest, *, tools: Sequence[Any] = (),
-                  belt: Any = None) -> Any:
-        """带工具的一次 Agent 调用，返回 Strands ``AgentResult``。"""
-        self.calls.append(request)
-        agent = self.build_agent(request, tools=tools, belt=belt)
+                  belt: Any = None) -> InvocationOutcome:
+        """带工具的一次 Agent 调用，返回这次调用的 :class:`InvocationOutcome`。
+
+        ``tools`` 非空却没声明 ``request.agent`` **直接报错**：白名单 hook 按
+        ``request.agent`` 查表，不声明就等于把工具交给一个没有白名单的 Agent
+        （Spec §8.9 第 4 条）。让它安静地跑掉，比让它报错危险得多。
+        """
+        if tools and request.agent is None:
+            raise ValueError(
+                "带工具的调用必须声明 request.agent —— 否则白名单 hook 不会挂上，"
+                f"工具 {[getattr(t, 'tool_name', t) for t in tools]} 将不受限制"
+            )
+        self._note(request)
+        agent, hook = self._build(request, tools=tools, belt=belt)
         if isinstance(self.strands_model, ScriptedStrandsModel):
             self.strands_model.pending_purpose = request.purpose
         with span("gen_ai.generate", **self._span_attrs(request, **{
             "campuspath.tools": len(tools),
         })) as current:
-            result = run_async(agent.invoke_async(
+            result = _unwrapped(lambda: run_async(agent.invoke_async(
                 request.prompt(), invocation_state={"purpose": request.purpose},
-            ))
-            self._record(result)
-            usage = self.last_usage or {}
+            )))
+            outcome = self._outcome(result, hook)
+            usage = outcome.usage or {}
             current.set_attributes({
                 "gen_ai.usage.input_tokens": usage.get("inputTokens", 0),
                 "gen_ai.usage.output_tokens": usage.get("outputTokens", 0),
-                "campuspath.tool_rejections": len(self.last_rejected_tools),
+                "campuspath.tool_rejections": len(outcome.rejected_tools),
                 "campuspath.stop_reason": str(getattr(result, "stop_reason", "")),
             })
-        return result
+        return outcome
 
     def generate(self, request: ModelRequest) -> str:
-        return str(self.run_agent(request)).strip()
+        return self.run_agent(request).text()
 
     def generate_structured(self, request: ModelRequest, output_model: type[T]) -> T:
         """结构化输出：模型直接产出契约 Pydantic 对象，省掉手工解析。"""
-        self.calls.append(request)
+        self._note(request)
         agent = self.build_agent(request)
         if isinstance(self.strands_model, ScriptedStrandsModel):
             self.strands_model.pending_purpose = request.purpose
         with span("gen_ai.generate", **self._span_attrs(request, **{
             "campuspath.structured": output_model.__name__,
         })):
-            return run_async(agent.structured_output_async(output_model, request.prompt()))
+            return _unwrapped(
+                lambda: run_async(
+                    agent.structured_output_async(output_model, request.prompt())))
 
     def generate_grounded(self, request: ModelRequest) -> str:
         raise GroundingUnavailable(
             f"{self.backend} 后端没有接地检索工具；现场市场研究需要 Vertex 后端"
         )
-
-    def system_prompts(self) -> list[str]:
-        return [c.system for c in self.calls]
 
 
 class ScriptedModel(StrandsModelClient):
@@ -265,6 +352,15 @@ class ScriptedModel(StrandsModelClient):
         super().__init__(ScriptedStrandsModel(script), backend=BACKEND_SCRIPTED,
                          model_id="scripted")
         self.script = self.strands_model.script
+        #: **只有桩留痕。** 测试要看"外部内容确实只走了 data 通道"，
+        #: 而桩处理的全是合成数据，留着不构成暴露面。
+        self.calls: list[ModelRequest] = []
+
+    def _note(self, request: ModelRequest) -> None:
+        self.calls.append(request)
+
+    def system_prompts(self) -> list[str]:
+        return [c.system for c in self.calls]
 
     def generate_grounded(self, request: ModelRequest) -> str:
         """桩的接地版与普通版同一剧本表——测试关心的是调用路径，不是工具。"""
@@ -327,7 +423,7 @@ class VertexModel(StrandsModelClient):
         """
         from google.genai import types  # noqa: PLC0415  # ai-studio-denylist
 
-        self.calls.append(request)
+        self._note(request)
         contents = request.system + "\n" + request.prompt()
         with span("gen_ai.generate_grounded", **self._span_attrs(request, **{
             "campuspath.grounding": "google_search", "campuspath.thinking_level": "LOW",
@@ -346,7 +442,9 @@ class VertexModel(StrandsModelClient):
 def autodetect_model(env: dict[str, str] | None = None) -> Any | None:
     """环境允许就接真模型，否则返回 None（依赖它的端点照旧 503）。
 
-    构造失败被吞掉是**故意**的：它意味着"没有可用后端"，不是"出错了"。
+    构造失败**不抛**是故意的：它意味着"没有可用后端"，不是"出错了"。
+    但它也不再是静默的——原因进 WARNING 日志，并留在
+    :data:`LAST_AUTODETECT_ERROR` 上（``/agents`` 注册表展示它）。
     Bedrock：先看 AWS 凭据链有没有东西——没有就不构造，避免每个请求
     都去撞 IMDS 超时。
 
@@ -356,18 +454,20 @@ def autodetect_model(env: dict[str, str] | None = None) -> Any | None:
     ``AGENTCORE_RUNTIME_ARN`` 就返回 None，不退回本地 Bedrock**——
     否则"语义平面跑在 AgentCore 上"会变成看运气的事。
     """
+    global LAST_AUTODETECT_ERROR
+
     env = os.environ if env is None else env
     try:
         backend = resolve_backend(env)
-    except Exception:
-        return None
+    except Exception as exc:
+        return _no_backend(exc, "解析后端失败")
     try:
         if backend == BACKEND_BEDROCK:
             import boto3  # noqa: PLC0415
 
             session = boto3.Session(region_name=env.get("AWS_REGION") or None)
             if session.get_credentials() is None:
-                return None
+                return _no_backend(None, "AWS 凭据链是空的")
             from .agentcore_client import (  # noqa: PLC0415  —— 反向依赖，惰性
                 RUNTIME_ARN_ENV,
                 AgentCoreModelClient,
@@ -377,10 +477,31 @@ def autodetect_model(env: dict[str, str] | None = None) -> Any | None:
             if agentcore_selected(env):
                 arn = (env.get(RUNTIME_ARN_ENV) or "").strip()
                 if not arn:
-                    return None
-                return AgentCoreModelClient(arn, region=env.get("AWS_REGION") or None,
-                                            env=env)
-            return BedrockModelClient()
-        return VertexModel()
-    except Exception:
-        return None
+                    return _no_backend(None,
+                                       f"选了 agentcore 但没有 {RUNTIME_ARN_ENV}")
+                model = AgentCoreModelClient(arn, region=env.get("AWS_REGION") or None,
+                                             env=env)
+            else:
+                model = BedrockModelClient()
+        else:
+            model = VertexModel()
+    except Exception as exc:
+        return _no_backend(exc, f"构造 {backend} 后端失败")
+    LAST_AUTODETECT_ERROR = None
+    return model
+
+
+def _no_backend(exc: BaseException | None, context: str) -> None:
+    """记下"为什么没有可用后端"，返回 None。
+
+    返回 None 本身是正确的——没有后端不是错误，依赖它的端点照旧 503。
+    错的是**一声不吭**：运维只看到 503，看不出是凭据过期、区域不对
+    还是 SDK 版本不合。原因写进日志，也留在 :data:`LAST_AUTODETECT_ERROR`
+    供 ``/agents`` 注册表展示。
+    """
+    global LAST_AUTODETECT_ERROR
+
+    reason = context if exc is None else f"{context}：{type(exc).__name__}: {exc}"
+    LAST_AUTODETECT_ERROR = reason
+    LOGGER.warning("没有可用的模型后端 —— %s", reason, exc_info=exc is not None)
+    return None

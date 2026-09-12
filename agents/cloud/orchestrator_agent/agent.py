@@ -5,8 +5,10 @@
 ``agents/tests/test_cloud_mirror.py`` 断言两者逐项一致——表改了
 镜像没跟上，CI 会先红。
 
-部署为独立包（不 import campuspath_agents）：AgentCore 打包的是本目录，
-把整个 monorepo 塞进 runtime 只为查一张字典不值得。
+路由表是独立的第二份（见上），但**架构约束不是**：
+``scripts/agentcore_stage.sh`` 把 ``campuspath_agents`` 与 ``campuspath_contracts``
+一并 vendoring 进打包目录，所以两个 hook 走的是本仓那一份实现——
+云上与本地拦的是同一段代码，不是"同口径的另一份"。
 
 2026-09-12（Agents for Humans Hackathon）起改用 **Strands Agents + Amazon
 Bedrock**：整条链路走 AWS，运行时凭据由 AgentCore 的执行角色提供，
@@ -14,9 +16,13 @@ Bedrock**：整条链路走 AWS，运行时凭据由 AgentCore 的执行角色�
 """
 
 import os
+from typing import Any
 
 from strands import Agent, tool
 from strands.models import BedrockModel
+
+from campuspath_agents.hooks import PromptHygieneHook, ToolWhitelistHook
+from campuspath_contracts.common import AgentId
 
 #: 与本地 ``campuspath_agents.strands_models.DEFAULT_BEDROCK_MODEL`` 同值
 #: （``test_model_generation`` 断言两边一致）。镜像独立打包，不能 import 本仓，
@@ -88,11 +94,40 @@ INSTRUCTION = (
     "永远不要虚构路由表里没有的 Agent。回答用中文。"
 )
 
-root_agent = Agent(
-    name="campuspath_orchestrator",
-    model=MODEL,
-    description="CampusPath A0：意图路由编排器（确定性路由表优先，模型只做兜底）",
-    system_prompt=INSTRUCTION,
-    tools=[route_intent_tool],
-    callback_handler=None,
-)
+#: 本 Agent 代表谁——hook 按它查白名单。
+AGENT_ID = AgentId.A0_ORCHESTRATOR
+
+
+def build_agent(model: Any = None) -> Agent:
+    """**每次调用都造一个新的** ``Agent``。
+
+    为什么是工厂而不是模块级单例（2026-09-12 F3）：Strands 的 ``Agent``
+    把对话历史留在自己的 ``messages`` 上。一个进程级实例被 AgentCore 反复调用，
+    等于**把上一个学生的消息带给下一个**——既是串味，也是越积越长的上下文
+    （token 花在别人的对话上）。Runtime 是多租户的，这条不是洁癖。
+
+    两个 hook 挂在这里，与本地 :class:`~campuspath_agents.model.StrandsModelClient`
+    挂的是同一份实现：
+
+    * :class:`~campuspath_agents.hooks.PromptHygieneHook` —— 发给模型的上下文里
+      出现凭据形态就抛异常（架构第 3 条）；
+    * :class:`~campuspath_agents.hooks.ToolWhitelistHook` —— 每次工具调用前重查
+      ``AGENT_TOOL_WHITELIST[A0]``（架构第 4 条）。提示词里写"不要乱调"是请求，
+      这个才是强制。
+
+    ``model`` 只给测试注入剧本桩用；生产不传，用模块级的 :data:`MODEL`。
+    """
+    return Agent(
+        name="campuspath_orchestrator",
+        model=model or MODEL,
+        description="CampusPath A0：意图路由编排器（确定性路由表优先，模型只做兜底）",
+        system_prompt=INSTRUCTION,
+        tools=[route_intent_tool],
+        hooks=[PromptHygieneHook(), ToolWhitelistHook(AGENT_ID)],
+        callback_handler=None,
+    )
+
+
+#: 兼容用的模块级实例（旧 import 路径、Console 里手点一次）。
+#: **入口不用它**——``agentcore_app`` 每次调用都走 :func:`build_agent`。
+root_agent = build_agent()

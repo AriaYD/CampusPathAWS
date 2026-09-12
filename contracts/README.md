@@ -90,5 +90,6 @@ The single record of `CONTRACTS_VERSION` (`campuspath_contracts/common.py`).
 
 | Version | Date | Change |
 |---|---|---|
+| 1.44.0 | 2026-09-12 | Registry observability: `ModelBackendStatus` gains `unavailable_reason` (when `available=false`, the reason `autodetect_model()` swallowed) and `tool_loop` (which side runs A4's tool loop: `local` / `remote` / `text_only`); A0's whitelist gains `route_intent` (the deterministic routing-table lookup — the cloud mirror exposes it as a tool, and with the whitelist hook attached an absent entry means A0 cannot consult its own routing table) |
 | 1.43.0 | 2026-09-12 | Strands migration: `ModelBackendStatus` gains `runtime` / `backend` / `sdk_version` / `last_usage` / `tool_rejections_last_call`; `generation_floor` / `location` / `vertex_only` stay but only mean anything on the vertex backend (on bedrock `location` is the Bedrock region and `vertex_only` is false) |
 | 1.42.0 | 2026-08-24 | Observability + agent registry: `AgentRegistry` / `ModelBackendStatus` / `CheckpointStatus` / `TraceExportStatus` / `RecentSpan` |
