@@ -9,7 +9,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 # rewrites 在 build 时烧进 routes-manifest——API 源必须在**构建期**就位，
 # Cloud Run 的运行时环境变量对它无效（踩过：代理 500 回落 127.0.0.1）
-ENV CAMPUSPATH_API_ORIGIN=https://campuspath-api-786160486093.asia-east2.run.app
+ENV CAMPUSPATH_API_ORIGIN=https://campuspath-api-strands-786160486093.asia-east2.run.app
 RUN bun run build
 
 ENV NODE_ENV=production
