@@ -1,4 +1,4 @@
-English edition of seed/DATA_DICTIONARY.md, translated for the All Things Agentic Hackathon submission (Aug 2026).
+English edition of seed/DATA_DICTIONARY.md, translated for the hackathon submission (2026).
 
 # Synthetic Campus Sandbox — Data Dictionary
 

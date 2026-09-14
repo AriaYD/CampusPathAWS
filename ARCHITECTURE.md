@@ -1,4 +1,4 @@
-English edition of ARCHITECTURE.md, translated for the All Things Agentic Hackathon submission (Aug 2026). The Chinese original remains the maintained source in the private working repository.
+English edition of ARCHITECTURE.md, translated for the hackathon submission (2026). The Chinese original remains the maintained source in the private working repository.
 
 # CampusPath Architecture Document
 
@@ -45,7 +45,7 @@ English edition of ARCHITECTURE.md, translated for the All Things Agentic Hackat
 > the rationale for `max-instances=1` is unchanged. `CAMPUSPATH_CHECKPOINT` unset means disabled (the default
 > for tests and local dev); production sets it to `firestore`.
 >
-> 2026-08-24 Model generation migration (Spec v4.1.34, All Things Agentic Hackathon hard requirement
+> 2026-08-24 Model generation migration (Spec v4.1.34, generation-floor requirement
 > "Gemini 3.5 or newer"): the semantic plane's single model exit point moved from `gemini-2.5-flash` to
 > **`gemini-3.5-flash`**, and `campuspath_agents.model` gained a **generation floor**
 > (`MIN_GEMINI_GENERATION=(3,5)`, checked at `VertexModel` construction time — same pattern as B12:

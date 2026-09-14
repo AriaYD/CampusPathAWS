@@ -1,4 +1,4 @@
-English edition of apps/web/README.md, translated for the All Things Agentic Hackathon submission (Aug 2026).
+English edition of apps/web/README.md, translated for the hackathon submission (2026).
 
 # CampusPath Student Web App (WP7)
 

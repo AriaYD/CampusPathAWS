@@ -1,4 +1,4 @@
-"""模型代际门槛（2026-08-24，All Things Agentic Hackathon 硬性要求）。
+"""模型代际门槛（2026-08-24 起：Vertex 后端 Gemini ≥ 3.5）。
 
 比赛规则："Gemini 3.5 or newer accessed through Gemini API or Vertex AI"。
 与 B12（只走 Vertex）同一思路：**写在文档里的要求会被下一次改默认值悄悄推翻**，

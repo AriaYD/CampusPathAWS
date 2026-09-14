@@ -48,8 +48,8 @@ from .vertex import assert_vertex_only, vertex_config
 
 T = TypeVar("T")
 
-#: Vertex 后端的默认模型。2026-08-24 起为 Gemini 3.5（All Things Agentic Hackathon
-#: 硬性要求 "Gemini 3.5 or newer"）。实测 ``gemini-3.5-flash`` **只在 ``location=global``**
+#: Vertex 后端的默认模型。2026-08-24 起为 Gemini 3.5（代际门槛
+#: "Gemini 3.5 or newer"）。实测 ``gemini-3.5-flash`` **只在 ``location=global``**
 #: 端点可用（us-central1 返回 404）。
 DEFAULT_MODEL = "gemini-3.5-flash"
 
