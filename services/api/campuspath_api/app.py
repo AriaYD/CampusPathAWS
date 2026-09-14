@@ -221,6 +221,7 @@ from campuspath_contracts.wellbeing import (
 )
 import logging
 import threading
+import time
 import os
 import re
 
@@ -279,6 +280,34 @@ def _autodetect_model():
         return None
 
 
+#: AgentCore 会话空闲 900 s 后 microVM 回收，下一次调用要付 ~10 s 冷启动。
+#: 评委的第一次点击不该等这个：运行时为 agentcore 时，每 540 s 对每个调用类别
+#: 发一条极短的探针（各 ~40 token），把常用会话保温。CAMPUSPATH_AGENTCORE_KEEPWARM=0 关闭；
+#: pytest 下不启动。
+_KEEPWARM_PREFIXES = ("match_rationale", "a5-pathway", "course-rec", "skill_tags",
+                      "reflect", "quality-report", "compose_workflow", "research", "extract")
+
+
+def _start_agentcore_keepwarm(model) -> None:
+    if getattr(model, "runtime", None) != "agentcore":
+        return
+    if os.environ.get("PYTEST_CURRENT_TEST") or os.environ.get("CAMPUSPATH_AGENTCORE_KEEPWARM", "1") == "0":
+        return
+    from campuspath_agents.model import ModelRequest
+
+    def _loop() -> None:
+        while True:
+            for prefix in _KEEPWARM_PREFIXES:
+                try:
+                    model.generate(ModelRequest(system="Reply with exactly: OK",
+                                                purpose=f"{prefix}:keepwarm"))
+                except Exception:  # noqa: BLE001 —— 保温失败不影响服务
+                    pass
+            time.sleep(540)
+
+    threading.Thread(target=_loop, name="agentcore-keepwarm", daemon=True).start()
+
+
 class Deps:
     """服务实例与数据。生产环境换 Firestore 后端，接口不变。
 
@@ -291,6 +320,7 @@ class Deps:
 
     def __init__(self, profile_name: str = "full", model: object | None = None) -> None:
         self.model = model if model is not None else _autodetect_model()
+        _start_agentcore_keepwarm(self.model)
         from campuspath_seed.build import build_seed
 
         bundle = build_seed(profile_name)

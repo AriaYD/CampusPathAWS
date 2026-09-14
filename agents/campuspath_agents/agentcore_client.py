@@ -99,24 +99,17 @@ def agentcore_selected(env: dict[str, str] | None = None) -> bool:
 
 
 def session_key_for(purpose: str) -> str:
-    """``purpose`` → 会话分组键。空 purpose 返回空串。
+    """``purpose`` → 会话分组键：**只取第一段（调用类别）**。空 purpose 返回空串。
 
-    **第一段是调用类别，第二段（像 ID 时）是当事人。**
-    AgentCore 会话是有状态的：同一个 ``runtimeSessionId`` 下的调用彼此看得见
-    上下文。只按第一段分组，``reflect:STU-A`` 与 ``reflect:STU-B`` 会落进同一个
-    会话——全校学生共用一个会话，A 的反思出现在 B 那次调用的上下文里。
-
-    第三段之后不进键：``a5-pathway:STU-A:balanced`` 与
-    ``a5-pathway:STU-A:intense`` 是同一个学生的三套强度，共享冷启动是对的。
+    2026-09-14 实测：按"前缀 + 当事人 id"分片时，一个新学生的首次规划要为几十门课
+    各冷启一个 microVM（``skill_tags:COMPxxxx`` 每门一个，每个 ~10 s），经 Web 代理
+    直接 504。而"会话共享上下文"的顾虑在本设计里不成立：运行时**每次调用都新建**
+    Strands ``Agent``，不挂 session manager，进程级客户端也不保留任何请求
+    （审查 F1/F3 已改）——同一 ``runtimeSessionId`` 下两次调用彼此看不见。
+    所以按类别分组即可：类别数固定（十个左右），冷启动只在每类首次或空闲 15 分钟后。
     """
     parts = purpose.split(":")
-    head = parts[0].strip()
-    if not head:
-        return ""
-    second = parts[1].strip() if len(parts) > 1 else ""
-    if second and _ID_LIKE_RE.match(second):
-        return f"{head}:{second}"
-    return head
+    return parts[0].strip()
 
 
 def session_id_for(purpose: str) -> str:

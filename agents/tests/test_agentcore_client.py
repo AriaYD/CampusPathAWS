@@ -28,6 +28,7 @@ from campuspath_agents.agentcore_client import (
     AgentCoreModelClient,
     AgentCoreProtocolError,
     session_id_for,
+    session_key_for,
 )
 from campuspath_agents.model import GroundingUnavailable, ModelRequest, autodetect_model
 from campuspath_contracts.common import AgentId
@@ -100,38 +101,26 @@ def test_no_agent_means_no_agent_key_value_not_a_fabricated_one():
 # --------------------------------------------------------------------------
 
 
-def test_session_id_is_long_enough_and_scoped_to_the_subject():
-    """已知会失败的样例：只按第一段分会话 —— **全校学生共用一个 AgentCore 会话**。
+def test_session_id_groups_by_purpose_category_only():
+    """会话键只取 purpose 第一段。
 
-    AgentCore 会话是有状态的：同一个 ``runtimeSessionId`` 下的调用会看到彼此的
-    上下文。``reflect:STU-A`` 与 ``reflect:STU-B`` 落在同一会话上，等于把
-    A 的反思暴露给 B 的那次调用。所以第二段**像 ID**（带数字或大写的代号）
-    时必须进 key；第三段（变体名之类）不进——同一学生的三套强度共享冷启动。
+    已知会失败的样例（2026-09-14 线上复现）：按第二段 id 分片时，新学生首次规划
+    为每门课各冷启一个 microVM，经 Web 代理 504。上下文不会跨调用泄漏——运行时
+    每次调用新建 Agent、不挂 session manager（见 agentcore_app / F1、F3）。
     """
-    table = {
-        "reflect:STU-A": "reflect:STU-B",              # 不同学生 → 不同会话
-        "a5-pathway:STU-A": "a5-pathway:STU-B",
-        "skill_tags:COMP4211": "skill_tags:COMP2011",
-        "extract:SRC-1": "extract:SRC-2",
-    }
-    for left, right in table.items():
-        assert session_id_for(left) != session_id_for(right), left
+    same = [
+        ("reflect:STU-A", "reflect:STU-B"),
+        ("skill_tags:COMP4211", "skill_tags:COMP2011"),
+        ("a5-pathway:STU-A:balanced", "a5-pathway:STU-B:intense"),
+    ]
+    for left, right in same:
+        assert session_id_for(left) == session_id_for(right), left
         assert len(session_id_for(left)) >= 33
-
-    # 同一学生的不同变体（第三段）仍共用会话
-    assert session_id_for("a5-pathway:STU-A:balanced") == session_id_for(
-        "a5-pathway:STU-A:intense")
-    assert session_id_for("a5-pathway:STU-A:balanced") == session_id_for("a5-pathway:STU-A")
-
-    # 第二段不像 ID（纯小写词）时只按第一段分 —— 不为措辞制造无谓的冷启动
-    assert session_id_for("compose:balanced") == session_id_for("compose:relaxed")
-
-    # 不同类别之间永远不串味
     assert session_id_for("reflect:STU-A") != session_id_for("a5-pathway:STU-A")
-
-    # 稳定：同一个 purpose 反复问到同一个 ID
-    assert session_id_for("reflect:STU-A") == session_id_for("reflect:STU-A")
-
+    assert session_key_for("skill_tags:COMP4211") == "skill_tags"
+    assert session_key_for("") == ""
+    first, second = session_id_for(""), session_id_for("")
+    assert first != second and len(first) >= 33
 
 def test_session_id_without_a_purpose_is_random_but_still_long_enough():
     first, second = session_id_for(""), session_id_for("")
@@ -139,14 +128,15 @@ def test_session_id_without_a_purpose_is_random_but_still_long_enough():
     assert first != second
 
 
-def test_generate_uses_the_purpose_scoped_session_id():
+def test_generate_uses_the_purpose_category_session_id():
     model = _client()
     model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-A:balanced"))
     model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-A:intense"))
     model.generate(ModelRequest(system="s", purpose="a5-pathway:STU-B:balanced"))
+    model.generate(ModelRequest(system="s", purpose="reflect:STU-A"))
     ids = [c["runtimeSessionId"] for c in model.client.calls]
-    assert ids[0] == ids[1] == session_id_for("a5-pathway:STU-A")
-    assert ids[2] != ids[0]
+    assert ids[0] == ids[1] == ids[2] == session_id_for("a5-pathway")   # 同类别共享会话
+    assert ids[3] != ids[0]                                              # 不同类别分开
     assert all(len(i) >= 33 for i in ids)
 
 
