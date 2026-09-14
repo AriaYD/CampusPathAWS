@@ -7,14 +7,15 @@ Stack: **Strands Agents SDK** · **Amazon Bedrock (Nova Pro)** · **Bedrock Agen
 
 > This is the public submission repository. The Chinese engineering ledgers (spec, plan, progress) are kept in the private working repository and are not part of the submission.
 
-| | |
-|---|---|
-| Live demo | https://campuspath-web-strands-786160486093.asia-east2.run.app (passcode is printed on `/landing`) — new Cloud Run services independent of the earlier Google Cloud hackathon deployment (see §8) |
-| API (OpenAPI) | https://campuspath-api-strands-786160486093.asia-east2.run.app/docs · agent registry: `GET /v1/ops/agents` (header `X-CampusPath-Role: career_center_admin`) reports `runtime=agentcore`, `backend=bedrock` |
-| Architecture | [`docs/hackathon/architecture.svg`](docs/hackathon/architecture.svg) |
-| Devpost write-up | [`docs/hackathon/devpost-agents-for-humans.md`](docs/hackathon/devpost-agents-for-humans.md) (project story, "Built with" tags, video shot list) |
-| Demo video | ≤ 5:00; shot list in the Devpost write-up above. <!-- TODO(user): YouTube link once recorded --> |
-| Data | **All student, calendar, opportunity and publisher data is synthetic.** Course catalog and degree requirements are scraped from HKUST's public catalog. UI shows a `Synthetic / Demo Data` badge. |
+|                  |                                                                                                                                                                                                             |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Live demo        | https://campuspath-web-strands-786160486093.asia-east2.run.app/landing **【Demo passcode： `OceanMeetsTheSky!`】** (passcode is printed on `/landing`)                                                         |
+| API (OpenAPI)    | https://campuspath-api-strands-786160486093.asia-east2.run.app/docs · agent registry: `GET /v1/ops/agents` (header `X-CampusPath-Role: career_center_admin`) reports `runtime=agentcore`, `backend=bedrock` |
+| Architecture     | [`docs/hackathon/architecture.svg`](docs/hackathon/architecture.svg)                                                                                                                                        |
+| Demo video       | ≤ 5:00; shot list in the Devpost write-up above. <!-- TODO(user): YouTube link once recorded -->                                                                                                            |
+| Data             | **All student, calendar, opportunity and publisher data is synthetic.** Course catalog and degree requirements are scraped from HKUST's public catalog. UI shows a `Synthetic / Demo Data` badge.           |
+
+> **Both portals need the demo passcode.** The landing page is the front door for judges: it explains the product in three languages and lists the two entrances — **Student** and **Institution (Career Center)**. Each entrance asks for the passcode printed on that page (`OceanMeetsTheSky!`). Without it the app shows only the login gate.
 
 ---
 
@@ -120,7 +121,7 @@ CAMPUSPATH_MODEL_BACKEND=bedrock CAMPUSPATH_AGENT_RUNTIME=agentcore \
 
 Deployed 2026-09-12 with `agentcore deploy --yes` (CDK bootstrap + CodeZip remote build; no local Docker needed). The runtime reports `READY`; `agentcore invoke` and the API's remote client both round-trip through Amazon Bedrock Nova Pro. Warm invocations take under a second; the first invocation of a new session takes ~10 s (microVM start).
 
-**Cloud Run** (FastAPI + Next.js, independent of the earlier Google Cloud hackathon's live services — see §8):
+**Cloud Run** (FastAPI + Next.js):
 
 ```bash
 # One script does secrets → API → web → status (dry run: DRY_RUN=1). It refuses to touch any other service name.
@@ -141,11 +142,7 @@ Every guard is proven with a **known-failing sample**, not asserted in prose —
 
 Plus three narrower probes added alongside the guard suite: the zero-LLM scan rejecting a `strands` import inside a deterministic service, `check_ai_studio` rejecting `GeminiModel(client_args={"api_key": …})` (the AI-Studio-billing shape) with the same severity as a bare `GOOGLE_API_KEY`, and `preflight.sh`'s `[7/7] AWS model backend` check.
 
-## 8. Pre-existing work disclosure
-
-The deterministic platform — contracts, the rules engine, capacity & calendar, wellbeing, the student and institution UI, and the synthetic data generator — was started on 2026-07-29 and was previously submitted to a Google Cloud hackathon in August 2026. The work created during this submission period (Aug 10 – Sep 14, 2026) is the Strands Agents agent layer (`agents/campuspath_agents/model.py`, `strands_models.py`, `hooks.py`, `tools.py`, `roster.py`), the Bedrock/AgentCore backend and its deployment, the guards described in §7, contract version 1.43.0, and this documentation.
-
-## 9. Data notice
+## 8. Data notice
 
 All student, calendar, opportunity and publisher data in this system is **synthetic**; the UI marks every such page `Synthetic / Demo Data`. The HKUST course catalog and degree requirements are scraped from HKUST's public catalog (no student data) with a polite crawl interval and a disk cache.
 
